@@ -1037,16 +1037,10 @@ export function initWizardChess() {
       };
 
       // -----------------------------------------------------------------------
-      // 1. ELEGANT PEDESTAL BASE & THEMATIC GROUND AURA DISC
+      // 1. ELEGANT PEDESTAL BASE & BESPOKE SKIN FOOTING
       // -----------------------------------------------------------------------
       const baseGroup = new THREE.Group();
       baseGroup.position.set(0, 0.02, 0);
-
-      // Signature Thematic Ground Rune Aura disc under every piece on the board
-      const radiantRuneAura = new THREE.Mesh(new THREE.RingGeometry(baseR * 0.96, baseR * 1.28, 24), glowMat);
-      radiantRuneAura.rotation.x = -Math.PI / 2;
-      radiantRuneAura.position.set(0, 0.005, 0);
-      baseGroup.add(radiantRuneAura);
 
       if (skinId === 'classic_sanctum') {
         const octBase = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.95, baseR * 1.08, 0.045, 8), trimMat);
@@ -1865,13 +1859,13 @@ export function initWizardChess() {
       activeSkinSlashHex = m.slashTrailHex || 0xfde047;
       skinGlowAccentMat.color.setHex(activeSkinSlashHex);
       skinGlowAccentMat.emissive.setHex(activeSkinSlashHex);
-      skinGlowAccentMat.emissiveIntensity = 2.4;
+      skinGlowAccentMat.emissiveIntensity = 0.95;
       skinGlowAccentMat.needsUpdate = true;
 
       const crystalCol = m.steel?.color || activeSkinSlashHex;
       skinCrystalTranslucentMat.color.setHex(crystalCol);
       skinCrystalTranslucentMat.emissive.setHex(activeSkinSlashHex);
-      skinCrystalTranslucentMat.emissiveIntensity = 1.7;
+      skinCrystalTranslucentMat.emissiveIntensity = 0.75;
       skinCrystalTranslucentMat.needsUpdate = true;
 
       // Rebuild bespoke 3D sculpted skin models across all active pieces on the board!

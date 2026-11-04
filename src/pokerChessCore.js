@@ -2575,19 +2575,19 @@ export const CHESS_SKIN_CATALOG = [
     loreVi:
       'Ngọc Bích Phỉ Thúy tự nhiên dát vàng 22K. Tốt tọa trên Đài Sen ngọc, Xe hóa Tháp Chùa mái cong nhiều tầng, Mã hóa Kỳ Lân bờm vàng, Vua ngự Long Quán và Pháp Luân ngọc.',
     previewSwatches: {
-      whiteHex: '#86efac',
+      whiteHex: '#a7f3d0',
       blackHex: '#081f18',
       trimHex: '#f59e0b',
-      bladeHex: '#a7f3d0',
+      bladeHex: '#6ee7b7',
       trailHex: '#10b981'
     },
     materials: {
-      white: { color: 0x52b788, roughness: 0.22, metalness: 0.08, emissive: 0x082f25, emissiveIntensity: 0.06 },
+      white: { color: 0xa7f3d0, roughness: 0.22, metalness: 0.08, emissive: 0x000000, emissiveIntensity: 0.0 },
       black: { color: 0x081f18, roughness: 0.20, metalness: 0.20, emissive: 0x000000, emissiveIntensity: 0.0 },
-      trim: { color: 0xf59e0b, roughness: 0.20, metalness: 0.92, emissive: 0x1e1203, emissiveIntensity: 0.12 },
-      steel: { color: 0xa7f3d0, roughness: 0.16, metalness: 0.90, emissive: 0x059669, emissiveIntensity: 0.15 },
-      boardLight: { color: 0xd1fae5, roughness: 0.28, metalness: 0.12 },
-      boardDark: { color: 0x06241d, roughness: 0.22, metalness: 0.24 },
+      trim: { color: 0xf59e0b, roughness: 0.18, metalness: 0.92, emissive: 0x78350f, emissiveIntensity: 0.12 },
+      steel: { color: 0x6ee7b7, roughness: 0.16, metalness: 0.90, emissive: 0x059669, emissiveIntensity: 0.15 },
+      boardLight: { color: 0xd1fae5, roughness: 0.28, metalness: 0.08 },
+      boardDark: { color: 0x06241d, roughness: 0.22, metalness: 0.20 },
       slashTrailHex: 0x10b981
     }
   },
@@ -2615,12 +2615,12 @@ export const CHESS_SKIN_CATALOG = [
       trailHex: '#dc2626'
     },
     materials: {
-      white: { color: 0xd1d5db, roughness: 0.20, metalness: 0.65, emissive: 0x450a0a, emissiveIntensity: 0.22 },
-      black: { color: 0x140508, roughness: 0.22, metalness: 0.50, emissive: 0x9f1239, emissiveIntensity: 0.35 },
-      trim: { color: 0xe11d48, roughness: 0.18, metalness: 0.92, emissive: 0xbe123c, emissiveIntensity: 0.45 },
-      steel: { color: 0x991b1b, roughness: 0.16, metalness: 0.92, emissive: 0x881337, emissiveIntensity: 0.40 },
-      boardLight: { color: 0xe5e7eb, roughness: 0.30, metalness: 0.14 },
-      boardDark: { color: 0x18060a, roughness: 0.24, metalness: 0.26 },
+      white: { color: 0xd1d5db, roughness: 0.22, metalness: 0.15, emissive: 0x000000, emissiveIntensity: 0.0 },
+      black: { color: 0x140508, roughness: 0.22, metalness: 0.35, emissive: 0x000000, emissiveIntensity: 0.0 },
+      trim: { color: 0xbe123c, roughness: 0.18, metalness: 0.92, emissive: 0x881337, emissiveIntensity: 0.18 },
+      steel: { color: 0x475569, roughness: 0.16, metalness: 0.90, emissive: 0x1e293b, emissiveIntensity: 0.10 },
+      boardLight: { color: 0xe5e7eb, roughness: 0.30, metalness: 0.08 },
+      boardDark: { color: 0x18060a, roughness: 0.24, metalness: 0.22 },
       slashTrailHex: 0xdc2626
     }
   },
@@ -2641,19 +2641,19 @@ export const CHESS_SKIN_CATALOG = [
     loreVi:
       'Pha lê thạch anh băng nguyên chất bọc Bạc Bắc Âu lạnh giá. Tốt trang bị Khiên tròn Sao Tuyết Bắc Âu, Xe là Pháo đài Trụ Băng 4 góc, Hậu mang Cánh Băng Vũ thanh thoát, Vua đội Vương miện Băng Tinh sắc nhọn.',
     previewSwatches: {
-      whiteHex: '#e0f2fe',
-      blackHex: '#0a1626',
-      trimHex: '#cbd5e1',
-      bladeHex: '#38bdf8',
+      whiteHex: '#f0f9ff',
+      blackHex: '#0c1322',
+      trimHex: '#38bdf8',
+      bladeHex: '#bae6fd',
       trailHex: '#0ea5e9'
     },
     materials: {
-      white: { color: 0xe0f2fe, roughness: 0.14, metalness: 0.22, emissive: 0x0284c7, emissiveIntensity: 0.22 },
-      black: { color: 0x081528, roughness: 0.18, metalness: 0.45, emissive: 0x0369a1, emissiveIntensity: 0.32 },
-      trim: { color: 0xe0f2fe, roughness: 0.12, metalness: 0.96, emissive: 0x38bdf8, emissiveIntensity: 0.45 },
-      steel: { color: 0x38bdf8, roughness: 0.14, metalness: 0.92, emissive: 0x0284c7, emissiveIntensity: 0.40 },
-      boardLight: { color: 0xf0f9ff, roughness: 0.24, metalness: 0.10 },
-      boardDark: { color: 0x081320, roughness: 0.22, metalness: 0.22 },
+      white: { color: 0xf0f9ff, roughness: 0.18, metalness: 0.12, emissive: 0x000000, emissiveIntensity: 0.0 },
+      black: { color: 0x0c1322, roughness: 0.20, metalness: 0.35, emissive: 0x000000, emissiveIntensity: 0.0 },
+      trim: { color: 0x38bdf8, roughness: 0.14, metalness: 0.95, emissive: 0x0284c7, emissiveIntensity: 0.20 },
+      steel: { color: 0xbae6fd, roughness: 0.14, metalness: 0.90, emissive: 0x0ea5e9, emissiveIntensity: 0.15 },
+      boardLight: { color: 0xf0f9ff, roughness: 0.28, metalness: 0.08 },
+      boardDark: { color: 0x081320, roughness: 0.24, metalness: 0.20 },
       slashTrailHex: 0x0ea5e9
     }
   },
@@ -2674,17 +2674,17 @@ export const CHESS_SKIN_CATALOG = [
     loreVi:
       'Cẩm thạch trắng ngập tràn ánh dương và Vàng Thái Dương 24K rực rỡ. Tốt mang phù hiệu Mặt trời, Mã là Thiên Mã Pegasean bọc giáp cánh vàng, Hậu sở hữu Đôi Cánh Seraphim Hoàng Kim, Vua ngự Astrolabe Thái Dương 12 tia.',
     previewSwatches: {
-      whiteHex: '#fefce8',
-      blackHex: '#241d15',
-      trimHex: '#eab308',
+      whiteHex: '#fffdf5',
+      blackHex: '#181410',
+      trimHex: '#f59e0b',
       bladeHex: '#fef08a',
       trailHex: '#d97706'
     },
     materials: {
-      white: { color: 0xfffbeb, roughness: 0.18, metalness: 0.15, emissive: 0xd97706, emissiveIntensity: 0.22 },
-      black: { color: 0x201505, roughness: 0.20, metalness: 0.35, emissive: 0xb45309, emissiveIntensity: 0.28 },
-      trim: { color: 0xfacc15, roughness: 0.14, metalness: 0.96, emissive: 0xd97706, emissiveIntensity: 0.45 },
-      steel: { color: 0xfef08a, roughness: 0.16, metalness: 0.92, emissive: 0xb45309, emissiveIntensity: 0.38 },
+      white: { color: 0xfffdf5, roughness: 0.20, metalness: 0.08, emissive: 0x000000, emissiveIntensity: 0.0 },
+      black: { color: 0x181410, roughness: 0.22, metalness: 0.30, emissive: 0x000000, emissiveIntensity: 0.0 },
+      trim: { color: 0xf59e0b, roughness: 0.15, metalness: 0.95, emissive: 0x78350f, emissiveIntensity: 0.15 },
+      steel: { color: 0xfef08a, roughness: 0.16, metalness: 0.90, emissive: 0xb45309, emissiveIntensity: 0.12 },
       boardLight: { color: 0xfef9c3, roughness: 0.28, metalness: 0.08 },
       boardDark: { color: 0x1f170e, roughness: 0.24, metalness: 0.18 },
       slashTrailHex: 0xd97706
@@ -2707,19 +2707,19 @@ export const CHESS_SKIN_CATALOG = [
     loreVi:
       'Đá Lăng Mộ phong hóa kết hợp Sắt Hồn Bạc cổ đại cùng đốm ma trơi xanh lục u tịch. Tốt đắp Cốt Giáp ngực, Xe là Tháp Lăng Mộ Cổ Đá, Mã là Ngựa Chiến Tử Thần, Vua mang Sừng Quỷ Lich uốn lượn uy nghiêm.',
     previewSwatches: {
-      whiteHex: '#d6d3d1',
-      blackHex: '#0f172a',
-      trimHex: '#64748b',
-      bladeHex: '#94a3b8',
-      trailHex: '#10b981'
+      whiteHex: '#e2e8f0',
+      blackHex: '#0d1117',
+      trimHex: '#10b981',
+      bladeHex: '#34d399',
+      trailHex: '#059669'
     },
     materials: {
-      white: { color: 0xe2e8f0, roughness: 0.24, metalness: 0.30, emissive: 0x059669, emissiveIntensity: 0.20 },
-      black: { color: 0x07110e, roughness: 0.22, metalness: 0.45, emissive: 0x10b981, emissiveIntensity: 0.32 },
-      trim: { color: 0x94a3b8, roughness: 0.18, metalness: 0.90, emissive: 0x047857, emissiveIntensity: 0.38 },
-      steel: { color: 0x34d399, roughness: 0.16, metalness: 0.92, emissive: 0x059669, emissiveIntensity: 0.42 },
-      boardLight: { color: 0xe2e8f0, roughness: 0.32, metalness: 0.10 },
-      boardDark: { color: 0x090e17, roughness: 0.26, metalness: 0.22 },
+      white: { color: 0xe2e8f0, roughness: 0.24, metalness: 0.12, emissive: 0x000000, emissiveIntensity: 0.0 },
+      black: { color: 0x0d1117, roughness: 0.22, metalness: 0.35, emissive: 0x000000, emissiveIntensity: 0.0 },
+      trim: { color: 0x10b981, roughness: 0.16, metalness: 0.92, emissive: 0x065f46, emissiveIntensity: 0.20 },
+      steel: { color: 0x34d399, roughness: 0.16, metalness: 0.90, emissive: 0x047857, emissiveIntensity: 0.15 },
+      boardLight: { color: 0xe2e8f0, roughness: 0.32, metalness: 0.08 },
+      boardDark: { color: 0x090e17, roughness: 0.26, metalness: 0.20 },
       slashTrailHex: 0x10b981
     }
   },
@@ -2740,19 +2740,19 @@ export const CHESS_SKIN_CATALOG = [
     loreVi:
       'Thạch anh Tím Amethyst tinh khiết kết hợp Đồng Thao Sao Rơi. Tốt khắc Vòng Tròn Ma Pháp chân đế, Xe là Ngọn Tháp Pháp Sư đỉnh ngọc bay, Vua sở hữu Vành Đai Gyroscope 3D xoay 360° trang nhã.',
     previewSwatches: {
-      whiteHex: '#ede9fe',
-      blackHex: '#100a20',
-      trimHex: '#b45309',
-      bladeHex: '#a855f7',
+      whiteHex: '#f8f5ff',
+      blackHex: '#130d22',
+      trimHex: '#c084fc',
+      bladeHex: '#d8b4fe',
       trailHex: '#9333ea'
     },
     materials: {
-      white: { color: 0xf5f3ff, roughness: 0.16, metalness: 0.20, emissive: 0x7c3aed, emissiveIntensity: 0.24 },
-      black: { color: 0x0e0720, roughness: 0.18, metalness: 0.45, emissive: 0x6d28d9, emissiveIntensity: 0.32 },
-      trim: { color: 0xd8b4fe, roughness: 0.15, metalness: 0.95, emissive: 0x9333ea, emissiveIntensity: 0.42 },
-      steel: { color: 0xa855f7, roughness: 0.14, metalness: 0.92, emissive: 0x7e22ce, emissiveIntensity: 0.42 },
-      boardLight: { color: 0xf5f3ff, roughness: 0.26, metalness: 0.12 },
-      boardDark: { color: 0x0c0717, roughness: 0.22, metalness: 0.24 },
+      white: { color: 0xf8f5ff, roughness: 0.20, metalness: 0.10, emissive: 0x000000, emissiveIntensity: 0.0 },
+      black: { color: 0x130d22, roughness: 0.20, metalness: 0.35, emissive: 0x000000, emissiveIntensity: 0.0 },
+      trim: { color: 0xc084fc, roughness: 0.15, metalness: 0.92, emissive: 0x7e22ce, emissiveIntensity: 0.20 },
+      steel: { color: 0xd8b4fe, roughness: 0.14, metalness: 0.90, emissive: 0x6b21a8, emissiveIntensity: 0.15 },
+      boardLight: { color: 0xf5f3ff, roughness: 0.28, metalness: 0.08 },
+      boardDark: { color: 0x0c0717, roughness: 0.22, metalness: 0.22 },
       slashTrailHex: 0x9333ea
     }
   },
@@ -2774,18 +2774,18 @@ export const CHESS_SKIN_CATALOG = [
       'Đá Basalt Núi Lửa đen nhám viền Đồng Đỏ đúc chảy cùng mạch than hồng ấm áp. Tốt mang khiên Vảy Rồng Hỏa Tộc, Xe là Miệng Núi Lửa kiên cố, Hậu mang Cánh Rồng Nham Thạch oai phong, Vua đội Vương miện Sừng Rồng cổ đại.',
     previewSwatches: {
       whiteHex: '#ffedd5',
-      blackHex: '#110b09',
+      blackHex: '#140e0a',
       trimHex: '#f97316',
       bladeHex: '#fb923c',
       trailHex: '#ff5722'
     },
     materials: {
-      white: { color: 0xffedd5, roughness: 0.22, metalness: 0.15, emissive: 0x9a3412, emissiveIntensity: 0.28 },
-      black: { color: 0x110b09, roughness: 0.25, metalness: 0.40, emissive: 0xc2410c, emissiveIntensity: 0.38 },
-      trim: { color: 0xf97316, roughness: 0.18, metalness: 0.95, emissive: 0xea580c, emissiveIntensity: 0.48 },
-      steel: { color: 0xfb923c, roughness: 0.15, metalness: 0.92, emissive: 0xc2410c, emissiveIntensity: 0.45 },
-      boardLight: { color: 0xffedd5, roughness: 0.32, metalness: 0.08 },
-      boardDark: { color: 0x1c120c, roughness: 0.28, metalness: 0.24 },
+      white: { color: 0xffedd5, roughness: 0.24, metalness: 0.10, emissive: 0x000000, emissiveIntensity: 0.0 },
+      black: { color: 0x140e0a, roughness: 0.24, metalness: 0.35, emissive: 0x000000, emissiveIntensity: 0.0 },
+      trim: { color: 0xf97316, roughness: 0.18, metalness: 0.95, emissive: 0xc2410c, emissiveIntensity: 0.20 },
+      steel: { color: 0xfb923c, roughness: 0.15, metalness: 0.90, emissive: 0x9a3412, emissiveIntensity: 0.15 },
+      boardLight: { color: 0xffedd5, roughness: 0.30, metalness: 0.08 },
+      boardDark: { color: 0x1c120c, roughness: 0.26, metalness: 0.22 },
       slashTrailHex: 0xff5722
     }
   },
@@ -2806,19 +2806,19 @@ export const CHESS_SKIN_CATALOG = [
     loreVi:
       'Ngọc Trai Ánh Sao kết hợp Sapphire Lam Đêm Vũ Trụ viền Bạch Kim Platinum thuần khiết. Tốt mang Quỹ Đạo Vòng Tròn Tinh Cầu thanh nhã, Xe là Đài Thiên Văn Vũ Trụ mái vòm, Hậu mang Cánh Tinh Tú Lăng Kính, Vua ngự Vương Miện Tinh Đế và Vành Đai Sao Thổ thanh lịch.',
     previewSwatches: {
-      whiteHex: '#f0f9ff',
-      blackHex: '#030712',
-      trimHex: '#e0f2fe',
-      bladeHex: '#38bdf8',
+      whiteHex: '#f8fafc',
+      blackHex: '#070c1a',
+      trimHex: '#38bdf8',
+      bladeHex: '#93c5fd',
       trailHex: '#0284c7'
     },
     materials: {
-      white: { color: 0xf0f9ff, roughness: 0.12, metalness: 0.25, emissive: 0x0284c7, emissiveIntensity: 0.28 },
-      black: { color: 0x030712, roughness: 0.14, metalness: 0.60, emissive: 0x0369a1, emissiveIntensity: 0.38 },
-      trim: { color: 0xe0f2fe, roughness: 0.10, metalness: 0.98, emissive: 0x38bdf8, emissiveIntensity: 0.55 },
-      steel: { color: 0x38bdf8, roughness: 0.12, metalness: 0.95, emissive: 0x0284c7, emissiveIntensity: 0.50 },
-      boardLight: { color: 0xf0fdf4, roughness: 0.20, metalness: 0.16 },
-      boardDark: { color: 0x030816, roughness: 0.16, metalness: 0.36 },
+      white: { color: 0xf8fafc, roughness: 0.18, metalness: 0.12, emissive: 0x000000, emissiveIntensity: 0.0 },
+      black: { color: 0x070c1a, roughness: 0.18, metalness: 0.40, emissive: 0x000000, emissiveIntensity: 0.0 },
+      trim: { color: 0x38bdf8, roughness: 0.12, metalness: 0.96, emissive: 0x0284c7, emissiveIntensity: 0.20 },
+      steel: { color: 0x93c5fd, roughness: 0.14, metalness: 0.92, emissive: 0x0369a1, emissiveIntensity: 0.15 },
+      boardLight: { color: 0xf0f9ff, roughness: 0.26, metalness: 0.08 },
+      boardDark: { color: 0x070f20, roughness: 0.22, metalness: 0.25 },
       slashTrailHex: 0x38bdf8
     }
   }
