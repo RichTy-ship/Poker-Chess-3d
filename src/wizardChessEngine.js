@@ -1218,64 +1218,11 @@ export function initWizardChess() {
       }
 
       // -----------------------------------------------------------------------
-      // 3. KNIGHTS (MÃ): Armored Chanfron steed visor on real horse head (Z=0.52, Y=1.26)
+      // 3. KNIGHTS (MÃ): Natural sculpted steed & armored rider with lance
+      // (Preserves clean un-occluded horse head & animated lance/shield)
       // -----------------------------------------------------------------------
       else if (role === 'knight') {
-        const headGroup = new THREE.Group();
-        headGroup.position.set(0, 1.26, 0.52);
-
-        // Forehead Chanfron armor plate
-        const chanfron = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.36, 0.12), trimMat);
-        chanfron.rotation.x = 0.35;
-        headGroup.add(chanfron);
-
-        if (skinId === 'jade_dynasty') {
-          const qilinHorns = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.34, 6), crystalMat);
-          qilinHorns.position.set(0, 0.26, -0.08);
-          qilinHorns.rotation.x = -0.35;
-          headGroup.add(qilinHorns);
-        } else if (skinId === 'crimson_inquisitor') {
-          const dreadSpike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.32, 4), steelMat);
-          dreadSpike.position.set(0, 0.24, -0.04);
-          headGroup.add(dreadSpike);
-        } else if (skinId === 'frost_valkyrie') {
-          const iceHorn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.38, 5), crystalMat);
-          iceHorn.position.set(0, 0.28, -0.06);
-          iceHorn.rotation.x = -0.25;
-          headGroup.add(iceHorn);
-        } else if (skinId === 'solar_seraphim') {
-          const sunPlume = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.32, 0.20), trimMat);
-          sunPlume.position.set(0, 0.24, -0.10);
-          headGroup.add(sunPlume);
-        } else if (skinId === 'infernal_drake') {
-          // Draconic Warhorse: Twin curved dragon horns & fiery plume
-          const dHornL = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.45, 5), trimMat);
-          dHornL.position.set(-0.14, 0.28, -0.10);
-          dHornL.rotation.z = 0.45;
-          dHornL.rotation.x = -0.55;
-          const dHornR = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.45, 5), trimMat);
-          dHornR.position.set(0.14, 0.28, -0.10);
-          dHornR.rotation.z = -0.45;
-          dHornR.rotation.x = -0.55;
-          const flamePlume = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.36, 4), glowMat);
-          flamePlume.position.set(0, 0.32, -0.18);
-          flamePlume.rotation.x = -0.75;
-          headGroup.add(dHornL, dHornR, flamePlume);
-        } else if (skinId === 'celestial_eternity') {
-          // Celestial Pegasus: Midnight sapphire horn & crystal ear winglets
-          const starHorn = new THREE.Mesh(new THREE.ConeGeometry(0.050, 0.50, 6), crystalMat);
-          starHorn.position.set(0, 0.28, 0.06);
-          starHorn.rotation.x = -0.30;
-          for (const side of [-1, 1]) {
-            const winglet = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.32, 0.10), crystalMat);
-            winglet.position.set(side * 0.16, 0.22, -0.06);
-            winglet.rotation.z = -side * 0.55;
-            winglet.rotation.x = -0.30;
-            headGroup.add(winglet);
-          }
-          headGroup.add(starHorn);
-        }
-        skinGroup.add(headGroup);
+        // Knight has fully animated rider & steed rig; themed via pedestal plinth & skin materials
       }
 
       // -----------------------------------------------------------------------
