@@ -9422,8 +9422,9 @@ export function initWizardChess() {
         soundFX.stopLowTimeTickingLoop(true);
       }
 
-      // Animate Themed Ambient Micro-Aura & Stardust motes
-      const currentSkinTrailHex = activeSkinSlashHex || 0xfde047;
+      // Animate Themed Ambient Micro-Aura & Stardust motes (paused during active combat duel to ensure solid 60 FPS)
+      if (!isAnimatingMove) {
+        const currentSkinTrailHex = activeSkinSlashHex || 0xfde047;
       if (ambientMoteMat.color.getHex() !== currentSkinTrailHex) {
         ambientMoteMat.color.setHex(currentSkinTrailHex);
       }
@@ -9445,6 +9446,7 @@ export function initWizardChess() {
         ambientMoteInstanced.setMatrixAt(i, dummyMoteMat4);
       }
       ambientMoteInstanced.instanceMatrix.needsUpdate = true;
+      }
 
       // Animate 3D Floating Combat Texts (Damage, Armor Block, Heal, Level Up, Combo Seal)
       for (let i = floatingTexts3D.length - 1; i >= 0; i--) {
