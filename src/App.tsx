@@ -748,21 +748,8 @@ export default function App() {
       setPeekDockDuringMove(false);
     }
 
-    // 1. Combat just started
-    if (!prev.hadCombat && currCombat && gameState.activeCombatBanner) {
-      const cb = gameState.activeCombatBanner;
-      showAnnouncement(
-        {
-          category: 'combat',
-          badge: '⚔ THÔNG BÁO COMBAT',
-          title: `${cb.attackerIcon} ${cb.attackerName.toUpperCase()} ⚔ ${cb.defenderIcon} ${cb.defenderName.toUpperCase()}`,
-          subtitle: `Giao tranh cận chiến! Sát thương ${cb.attackerAtk}⚔ đối đầu Phản đòn ${cb.defenderAtk}🛡`
-        },
-        2500
-      );
-    }
     // 2. Combat just finished
-    else if (prev.hadCombat && !currCombat) {
+    if (prev.hadCombat && !currCombat) {
       if (isPlayer && currPhase === 'DRAW_PHASE') {
         showAnnouncement({
           category: 'turn',
@@ -1354,99 +1341,7 @@ export default function App() {
         </div>
       )}
 
-      {/* EPIC ACTIVE MELEE COMBAT CLASH BANNER & SCREEN VIGNETTE WITH 3D ANIMATION TRIGGERS */}
-      {gameState?.activeCombatBanner && (
-        <>
-          <div className="combat-screen-vignette" aria-hidden="true" />
-          <div className="active-combat-clash-banner" id="active-combat-clash-banner" role="status">
-            <div className="clash-combatant left">
-              <span className="clash-unit-icon">{gameState.activeCombatBanner.attackerIcon}</span>
-              <div className="clash-unit-meta">
-                <span className="clash-unit-name">
-                  {gameState.activeCombatBanner.attackerName} (
-                  {gameState.activeCombatBanner.attackerColor === 'w' ? 'Trắng' : 'Đen'})
-                </span>
-                <span className="clash-unit-atk">
-                  ⚔ Sát Thương: <strong>{gameState.activeCombatBanner.attackerAtk}</strong>
-                  {typeof gameState.activeCombatBanner.attackerHp === 'number' && (
-                    <>
-                      {' • '}❤ Máu:{' '}
-                      <strong>
-                        {gameState.activeCombatBanner.attackerHp}/
-                        {gameState.activeCombatBanner.attackerMaxHp}
-                      </strong>
-                    </>
-                  )}
-                  {gameState.activeCombatBanner.attackerCombo
-                    ? ` • ✦ ${gameState.activeCombatBanner.attackerCombo}`
-                    : ''}
-                </span>
-                <button
-                  type="button"
-                  className="clash-anim-trigger-btn attack"
-                  id="btn-banner-melee-attack"
-                  onClick={() =>
-                    getEngine()?.triggerUnitMeleeAttack?.(
-                      gameState.activeCombatBanner?.attackerR,
-                      gameState.activeCombatBanner?.attackerC
-                    )
-                  }
-                  title="Kích hoạt chuyển động 3D Melee Attack của quân tấn công"
-                >
-                  ⚔ {gameState.activeCombatBanner.attackerAnimState === 'MELEE_ATTACK' ? 'Melee Attack (3D Active)' : 'Melee Attack'}
-                </button>
-              </div>
-            </div>
-
-            <div className="clash-center-emblem">
-              <span className="clash-swords-icon">⚔</span>
-              <span className="clash-outcome-tag">
-                {outcomeMeta[gameState.activeCombatBanner.outcome]?.label || 'GIAO CHIẾN!'}
-              </span>
-            </div>
-
-            <div className="clash-combatant right">
-              <div className="clash-unit-meta">
-                <span className="clash-unit-name">
-                  {gameState.activeCombatBanner.defenderName} (
-                  {gameState.activeCombatBanner.defenderColor === 'w' ? 'Trắng' : 'Đen'})
-                </span>
-                <span className="clash-unit-atk">
-                  ⚔ Tự Động Đánh Trả: <strong>{gameState.activeCombatBanner.defenderAtk}</strong>
-                  {typeof gameState.activeCombatBanner.defenderHp === 'number' && (
-                    <>
-                      {' • '}❤ Máu:{' '}
-                      <strong>
-                        {gameState.activeCombatBanner.defenderHp}/
-                        {gameState.activeCombatBanner.defenderMaxHp}
-                      </strong>
-                    </>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  className="clash-anim-trigger-btn defend"
-                  id="btn-banner-melee-defend"
-                  onClick={() =>
-                    getEngine()?.triggerUnitMeleeDefend?.(
-                      gameState.activeCombatBanner?.defenderR,
-                      gameState.activeCombatBanner?.defenderC
-                    )
-                  }
-                  title="Kích hoạt chuyển động 3D Đánh Trả / Phòng Thủ của quân bị tấn công"
-                >
-                  {gameState.activeCombatBanner.defenderAnimState === 'MELEE_ATTACK'
-                    ? '⚔ Đánh Trả (3D Counter Active)'
-                    : gameState.activeCombatBanner.defenderAnimState === 'MELEE_DEFEND'
-                      ? '🛡 Đỡ Đòn & Đánh Trả (3D Active)'
-                      : '⚔ Tự Động Đánh Trả'}
-                </button>
-              </div>
-              <span className="clash-unit-icon">{gameState.activeCombatBanner.defenderIcon}</span>
-            </div>
-          </div>
-        </>
-      )}
+      {/* Active Combat Clash Banner & Vignette disabled completely for max FPS */}
 
       {/* BOTTOM-DOCKED TURN & COMBAT STATUS BAR (SHOWN ONLY WHEN THE CARD DOCK IS AUTO-HIDDEN) */}
       {gameState && !gameState.gameOver && !isCardDockVisible && (
@@ -2090,7 +1985,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {Object.values(POKER_COMBO_DEFS).map((c) => (
+                      {Object.values(POKER_COMBO_DEFS).map((c: any) => (
                         <tr key={c.id} className={c.isUltimate ? 'ultimate-row' : ''}>
                           <td style={{ color: c.colorHex, fontWeight: 700 }}>{c.name}</td>
                           <td>

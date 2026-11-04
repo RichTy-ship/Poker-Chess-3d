@@ -5310,30 +5310,7 @@ export function initWizardChess() {
         piece.combatAnimTimer = 2.2;
         captured.combatAnimState = 'MELEE_DEFEND';
         captured.combatAnimTimer = 2.2;
-        activeCombatBanner = {
-          attackerR: fromR,
-          attackerC: fromC,
-          attackerName: UNIT_BASE_STATS[piece.type]?.name || piece.type,
-          attackerIcon: UNIT_BASE_STATS[piece.type]?.icon || '⚔',
-          attackerColor: piece.color,
-          attackerAtk: combatSim.atkDmg,
-          attackerHp: atkHpStart,
-          attackerMaxHp: piece.maxHp,
-          attackerCombo: piece.activeCombo?.name || null,
-          attackerAnimState: 'MELEE_ATTACK',
-          defenderR: toR,
-          defenderC: toC,
-          defenderName: UNIT_BASE_STATS[captured.type]?.name || captured.type,
-          defenderIcon: UNIT_BASE_STATS[captured.type]?.icon || '🛡',
-          defenderColor: captured.color,
-          defenderAtk: combatSim.defCounterDmg,
-          defenderHp: defHpStart,
-          defenderMaxHp: captured.maxHp,
-          defenderAnimState: 'MELEE_DEFEND',
-          combatStage: 'APPROACH',
-          outcome: combatSim.outcome
-        };
-        emitPokerChessSync();
+        activeCombatBanner = null;
       } else {
         soundFX.playFootstepMarch(piece.type);
       }
@@ -5932,14 +5909,7 @@ export function initWizardChess() {
               if (!canCounterAttack) {
                 counterImpactTriggered = true;
               }
-              if (activeCombatBanner && combatSim) {
-                activeCombatBanner.defenderHp = Math.max(
-                  defDies && canCounterAttack ? 1 : combatSim.defHpAfter,
-                  combatSim.defHpAfter
-                );
-                activeCombatBanner.combatStage = 'ATTACK_LANDED';
-                emitPokerChessSync();
-              }
+              // Mid-combat sync disabled
             }
 
             // Smoothly drain Defender's HP bar over 0.26s after Beat 1 weapon impact
@@ -6092,12 +6062,7 @@ export function initWizardChess() {
                 piece.trailHp = atkHpStart;
                 piece.displayHp = atkHpStart;
               }
-              if (activeCombatBanner && combatSim) {
-                activeCombatBanner.attackerHp = Math.max(0, combatSim.atkHpAfter);
-                activeCombatBanner.defenderHp = Math.max(0, combatSim.defHpAfter);
-                activeCombatBanner.combatStage = 'COUNTER_LANDED';
-                emitPokerChessSync();
-              }
+              // Mid-combat sync disabled
             }
 
             // Smoothly drain Attacker's HP bar over 0.26s ONLY AFTER Beat 2B counter-blow impact!
