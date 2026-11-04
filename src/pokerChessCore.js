@@ -55,102 +55,102 @@ export const POKER_COMBO_DEFS = {
     name: 'Mậu Thầu',
     enName: 'High Card',
     role: 'Phép Cường Hóa (1💎)',
-    atkBonus: 2,
-    armorBonus: 2,
-    healInstant: 3,
+    atkBonus: 3,
+    armorBonus: 3,
+    healInstant: 6,
     colorHex: '#64748b',
     ringColor: 0x64748b,
-    desc: 'Tiêu 1💎 Mana: Gắn Buff +2 Công, +2 Giáp & Battlecry hồi ngay +3 Máu cho 1 quân đồng minh.'
+    desc: 'Tiêu 1💎 Mana: Gắn Buff +3 Công, +3 Giáp & Battlecry hồi ngay +6 Máu cho 1 quân đồng minh.'
   },
   ONE_PAIR: {
     id: 'ONE_PAIR',
     rank: 2,
     manaCost: 2,
-    hsKeyword: 'First Blood • Đòn Mở Màn',
+    hsKeyword: 'First Blood • Đòn Mở Màn Bạo Kích',
     name: 'Một Đôi',
     enName: 'One Pair',
     role: 'Phép Tấn Công (2💎)',
-    atkBonus: 4,
-    armorBonus: 0,
+    atkBonus: 6,
+    armorBonus: 2,
     healInstant: 0,
     colorHex: '#38bdf8',
     ringColor: 0x38bdf8,
-    desc: 'Tiêu 2💎 Mana: Gắn Buff +4 Công. Đòn Mở Màn: +2 Sát thương xuyên giáp nếu mục tiêu đang đầy máu.'
+    desc: 'Tiêu 2💎 Mana: Gắn Buff +6 Công, +2 Giáp. Đòn Mở Màn Bạo Kích: +5 Sát thương chuẩn xuyên giáp nếu mục tiêu còn >= 75% máu.'
   },
   TWO_PAIR: {
     id: 'TWO_PAIR',
     rank: 3,
     manaCost: 2,
-    hsKeyword: 'Taunt Shield • Khiên Kép',
+    hsKeyword: 'Taunt Shield • Khiên Kép Phản Chấn',
     name: 'Hai Đôi',
     enName: 'Two Pair',
     role: 'Phép Công Thủ (2💎)',
-    atkBonus: 3,
-    armorBonus: 5,
+    atkBonus: 4,
+    armorBonus: 8,
     healInstant: 0,
     colorHex: '#2dd4bf',
     ringColor: 0x2dd4bf,
-    desc: 'Tiêu 2💎 Mana: Gắn Buff +3 Công, +5 Giáp. Khiên Kép: Giảm 2 sát thương phản đòn khi giao tranh.'
+    desc: 'Tiêu 2💎 Mana: Gắn Buff +4 Công, +8 Giáp. Khiên Kép Phản Chấn: Giảm 4 sát thương phản đòn khi giao tranh và phản chấn 3 ST Chuẩn!'
   },
   THREE_OF_A_KIND: {
     id: 'THREE_OF_A_KIND',
     rank: 4,
     manaCost: 3,
-    hsKeyword: 'Armor Shatter • Phá Giáp',
+    hsKeyword: 'Armor Shatter • Đại Phá Giáp',
     name: 'Sám Cô',
     enName: 'Three of a Kind',
     role: 'Phép Xuyên Phá (3💎)',
-    atkBonus: 6,
-    armorBonus: 3,
+    atkBonus: 8,
+    armorBonus: 4,
     healInstant: 0,
     colorHex: '#a855f7',
     ringColor: 0xa855f7,
-    desc: 'Tiêu 3💎 Mana: Gắn Buff +6 Công, +3 Giáp. Phá Giáp: Nghiền nát toàn bộ Giáp mục tiêu trước khi gây sát thương (+3 ST nếu địch có Giáp).'
+    desc: 'Tiêu 3💎 Mana: Gắn Buff +8 Công, +4 Giáp. Đại Phá Giáp: Nghiền nát 100% Giáp mục tiêu và gây thêm +6 ST Chuẩn nếu mục tiêu có Giáp.'
   },
   STRAIGHT: {
     id: 'STRAIGHT',
     rank: 5,
     manaCost: 3,
-    hsKeyword: 'Rush • Bộ Pháp Liên Hoàn',
+    hsKeyword: 'Rush • Bộ Pháp Thần Tốc',
     name: 'Sảnh',
     enName: 'Straight',
     role: 'Phép Cơ Động (3💎)',
-    atkBonus: 4,
-    armorBonus: 4,
+    atkBonus: 6,
+    armorBonus: 6,
     healInstant: 0,
     colorHex: '#10b981',
     ringColor: 0x10b981,
-    desc: 'Tiêu 3💎 Mana: Gắn Buff +4 Công, +4 Giáp. Rush: Tốt/Vua đi thêm +1 ô; quân trượt được xuyên qua 1 đồng minh chắn đường.'
+    desc: 'Tiêu 3💎 Mana: Gắn Buff +6 Công, +6 Giáp. Bộ Pháp Thần Tốc: Tốt/Vua đi thêm +2 ô; quân trượt xuyên qua đồng minh; giảm 50% sát thương phản đòn!'
   },
   FLUSH: {
     id: 'FLUSH',
     rank: 6,
     manaCost: 3,
-    hsKeyword: 'Cleave • Sóng Xung Kích',
+    hsKeyword: 'Cleave • Đại Hải Triều',
     name: 'Thùng',
     enName: 'Flush',
     role: 'Phép Đánh Lan (3💎)',
-    atkBonus: 5,
-    armorBonus: 3,
+    atkBonus: 7,
+    armorBonus: 5,
     healInstant: 0,
     colorHex: '#3b82f6',
     ringColor: 0x3b82f6,
-    desc: 'Tiêu 3💎 Mana: Gắn Buff +5 Công, +3 Giáp. Cleave: Gây 4 Sát thương chuẩn lan sang tối đa 3 quân địch đứng cạnh mục tiêu.'
+    desc: 'Tiêu 3💎 Mana: Gắn Buff +7 Công, +5 Giáp. Đại Hải Triều: Đánh lan 7 Sát thương chuẩn sang TẤT CẢ quân địch đứng cạnh mục tiêu!'
   },
   FULL_HOUSE: {
     id: 'FULL_HOUSE',
     rank: 7,
     manaCost: 4,
-    hsKeyword: 'Divine Strike • Đánh Trước',
+    hsKeyword: 'Divine Strike • Uy Quyền Hoàng Gia',
     name: 'Cù Lũ',
     enName: 'Full House',
     role: 'Phép Hoàng Gia (4💎)',
-    atkBonus: 7,
-    armorBonus: 7,
-    healInstant: 8,
+    atkBonus: 10,
+    armorBonus: 10,
+    healInstant: 14,
     colorHex: '#f59e0b',
     ringColor: 0xf59e0b,
-    desc: 'Tiêu 4💎 Mana: Gắn Buff +7 Công, +7 Giáp, Hồi +8 Máu. Divine Strike: Đánh Trước (Nếu kết liễu mục tiêu, miễn 100% sát thương phản đòn!).'
+    desc: 'Tiêu 4💎 Mana: Gắn Buff +10 Công, +10 Giáp, Hồi +14 Máu. Uy Quyền Hoàng Gia: Đánh trước miễn 100% phản đòn nếu kết liễu, hoặc giảm 50% phản đòn & Hút 50% Máu!'
   },
   FOUR_OF_A_KIND: {
     id: 'FOUR_OF_A_KIND',
@@ -557,7 +557,7 @@ export function attachRPGStatsToPiece(pieceObj, level = 1) {
 }
 
 export function getUnitArmorCap(piece) {
-  return Math.max(4, Math.floor((piece.maxHp || 12) * 0.5));
+  return Math.max(12, Math.floor((piece?.maxHp || 12) * 0.75));
 }
 
 export function applyComboEmpowermentToUnit(piece, comboEval, boardState, turnNumber = 1) {
@@ -842,35 +842,44 @@ export function simulateRPGCombat(attacker, defender, fromR, fromC, toR, toC, bo
     combatNotes.push('Hợp Vây Hậu (+2⚔)');
   }
 
-  // 8. Poker Combo Special Mechanics
+  // 8. Poker Combo Special Mechanics (Supercharged Tier System)
   const atkComboId = attacker.activeCombo?.id;
   const defComboId = defender.activeCombo?.id;
 
-  // ONE_PAIR: First Blood (+2 True Damage if target is at 100% HP)
+  // ONE_PAIR: First Blood Bạo Kích (+5 True Damage if target has >= 75% HP)
   let bonusTrueDmgToDef = 0;
-  if (atkComboId === 'ONE_PAIR' && defender.hp >= defender.maxHp) {
-    bonusTrueDmgToDef += 2;
-    combatNotes.push('Đòn Mở Màn Một Đôi (+2 ST Chuẩn)');
+  if (atkComboId === 'ONE_PAIR' && (defender.hp / (defender.maxHp || 1)) >= 0.75) {
+    bonusTrueDmgToDef += 5;
+    combatNotes.push('Đòn Mở Màn Một Đôi (+5 ST Chuẩn Xuyên Giáp)');
   }
 
-  // TWO_PAIR: Dual Bulwark (-2 counter damage taken)
+  // TWO_PAIR: Dual Bulwark & Reflect (-4 counter damage taken + 3 true reflect)
+  let twoPairReflectDmg = 0;
   if (atkComboId === 'TWO_PAIR') {
-    defCounterDmg = Math.max(0, defCounterDmg - 2);
+    defCounterDmg = Math.max(0, defCounterDmg - 4);
+    twoPairReflectDmg = 3;
+    combatNotes.push('Khiên Kép Hai Đôi (Giảm 4 phản đòn & Phản chấn 3 ST)');
   }
   if (defComboId === 'TWO_PAIR') {
-    atkDmg = Math.max(0, atkDmg - 2);
+    atkDmg = Math.max(0, atkDmg - 4);
   }
 
-  // THREE_OF_A_KIND: Armor Shatter (Destroys all target armor before damage + 3 bonus dmg if target had armor)
+  // THREE_OF_A_KIND: Armor Shatter (Destroys 100% target armor before damage + 6 bonus true damage if target had armor)
   if (atkComboId === 'THREE_OF_A_KIND') {
     if (defEffectiveArmor > 0) {
-      atkDmg += 3;
-      combatNotes.push('Sám Cô Phá Giáp (+3⚔)');
+      bonusTrueDmgToDef += 6;
+      combatNotes.push(`Sám Cô Đại Phá Giáp (Nghiền nát ${defEffectiveArmor} Giáp & +6 ST Chuẩn)`);
     }
     defEffectiveArmor = 0;
   }
   if (defComboId === 'THREE_OF_A_KIND') {
     atkEffectiveArmor = 0;
+  }
+
+  // STRAIGHT: Rush Evasion (Reduces counter damage by 50%)
+  if (atkComboId === 'STRAIGHT') {
+    defCounterDmg = Math.floor(defCounterDmg * 0.5);
+    combatNotes.push('Sảnh Bộ Pháp Thần Tốc (Giảm 50% phản đòn)');
   }
 
   // Calculate Damage to Defender
@@ -903,12 +912,19 @@ export function simulateRPGCombat(attacker, defender, fromR, fromC, toR, toC, bo
   const defHpAfter = Math.max(0, defender.hp - totalHpLossDef);
   const defArmorAfter = Math.max(0, (atkComboId === 'THREE_OF_A_KIND' ? 0 : (defender.armor || 0)) - absorbedByDefArmor);
 
-  // FULL_HOUSE: First Strike ("Uy Quyền Tuyệt Đối": if Defender dies, Defender deals 0 counter-damage!)
+  // FULL_HOUSE: First Strike & Vampiric Leech ("Uy Quyền Hoàng Gia")
   let firstStrikeTriggered = false;
-  if (atkComboId === 'FULL_HOUSE' && defHpAfter <= 0) {
-    defCounterDmg = 0;
-    firstStrikeTriggered = true;
-    combatNotes.push('Cù Lũ Đánh Trước (Miễn Phản Đòn!)');
+  let fullHouseLeechHp = 0;
+  if (atkComboId === 'FULL_HOUSE') {
+    if (defHpAfter <= 0) {
+      defCounterDmg = 0;
+      firstStrikeTriggered = true;
+      combatNotes.push('Cù Lũ Đánh Trước (Kết liễu — Miễn 100% phản đòn!)');
+    } else {
+      defCounterDmg = Math.floor(defCounterDmg * 0.5);
+      fullHouseLeechHp = Math.max(2, Math.floor(totalHpLossDef * 0.5));
+      combatNotes.push(`Cù Lũ Uy Quyền (Giảm 50% phản đòn & Hút +${fullHouseLeechHp} HP)`);
+    }
   }
 
   // Calculate simultaneous Counter-Damage to Attacker
@@ -917,7 +933,7 @@ export function simulateRPGCombat(attacker, defender, fromR, fromC, toR, toC, bo
   const atkHpAfter = Math.max(0, attacker.hp - totalHpLossAtk);
   const atkArmorAfter = Math.max(0, (defComboId === 'THREE_OF_A_KIND' ? 0 : (attacker.armor || 0)) - absorbedByAtkArmor);
 
-  // FLUSH: Elemental Cleave (4 True Damage to up to 3 adjacent enemies around Defender)
+  // FLUSH: Elemental Tidal Cleave (7 True Damage to ALL adjacent enemies around Defender)
   const flushSplashTargets = [];
   if (atkComboId === 'FLUSH') {
     for (let dr = -1; dr <= 1; dr++) {
@@ -931,16 +947,14 @@ export function simulateRPGCombat(attacker, defender, fromR, fromC, toR, toC, bo
             piece: splashUnit,
             r: nr,
             c: nc,
-            dmg: 4,
-            willDie: splashUnit.hp - 4 <= 0
+            dmg: 7,
+            willDie: splashUnit.hp - 7 <= 0
           });
-          if (flushSplashTargets.length >= 3) break;
         }
       }
-      if (flushSplashTargets.length >= 3) break;
     }
     if (flushSplashTargets.length > 0) {
-      combatNotes.push(`Thùng Đánh Lan (${flushSplashTargets.length} mục tiêu -4 HP)`);
+      combatNotes.push(`Thùng Đại Hải Triều (${flushSplashTargets.length} mục tiêu xung quanh nhận 7 ST Chuẩn)`);
     }
   }
 
@@ -977,6 +991,8 @@ export function simulateRPGCombat(attacker, defender, fromR, fromC, toR, toC, bo
     guardPiece,
     guardInterceptDmg,
     flushSplashTargets,
+    twoPairReflectDmg,
+    fullHouseLeechHp,
     combatNotes
   };
 }
@@ -2599,10 +2615,10 @@ export const CHESS_SKIN_CATALOG = [
       trailHex: '#dc2626'
     },
     materials: {
-      white: { color: 0xd1d5db, roughness: 0.20, metalness: 0.65, emissive: 0x000000, emissiveIntensity: 0.0 },
-      black: { color: 0x19070b, roughness: 0.22, metalness: 0.45, emissive: 0x000000, emissiveIntensity: 0.0 },
-      trim: { color: 0xb91c1c, roughness: 0.22, metalness: 0.85, emissive: 0x450a0a, emissiveIntensity: 0.15 },
-      steel: { color: 0x991b1b, roughness: 0.18, metalness: 0.90, emissive: 0x450a0a, emissiveIntensity: 0.15 },
+      white: { color: 0xd1d5db, roughness: 0.20, metalness: 0.65, emissive: 0x450a0a, emissiveIntensity: 0.22 },
+      black: { color: 0x140508, roughness: 0.22, metalness: 0.50, emissive: 0x9f1239, emissiveIntensity: 0.35 },
+      trim: { color: 0xe11d48, roughness: 0.18, metalness: 0.92, emissive: 0xbe123c, emissiveIntensity: 0.45 },
+      steel: { color: 0x991b1b, roughness: 0.16, metalness: 0.92, emissive: 0x881337, emissiveIntensity: 0.40 },
       boardLight: { color: 0xe5e7eb, roughness: 0.30, metalness: 0.14 },
       boardDark: { color: 0x18060a, roughness: 0.24, metalness: 0.26 },
       slashTrailHex: 0xdc2626
@@ -2632,10 +2648,10 @@ export const CHESS_SKIN_CATALOG = [
       trailHex: '#0ea5e9'
     },
     materials: {
-      white: { color: 0xe0f2fe, roughness: 0.16, metalness: 0.12, emissive: 0x032840, emissiveIntensity: 0.08 },
-      black: { color: 0x0a1626, roughness: 0.20, metalness: 0.30, emissive: 0x000000, emissiveIntensity: 0.0 },
-      trim: { color: 0xcbd5e1, roughness: 0.18, metalness: 0.95, emissive: 0x082f49, emissiveIntensity: 0.12 },
-      steel: { color: 0x38bdf8, roughness: 0.16, metalness: 0.90, emissive: 0x0369a1, emissiveIntensity: 0.18 },
+      white: { color: 0xe0f2fe, roughness: 0.14, metalness: 0.22, emissive: 0x0284c7, emissiveIntensity: 0.22 },
+      black: { color: 0x081528, roughness: 0.18, metalness: 0.45, emissive: 0x0369a1, emissiveIntensity: 0.32 },
+      trim: { color: 0xe0f2fe, roughness: 0.12, metalness: 0.96, emissive: 0x38bdf8, emissiveIntensity: 0.45 },
+      steel: { color: 0x38bdf8, roughness: 0.14, metalness: 0.92, emissive: 0x0284c7, emissiveIntensity: 0.40 },
       boardLight: { color: 0xf0f9ff, roughness: 0.24, metalness: 0.10 },
       boardDark: { color: 0x081320, roughness: 0.22, metalness: 0.22 },
       slashTrailHex: 0x0ea5e9
@@ -2665,10 +2681,10 @@ export const CHESS_SKIN_CATALOG = [
       trailHex: '#d97706'
     },
     materials: {
-      white: { color: 0xfefce8, roughness: 0.24, metalness: 0.06, emissive: 0x000000, emissiveIntensity: 0.0 },
-      black: { color: 0x241d15, roughness: 0.22, metalness: 0.22, emissive: 0x000000, emissiveIntensity: 0.0 },
-      trim: { color: 0xeab308, roughness: 0.20, metalness: 0.92, emissive: 0x2e1a02, emissiveIntensity: 0.12 },
-      steel: { color: 0xfef08a, roughness: 0.18, metalness: 0.90, emissive: 0x713f12, emissiveIntensity: 0.15 },
+      white: { color: 0xfffbeb, roughness: 0.18, metalness: 0.15, emissive: 0xd97706, emissiveIntensity: 0.22 },
+      black: { color: 0x201505, roughness: 0.20, metalness: 0.35, emissive: 0xb45309, emissiveIntensity: 0.28 },
+      trim: { color: 0xfacc15, roughness: 0.14, metalness: 0.96, emissive: 0xd97706, emissiveIntensity: 0.45 },
+      steel: { color: 0xfef08a, roughness: 0.16, metalness: 0.92, emissive: 0xb45309, emissiveIntensity: 0.38 },
       boardLight: { color: 0xfef9c3, roughness: 0.28, metalness: 0.08 },
       boardDark: { color: 0x1f170e, roughness: 0.24, metalness: 0.18 },
       slashTrailHex: 0xd97706
@@ -2698,10 +2714,10 @@ export const CHESS_SKIN_CATALOG = [
       trailHex: '#10b981'
     },
     materials: {
-      white: { color: 0xd6d3d1, roughness: 0.32, metalness: 0.08, emissive: 0x000000, emissiveIntensity: 0.0 },
-      black: { color: 0x0f172a, roughness: 0.26, metalness: 0.30, emissive: 0x000000, emissiveIntensity: 0.0 },
-      trim: { color: 0x64748b, roughness: 0.22, metalness: 0.88, emissive: 0x052e16, emissiveIntensity: 0.10 },
-      steel: { color: 0x94a3b8, roughness: 0.20, metalness: 0.85, emissive: 0x064e3b, emissiveIntensity: 0.14 },
+      white: { color: 0xe2e8f0, roughness: 0.24, metalness: 0.30, emissive: 0x059669, emissiveIntensity: 0.20 },
+      black: { color: 0x07110e, roughness: 0.22, metalness: 0.45, emissive: 0x10b981, emissiveIntensity: 0.32 },
+      trim: { color: 0x94a3b8, roughness: 0.18, metalness: 0.90, emissive: 0x047857, emissiveIntensity: 0.38 },
+      steel: { color: 0x34d399, roughness: 0.16, metalness: 0.92, emissive: 0x059669, emissiveIntensity: 0.42 },
       boardLight: { color: 0xe2e8f0, roughness: 0.32, metalness: 0.10 },
       boardDark: { color: 0x090e17, roughness: 0.26, metalness: 0.22 },
       slashTrailHex: 0x10b981
@@ -2731,10 +2747,10 @@ export const CHESS_SKIN_CATALOG = [
       trailHex: '#9333ea'
     },
     materials: {
-      white: { color: 0xede9fe, roughness: 0.18, metalness: 0.10, emissive: 0x1e1b4b, emissiveIntensity: 0.06 },
-      black: { color: 0x100a20, roughness: 0.22, metalness: 0.25, emissive: 0x000000, emissiveIntensity: 0.0 },
-      trim: { color: 0xb45309, roughness: 0.22, metalness: 0.90, emissive: 0x2e1065, emissiveIntensity: 0.12 },
-      steel: { color: 0xa855f7, roughness: 0.16, metalness: 0.92, emissive: 0x581c87, emissiveIntensity: 0.18 },
+      white: { color: 0xf5f3ff, roughness: 0.16, metalness: 0.20, emissive: 0x7c3aed, emissiveIntensity: 0.24 },
+      black: { color: 0x0e0720, roughness: 0.18, metalness: 0.45, emissive: 0x6d28d9, emissiveIntensity: 0.32 },
+      trim: { color: 0xd8b4fe, roughness: 0.15, metalness: 0.95, emissive: 0x9333ea, emissiveIntensity: 0.42 },
+      steel: { color: 0xa855f7, roughness: 0.14, metalness: 0.92, emissive: 0x7e22ce, emissiveIntensity: 0.42 },
       boardLight: { color: 0xf5f3ff, roughness: 0.26, metalness: 0.12 },
       boardDark: { color: 0x0c0717, roughness: 0.22, metalness: 0.24 },
       slashTrailHex: 0x9333ea
@@ -2757,20 +2773,20 @@ export const CHESS_SKIN_CATALOG = [
     loreVi:
       'Đá Basalt Núi Lửa đen nhám viền Đồng Đỏ đúc chảy cùng mạch than hồng ấm áp. Tốt mang khiên Vảy Rồng Hỏa Tộc, Xe là Miệng Núi Lửa kiên cố, Hậu mang Cánh Rồng Nham Thạch oai phong, Vua đội Vương miện Sừng Rồng cổ đại.',
     previewSwatches: {
-      whiteHex: '#e7e5e4',
-      blackHex: '#141416',
-      trimHex: '#c2410c',
-      bladeHex: '#ea580c',
-      trailHex: '#f97316'
+      whiteHex: '#ffedd5',
+      blackHex: '#110b09',
+      trimHex: '#f97316',
+      bladeHex: '#fb923c',
+      trailHex: '#ff5722'
     },
     materials: {
-      white: { color: 0xe7e5e4, roughness: 0.32, metalness: 0.06, emissive: 0x000000, emissiveIntensity: 0.0 },
-      black: { color: 0x141416, roughness: 0.40, metalness: 0.20, emissive: 0x000000, emissiveIntensity: 0.0 },
-      trim: { color: 0xc2410c, roughness: 0.25, metalness: 0.88, emissive: 0x431407, emissiveIntensity: 0.15 },
-      steel: { color: 0xea580c, roughness: 0.20, metalness: 0.90, emissive: 0x7c2d12, emissiveIntensity: 0.20 },
-      boardLight: { color: 0xf5f5f4, roughness: 0.32, metalness: 0.08 },
-      boardDark: { color: 0x101012, roughness: 0.30, metalness: 0.20 },
-      slashTrailHex: 0xf97316
+      white: { color: 0xffedd5, roughness: 0.22, metalness: 0.15, emissive: 0x9a3412, emissiveIntensity: 0.28 },
+      black: { color: 0x110b09, roughness: 0.25, metalness: 0.40, emissive: 0xc2410c, emissiveIntensity: 0.38 },
+      trim: { color: 0xf97316, roughness: 0.18, metalness: 0.95, emissive: 0xea580c, emissiveIntensity: 0.48 },
+      steel: { color: 0xfb923c, roughness: 0.15, metalness: 0.92, emissive: 0xc2410c, emissiveIntensity: 0.45 },
+      boardLight: { color: 0xffedd5, roughness: 0.32, metalness: 0.08 },
+      boardDark: { color: 0x1c120c, roughness: 0.28, metalness: 0.24 },
+      slashTrailHex: 0xff5722
     }
   },
   {
@@ -2790,20 +2806,20 @@ export const CHESS_SKIN_CATALOG = [
     loreVi:
       'Ngọc Trai Ánh Sao kết hợp Sapphire Lam Đêm Vũ Trụ viền Bạch Kim Platinum thuần khiết. Tốt mang Quỹ Đạo Vòng Tròn Tinh Cầu thanh nhã, Xe là Đài Thiên Văn Vũ Trụ mái vòm, Hậu mang Cánh Tinh Tú Lăng Kính, Vua ngự Vương Miện Tinh Đế và Vành Đai Sao Thổ thanh lịch.',
     previewSwatches: {
-      whiteHex: '#f8fafc',
-      blackHex: '#020617',
-      trimHex: '#e2e8f0',
+      whiteHex: '#f0f9ff',
+      blackHex: '#030712',
+      trimHex: '#e0f2fe',
       bladeHex: '#38bdf8',
-      trailHex: '#2563eb'
+      trailHex: '#0284c7'
     },
     materials: {
-      white: { color: 0xf8fafc, roughness: 0.12, metalness: 0.20, emissive: 0x032442, emissiveIntensity: 0.08 },
-      black: { color: 0x020617, roughness: 0.15, metalness: 0.55, emissive: 0x02162e, emissiveIntensity: 0.10 },
-      trim: { color: 0xe2e8f0, roughness: 0.12, metalness: 0.96, emissive: 0x0c4a6e, emissiveIntensity: 0.15 },
-      steel: { color: 0x38bdf8, roughness: 0.14, metalness: 0.92, emissive: 0x0369a1, emissiveIntensity: 0.18 },
-      boardLight: { color: 0xf1f5f9, roughness: 0.20, metalness: 0.18 },
-      boardDark: { color: 0x020814, roughness: 0.16, metalness: 0.32 },
-      slashTrailHex: 0x2563eb
+      white: { color: 0xf0f9ff, roughness: 0.12, metalness: 0.25, emissive: 0x0284c7, emissiveIntensity: 0.28 },
+      black: { color: 0x030712, roughness: 0.14, metalness: 0.60, emissive: 0x0369a1, emissiveIntensity: 0.38 },
+      trim: { color: 0xe0f2fe, roughness: 0.10, metalness: 0.98, emissive: 0x38bdf8, emissiveIntensity: 0.55 },
+      steel: { color: 0x38bdf8, roughness: 0.12, metalness: 0.95, emissive: 0x0284c7, emissiveIntensity: 0.50 },
+      boardLight: { color: 0xf0fdf4, roughness: 0.20, metalness: 0.16 },
+      boardDark: { color: 0x030816, roughness: 0.16, metalness: 0.36 },
+      slashTrailHex: 0x38bdf8
     }
   }
 ];
