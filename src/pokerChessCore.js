@@ -1331,11 +1331,11 @@ class SanctumSoundEngine {
           const track = this.getCurrentTrackInfo();
           const baseVol = this.bgmVolume * (track?.intensityMultiplier || 1);
           if (mode === 'combat') {
-            this.bgmAudio.playbackRate = 1.06;
-            this.bgmAudio.volume = Math.min(1.0, baseVol * 1.25);
+            this.bgmAudio.playbackRate = 1.05;
+            this.bgmAudio.volume = Math.max(0.08, baseVol * 0.70);
           } else if (mode === 'urgent') {
             this.bgmAudio.playbackRate = 1.03;
-            this.bgmAudio.volume = Math.min(1.0, baseVol * 1.15);
+            this.bgmAudio.volume = Math.min(1.0, baseVol * 1.12);
           } else {
             this.bgmAudio.playbackRate = 1.0;
             this.bgmAudio.volume = Math.min(1.0, baseVol);
@@ -1344,6 +1344,23 @@ class SanctumSoundEngine {
       }
     }
     return this.bgmIntensity;
+  }
+
+  duckMusicForCombatImpact(durationMs = 600, duckFactor = 0.52) {
+    if (!this.bgmAudio || !this.bgmPlaying || this.muted) return;
+    try {
+      const track = this.getCurrentTrackInfo();
+      const baseVol = this.bgmVolume * (track?.intensityMultiplier || 1);
+      this.bgmAudio.volume = Math.max(0.05, baseVol * duckFactor);
+      if (this._duckTimer) clearTimeout(this._duckTimer);
+      this._duckTimer = setTimeout(() => {
+        this._duckTimer = null;
+        if (this.bgmAudio && this.bgmPlaying && !this.muted) {
+          const targetVol = this.bgmIntensity === 'combat' ? baseVol * 0.70 : baseVol;
+          this.bgmAudio.volume = Math.min(1.0, targetVol);
+        }
+      }, durationMs);
+    } catch (e) {}
   }
 
   startBattleMusic(trackIdx) {
@@ -1808,6 +1825,7 @@ class SanctumSoundEngine {
   }
 
   playBladeClash(isEmpowered = false) {
+    this.duckMusicForCombatImpact(520, 0.58);
     const ctx = this.ensureCtx();
     if (!ctx) return;
     const now = ctx.currentTime;
@@ -2035,6 +2053,7 @@ class SanctumSoundEngine {
   }
 
   playClashImpact(isKill = false, isEmpowered = false) {
+    this.duckMusicForCombatImpact(isKill ? 850 : 580, isKill ? 0.38 : 0.48);
     this.vibrateMeleeCollision(isKill);
     const ctx = this.ensureCtx();
     if (!ctx) return;

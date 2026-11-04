@@ -101,7 +101,7 @@ export function initWizardChess() {
         // balanced: native 1.0 pixel ratio and fast PCF shadows
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFShadowMap;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.shadowMap.needsUpdate = true;
       }
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -110,7 +110,7 @@ export function initWizardChess() {
     applyPerformanceSettings(performancePreset);
     renderer.shadowMap.autoUpdate = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.24;
+    renderer.toneMappingExposure = 1.15;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
@@ -898,41 +898,41 @@ export function initWizardChess() {
     // Materials for White & Black Sculpted Stone Chess Pieces & 10 3D Skins
     // =========================================================================
     const whitePieceMat = new THREE.MeshStandardMaterial({
-      color: 0xe6dfd0,
-      roughness: 0.34,
-      metalness: 0.06
+      color: 0xf5efe6,
+      roughness: 0.20,
+      metalness: 0.10
     });
 
     const blackPieceMat = new THREE.MeshStandardMaterial({
-      color: 0x222630,
-      roughness: 0.28,
-      metalness: 0.24
+      color: 0x141720,
+      roughness: 0.16,
+      metalness: 0.38
     });
 
     const goldTrimMat = new THREE.MeshStandardMaterial({
-      color: 0xd4af37,
-      roughness: 0.26,
-      metalness: 0.86
+      color: 0xf6c543,
+      roughness: 0.16,
+      metalness: 0.94
     });
 
     const forgedSteelMat = new THREE.MeshStandardMaterial({
-      color: 0xdce4ee,
-      roughness: 0.20,
-      metalness: 0.88,
-      emissive: 0x222832,
-      emissiveIntensity: 0.25
+      color: 0xe4edf7,
+      roughness: 0.15,
+      metalness: 0.92,
+      emissive: 0x162030,
+      emissiveIntensity: 0.28
     });
 
     const lightSqMat = new THREE.MeshStandardMaterial({
-      color: 0xdcd3c2,
-      roughness: 0.38,
-      metalness: 0.06
+      color: 0xede5d6,
+      roughness: 0.22,
+      metalness: 0.08
     });
 
     const darkSqMat = new THREE.MeshStandardMaterial({
-      color: 0x14171f,
-      roughness: 0.28,
-      metalness: 0.18
+      color: 0x101319,
+      roughness: 0.18,
+      metalness: 0.24
     });
 
     let boardState = Array.from({ length: 8 }, () => Array(8).fill(null));
@@ -3273,13 +3273,16 @@ export function initWizardChess() {
       canvas.width = 512;
       canvas.height = 128;
       const ctx = canvas.getContext('2d');
-      ctx.font = '900 44px Cinzel, Georgia, sans-serif';
+      ctx.font = '900 46px "Cinzel", "Cinzel Decorative", Georgia, serif';
       ctx.textAlign = 'center';
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.92)';
-      ctx.lineWidth = 8;
-      ctx.strokeText(text, 256, 78);
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+      ctx.lineWidth = 9;
+      ctx.strokeText(text, 256, 76);
       ctx.fillStyle = colorHex;
-      ctx.fillText(text, 256, 78);
+      ctx.fillText(text, 256, 76);
 
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
@@ -3470,16 +3473,27 @@ export function initWizardChess() {
       });
     }
 
+    const sparkMatCache = new Map();
+    function getCachedSparkMaterial(colorHex) {
+      if (!sparkMatCache.has(colorHex)) {
+        sparkMatCache.set(
+          colorHex,
+          new THREE.MeshBasicMaterial({
+            color: colorHex,
+            transparent: true,
+            opacity: 1.0,
+            blending: THREE.AdditiveBlending
+          })
+        );
+      }
+      return sparkMatCache.get(colorHex);
+    }
+
     function spawnCombatSparks3D(worldPos, colorHex = 0xfbbf24, count = 28, speedMul = 1.0) {
       const sparkPalette = [colorHex, 0xfde047, 0xffedd5, 0xef4444];
       for (let i = 0; i < count; i++) {
         const chosenHex = sparkPalette[i % sparkPalette.length];
-        const mat = new THREE.MeshBasicMaterial({
-          color: chosenHex,
-          transparent: true,
-          opacity: 1.0,
-          blending: THREE.AdditiveBlending
-        });
+        const mat = getCachedSparkMaterial(chosenHex);
         const spark = new THREE.Mesh(sharedSparkGeo, mat);
         const sz = (0.55 + Math.random() * 0.85) * (speedMul > 1.1 ? 1.15 : 1.0);
         spark.scale.setScalar(sz);
@@ -9570,7 +9584,6 @@ export function initWizardChess() {
         sp.life -= dt;
         if (sp.life <= 0) {
           if (sp.mesh) scene.remove(sp.mesh);
-          if (sp.mat) sp.mat.dispose();
           combatSparks3D.splice(i, 1);
           continue;
         }
