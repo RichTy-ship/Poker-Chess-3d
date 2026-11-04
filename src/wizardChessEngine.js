@@ -3637,7 +3637,9 @@ export function initWizardChess() {
         });
       }
 
-      emitPokerChessSync();
+      if (!options.inDuel) {
+        emitPokerChessSync();
+      }
       return true;
     }
 
@@ -3697,7 +3699,9 @@ export function initWizardChess() {
         });
       }
 
-      emitPokerChessSync();
+      if (!options.inDuel) {
+        emitPokerChessSync();
+      }
       return true;
     }
 
@@ -3801,11 +3805,11 @@ export function initWizardChess() {
       nextAction.clampWhenFinished = !loop;
       if (isAttack) {
         const prof = ATTACK_SYNC_PROFILES[piece.type] || ATTACK_SYNC_PROFILES.queen;
-        nextAction.timeScale = prof.timeScale * 1.35;
+        nextAction.timeScale = prof.timeScale * 2.2;
       } else if (lowerKw.includes('move') || lowerKw.includes('walk') || lowerKw.includes('run')) {
-        nextAction.timeScale = 1.45;
+        nextAction.timeScale = 1.85;
       } else {
-        nextAction.timeScale = 1.15;
+        nextAction.timeScale = 1.25;
       }
       if (isIdle && (!fadeSeconds || fadeSeconds <= 0.01)) {
         nextAction.time = ((piece.r * 5 + piece.c * 3) % 16) * 0.11;
@@ -5167,24 +5171,24 @@ export function initWizardChess() {
         scoreDuelPerpOcclusion(prefPerp) > scoreDuelPerpOcclusion(altPerp) + 0.25 ? altPerp : prefPerp;
 
       const duelCamMid = new THREE.Vector3(
-        midPoint.x + chosenPerp.x * 1.34 - dirX * 0.44,
-        BOARD_SURFACE_Y + 0.96,
-        midPoint.z + chosenPerp.z * 1.34 - dirZ * 0.44
+        midPoint.x + chosenPerp.x * 1.55 - dirX * 0.32,
+        BOARD_SURFACE_Y + 1.20,
+        midPoint.z + chosenPerp.z * 1.55 - dirZ * 0.32
       );
       const duelCamClose = new THREE.Vector3(
-        midPoint.x + chosenPerp.x * 0.92 + dirX * 0.18,
-        BOARD_SURFACE_Y + 0.74,
-        midPoint.z + chosenPerp.z * 0.92 + dirZ * 0.18
+        midPoint.x + chosenPerp.x * 1.30 + dirX * 0.10,
+        BOARD_SURFACE_Y + 1.02,
+        midPoint.z + chosenPerp.z * 1.30 + dirZ * 0.10
       );
       const duelTargetStart = new THREE.Vector3(
-        strikePos.x + dirX * 0.10,
-        BOARD_SURFACE_Y + 0.34,
-        strikePos.z + dirZ * 0.10
+        strikePos.x + dirX * 0.08,
+        BOARD_SURFACE_Y + 0.38,
+        strikePos.z + dirZ * 0.08
       );
       const duelTargetEnd = new THREE.Vector3(
-        endPos.x - dirX * 0.05,
-        BOARD_SURFACE_Y + 0.30,
-        endPos.z - dirZ * 0.05
+        endPos.x - dirX * 0.04,
+        BOARD_SURFACE_Y + 0.36,
+        endPos.z - dirZ * 0.04
       );
 
       function evalQuadraticBezier(outVec, p0, p1, p2, t) {
@@ -5227,11 +5231,11 @@ export function initWizardChess() {
       }
 
       const squaresMoved = Math.max(1, Math.hypot(toR - fromR, toC - fromC));
-      const stdMoveDuration = Number((0.36 + Math.max(0, squaresMoved - 1) * 0.06).toFixed(3));
+      const stdMoveDuration = Number((0.28 + Math.max(0, squaresMoved - 1) * 0.04).toFixed(3));
       const atkProfile = ATTACK_SYNC_PROFILES[piece.type] || ATTACK_SYNC_PROFILES.queen;
       const defProfile = ATTACK_SYNC_PROFILES[captured?.type] || ATTACK_SYNC_PROFILES.queen;
-      const atkSpeed = atkProfile.timeScale * 1.35;
-      const defSpeed = defProfile.timeScale * 1.35;
+      const atkSpeed = atkProfile.timeScale * 2.2;
+      const defSpeed = defProfile.timeScale * 2.2;
       const SWING_START_CLIP_TIME = atkProfile.swingStartClip;
       const CONTACT_CLIP_TIME = atkProfile.contactClip;
       const BLOW_CLIP_TIME = atkProfile.blowClip;
@@ -5239,14 +5243,14 @@ export function initWizardChess() {
       const DEF_BLOW_CLIP_TIME = defProfile.blowClip;
 
       const tApproach = isCapture
-        ? Number((0.38 + Math.max(0, squaresMoved - 1) * 0.05).toFixed(3))
+        ? Number((0.22 + Math.max(0, squaresMoved - 1) * 0.035).toFixed(3))
         : stdMoveDuration;
       const tContact = isCapture ? (tApproach + CONTACT_CLIP_TIME / atkSpeed) : stdMoveDuration;
       const tImpact = isCapture ? (tApproach + BLOW_CLIP_TIME / atkSpeed) : stdMoveDuration;
       const canCounterAttack = Boolean(
         isCapture && combatSim && !combatSim.firstStrikeTriggered && combatSim.defCounterDmg > 0
       );
-      const tCounterStart = canCounterAttack ? Number((tImpact + 0.14).toFixed(3)) : tImpact;
+      const tCounterStart = canCounterAttack ? Number((tImpact + 0.04).toFixed(3)) : tImpact;
       const tCounterContact = canCounterAttack
         ? Number((tCounterStart + DEF_CONTACT_CLIP_TIME / defSpeed).toFixed(3))
         : tImpact;
@@ -5254,11 +5258,11 @@ export function initWizardChess() {
         ? Number((tCounterStart + DEF_BLOW_CLIP_TIME / defSpeed).toFixed(3))
         : tImpact;
       const tShatterResolve = isCapture
-        ? Number(((canCounterAttack ? tCounterImpact : tImpact) + 0.15).toFixed(3))
+        ? Number(((canCounterAttack ? tCounterImpact : tImpact) + 0.06).toFixed(3))
         : stdMoveDuration;
-      const tStrikeDone = isCapture ? Number((tShatterResolve + 0.18).toFixed(3)) : stdMoveDuration;
+      const tStrikeDone = isCapture ? Number((tShatterResolve + 0.08).toFixed(3)) : stdMoveDuration;
       const camReturnDist = savedCamPos.distanceTo(duelCamClose);
-      const returnDuration = isCapture ? Number((0.48 + Math.min(0.20, camReturnDist * 0.05)).toFixed(3)) : 0;
+      const returnDuration = isCapture ? Number((0.22 + Math.min(0.08, camReturnDist * 0.02)).toFixed(3)) : 0;
       const totalDuration = isCapture ? (tStrikeDone + returnDuration) : stdMoveDuration;
 
       const atkHpStart = piece.hp;
@@ -5664,6 +5668,7 @@ export function initWizardChess() {
         lastEmpoweredSquare = null;
         ultimateTargetSquares = [];
         isAnimatingMove = false;
+        renderer.shadowMap.needsUpdate = true;
         soundFX.playTurnStartFanfare(currentTurn);
         updateAllUnitBadges();
         updateTurnUI();
@@ -5918,8 +5923,8 @@ export function initWizardChess() {
                 defDies && canCounterAttack
                   ? Math.max(1, combatSim.defHpAfter)
                   : Math.max(0, combatSim.defHpAfter);
-              const drainProgress = Math.min(1, Math.max(0, (elapsed - beat1ImpactTime) / 0.26));
-              const trailProgress = Math.min(1, Math.max(0, (elapsed - beat1ImpactTime) / 0.42));
+              const drainProgress = Math.min(1, Math.max(0, (elapsed - beat1ImpactTime) / 0.14));
+              const trailProgress = Math.min(1, Math.max(0, (elapsed - beat1ImpactTime) / 0.22));
               const easeDrain = 1 - Math.pow(1 - drainProgress, 2.2);
               const easeTrail = Math.pow(trailProgress, 1.4);
               captured.displayHp = defHpStart + (defTargetHp - defHpStart) * easeDrain;
@@ -6068,8 +6073,8 @@ export function initWizardChess() {
             // Smoothly drain Attacker's HP bar over 0.26s ONLY AFTER Beat 2B counter-blow impact!
             if (canCounterAttack && counterImpactTriggered && piece && combatSim) {
               const atkTargetHp = Math.max(0, combatSim.atkHpAfter);
-              const atkDrainProg = Math.min(1, Math.max(0, (elapsed - impactActualTime) / 0.26));
-              const atkTrailProg = Math.min(1, Math.max(0, (elapsed - impactActualTime) / 0.42));
+              const atkDrainProg = Math.min(1, Math.max(0, (elapsed - impactActualTime) / 0.14));
+              const atkTrailProg = Math.min(1, Math.max(0, (elapsed - impactActualTime) / 0.22));
               const easeAtkDrain = 1 - Math.pow(1 - atkDrainProg, 2.2);
               const easeAtkTrail = Math.pow(atkTrailProg, 1.4);
               piece.displayHp = atkHpStart + (atkTargetHp - atkHpStart) * easeAtkDrain;
@@ -6090,7 +6095,7 @@ export function initWizardChess() {
             if (
               !lethalShatterTriggered &&
               counterImpactTriggered &&
-              elapsed >= impactActualTime + 0.24
+              elapsed >= impactActualTime + 0.08
             ) {
               lethalShatterTriggered = true;
               if (defDies && captured && captured.mesh) {
@@ -6125,11 +6130,11 @@ export function initWizardChess() {
               postStrikePiecePos.copy(piece.mesh.position);
             }
 
-            if (shatterTriggered && elapsed >= impactActualTime && elapsed <= impactActualTime + 0.26) {
-              const shakeProgress = (elapsed - impactActualTime) / 0.26;
-              const decay = (1 - shakeProgress) * (1 - shakeProgress);
-              const amp = 0.026 * decay;
-              camera.position.y += Math.sin(shakeProgress * Math.PI * 8) * amp;
+            if (shatterTriggered && elapsed >= impactActualTime && elapsed <= impactActualTime + 0.12) {
+              const shakeProgress = (elapsed - impactActualTime) / 0.12;
+              const decay = 1 - shakeProgress;
+              const amp = 0.012 * decay;
+              camera.position.y += Math.sin(shakeProgress * Math.PI * 4) * amp;
             }
           }
         } else {
@@ -9860,35 +9865,12 @@ export function initWizardChess() {
           d.vel.x *= 0.72;
           d.vel.z *= 0.72;
         }
-        // Bounce flying stone shards off intact pieces on the board (spatial neighborhood check)
-        if (d.mesh.position.y < BOARD_SURFACE_Y + 0.48) {
-          const centerC = Math.round(d.mesh.position.x / BOARD_SQ_SIZE + 3.5);
-          const centerR = Math.round(d.mesh.position.z / BOARD_SQ_SIZE + 3.5);
-          const minR = Math.max(0, centerR - 1);
-          const maxR = Math.min(7, centerR + 1);
-          const minC = Math.max(0, centerC - 1);
-          const maxC = Math.min(7, centerC + 1);
-          for (let r = minR; r <= maxR; r++) {
-            for (let c = minC; c <= maxC; c++) {
-              const p = boardState[r]?.[c];
-              if (p && p.mesh) {
-                const rx = d.mesh.position.x - p.mesh.position.x;
-                const rz = d.mesh.position.z - p.mesh.position.z;
-                const rDist = Math.hypot(rx, rz);
-                if (rDist < 0.165 && rDist > 0.0001) {
-                  const nx = rx / rDist;
-                  const nz = rz / rDist;
-                  d.mesh.position.x = p.mesh.position.x + nx * 0.165;
-                  d.mesh.position.z = p.mesh.position.z + nz * 0.165;
-                  const vn = d.vel.x * nx + d.vel.z * nz;
-                  if (vn < 0) {
-                    d.vel.x -= 1.55 * vn * nx;
-                    d.vel.z -= 1.55 * vn * nz;
-                  }
-                }
-              }
-            }
-          }
+        // Fast & natural stone debris shard scattering
+        if (d.mesh.position.y < BOARD_SURFACE_Y + 0.03) {
+          d.mesh.position.y = BOARD_SURFACE_Y + 0.03;
+          d.vel.y *= -0.32;
+          d.vel.x *= 0.68;
+          d.vel.z *= 0.68;
         }
         d.mesh.rotation.x += d.rotVel.x * dt;
         d.mesh.rotation.y += d.rotVel.y * dt;
@@ -9928,7 +9910,7 @@ export function initWizardChess() {
         renderer.shadowMap.enabled
       ) {
         shadowUpdateFrameCounter++;
-        if (shadowUpdateFrameCounter % 2 === 0) {
+        if (shadowUpdateFrameCounter % 6 === 0) {
           renderer.shadowMap.needsUpdate = true;
         }
       }
