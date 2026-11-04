@@ -74,16 +74,53 @@ export function initWizardChess() {
       powerPreference: 'high-performance',
       preserveDrawingBuffer: isAutomatedTest
     });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    let performancePreset = 'balanced';
+    try {
+      const savedPreset = localStorage.getItem('pokerchess_perf_mode');
+      if (savedPreset === 'performance' || savedPreset === 'balanced' || savedPreset === 'ultra') {
+        performancePreset = savedPreset;
+      }
+    } catch (e) {}
+
+    function applyPerformanceSettings(preset) {
+      performancePreset = preset;
+      try {
+        localStorage.setItem('pokerchess_perf_mode', preset);
+      } catch (e) {}
+
+      if (preset === 'performance') {
+        renderer.setPixelRatio(0.85);
+        renderer.shadowMap.enabled = false;
+      } else if (preset === 'ultra') {
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.needsUpdate = true;
+      } else {
+        // balanced: native 1.0 pixel ratio and fast PCF shadows
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFShadowMap;
+        renderer.shadowMap.needsUpdate = true;
+      }
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    applyPerformanceSettings(performancePreset);
     renderer.shadowMap.autoUpdate = false;
-    renderer.shadowMap.needsUpdate = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.24;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
+
+    function cyclePerformancePreset() {
+      const order = ['balanced', 'performance', 'ultra'];
+      const nextIdx = (order.indexOf(performancePreset) + 1) % order.length;
+      applyPerformanceSettings(order[nextIdx]);
+      emitPokerChessSync();
+      return performancePreset;
+    }
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x070a12);
@@ -2089,6 +2126,12 @@ export function initWizardChess() {
     const activeMixers = [];
     const shatterDebris = [];
     const clock = new THREE.Clock();
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+    let currentFPS = 60;
+    let shadowUpdateFrameCounter = 0;
+    let idleMixerFrameCounter = 0;
+    let brazierThrottleCounter = 0;
 
     const boardGroup = new THREE.Group();
     scene.add(boardGroup);
@@ -4316,6 +4359,8 @@ export function initWizardChess() {
 
     function captureBoardSnapshot() {
       return {
+        fps: currentFPS,
+        performancePreset,
         currentTurn,
         turnNumber,
         turnPhase,
@@ -5050,7 +5095,8 @@ export function initWizardChess() {
 
     function spawnStoneShatter(worldPos, color) {
       const mat = color === 'w' ? whitePieceMat : blackPieceMat;
-      for (let i = 0; i < 32; i++) {
+      const fragCount = performancePreset === 'performance' ? 14 : 24;
+      for (let i = 0; i < fragCount; i++) {
         const sz = 0.024 + Math.random() * 0.048;
         const frag = new THREE.Mesh(sharedShardGeo, mat);
         frag.scale.setScalar(sz);
@@ -5059,7 +5105,7 @@ export function initWizardChess() {
           worldPos.y + 0.10 + Math.random() * 0.28,
           worldPos.z + (Math.random() - 0.5) * 0.16
         );
-        frag.castShadow = true;
+        frag.castShadow = false;
         scene.add(frag);
         shatterDebris.push({
           mesh: frag,
@@ -7415,7 +7461,7 @@ export function initWizardChess() {
           BOARD_SURFACE_Y + 0.04 + Math.random() * 0.10,
           worldPos.z + (Math.random() - 0.5) * 0.14
         );
-        frag.castShadow = true;
+        frag.castShadow = false;
         scene.add(frag);
         shatterDebris.push({
           mesh: frag,
@@ -8623,7 +8669,9 @@ export function initWizardChess() {
             soundFX.playSquareTarget(Boolean(hoveredLegal.capture));
           }
         }
-        emitPokerChessSync();
+        if (prevPiece || nextPiece || selectedSquare) {
+          emitPokerChessSync();
+        }
       }
     });
 
@@ -9828,10 +9876,12 @@ export function initWizardChess() {
           activeMixers[i].update(dt);
         }
       } else {
-        mixerBatchParity = (mixerBatchParity + 1) & 1;
-        const idleDt = dt * 2;
-        for (let i = mixerBatchParity; i < activeMixers.length; i += 2) {
-          activeMixers[i].update(idleDt);
+        idleMixerFrameCounter = (idleMixerFrameCounter + 1) % 3;
+        if (idleMixerFrameCounter === 0) {
+          const idleDt = dt * 3;
+          for (let i = 0; i < activeMixers.length; i++) {
+            activeMixers[i].update(idleDt);
+          }
         }
       }
 
@@ -10327,11 +10377,17 @@ export function initWizardChess() {
           d.vel.x *= 0.72;
           d.vel.z *= 0.72;
         }
-        // Bounce flying stone shards off intact pieces on the board so all statues feel solid
+        // Bounce flying stone shards off intact pieces on the board (spatial neighborhood check)
         if (d.mesh.position.y < BOARD_SURFACE_Y + 0.48) {
-          for (let r = 0; r < 8; r++) {
-            for (let c = 0; c < 8; c++) {
-              const p = boardState[r][c];
+          const centerC = Math.round(d.mesh.position.x / BOARD_SQ_SIZE + 3.5);
+          const centerR = Math.round(d.mesh.position.z / BOARD_SQ_SIZE + 3.5);
+          const minR = Math.max(0, centerR - 1);
+          const maxR = Math.min(7, centerR + 1);
+          const minC = Math.max(0, centerC - 1);
+          const maxC = Math.min(7, centerC + 1);
+          for (let r = minR; r <= maxR; r++) {
+            for (let c = minC; c <= maxC; c++) {
+              const p = boardState[r]?.[c];
               if (p && p.mesh) {
                 const rx = d.mesh.position.x - p.mesh.position.x;
                 const rz = d.mesh.position.z - p.mesh.position.z;
@@ -10360,34 +10416,38 @@ export function initWizardChess() {
         }
       }
 
-      // Advance volumetric GLSL brazier flames & active warm firelight flicker
-      for (let i = 0; i < brazierFireUniforms.length; i++) {
-        brazierFireUniforms[i].uTime.value = elapsedTotal;
-      }
-      for (let i = 0; i < brazierGlowSprites.length; i++) {
-        const sp = brazierGlowSprites[i];
-        const baseOp = sp.userData.baseOpacity || 0.4;
-        const seed = sp.userData.seed || 0;
-        sp.material.opacity =
-          baseOp +
-          Math.sin(elapsedTotal * 5.2 + seed) * 0.045 +
-          Math.cos(elapsedTotal * 8.4 + seed * 1.3) * 0.025;
-      }
-      for (let i = 0; i < brazierLights.length; i++) {
-        const baseInt = brazierLights[i].userData.baseIntensity || 3.2;
-        brazierLights[i].intensity =
-          baseInt +
-          Math.sin(elapsedTotal * 5.6 + i * 1.7) * 0.28 +
-          Math.cos(elapsedTotal * 9.1 + i) * 0.16;
+      // Advance volumetric GLSL brazier flames & active warm firelight flicker (throttled)
+      brazierThrottleCounter = (brazierThrottleCounter + 1) % 2;
+      if (brazierThrottleCounter === 0) {
+        for (let i = 0; i < brazierFireUniforms.length; i++) {
+          brazierFireUniforms[i].uTime.value = elapsedTotal;
+        }
+        for (let i = 0; i < brazierGlowSprites.length; i++) {
+          const sp = brazierGlowSprites[i];
+          const baseOp = sp.userData.baseOpacity || 0.4;
+          const seed = sp.userData.seed || 0;
+          sp.material.opacity =
+            baseOp +
+            Math.sin(elapsedTotal * 5.2 + seed) * 0.045 +
+            Math.cos(elapsedTotal * 8.4 + seed * 1.3) * 0.025;
+        }
+        for (let i = 0; i < brazierLights.length; i++) {
+          const baseInt = brazierLights[i].userData.baseIntensity || 3.2;
+          brazierLights[i].intensity =
+            baseInt +
+            Math.sin(elapsedTotal * 5.6 + i * 1.7) * 0.28 +
+            Math.cos(elapsedTotal * 9.1 + i) * 0.16;
+        }
       }
 
       if (
-        isAnimatingMove ||
-        activeMoveTweens.length > 0 ||
-        shatterDebris.length > 0 ||
-        checkmateState.active
+        (isAnimatingMove || activeMoveTweens.length > 0 || checkmateState.active) &&
+        renderer.shadowMap.enabled
       ) {
-        renderer.shadowMap.needsUpdate = true;
+        shadowUpdateFrameCounter++;
+        if (shadowUpdateFrameCounter % 2 === 0) {
+          renderer.shadowMap.needsUpdate = true;
+        }
       }
 
       if (doRender) {
@@ -10396,6 +10456,10 @@ export function initWizardChess() {
     }
 
     let manualStepMode = false;
+    window.wizardChess.cyclePerformancePreset = cyclePerformancePreset;
+    window.wizardChess.setPerformancePreset = applyPerformanceSettings;
+    window.wizardChess.getPerformancePreset = () => performancePreset;
+    window.wizardChess.getFPS = () => currentFPS;
     window.wizardChess.setManualStepMode = (v) => {
       manualStepMode = Boolean(v);
     };
@@ -10405,6 +10469,13 @@ export function initWizardChess() {
         requestAnimationFrame(animate);
       }
       if (manualStepMode) return;
+      const now = performance.now();
+      frameCount++;
+      if (now - lastFpsTime >= 500) {
+        currentFPS = Math.round((frameCount * 1000) / (now - lastFpsTime));
+        frameCount = 0;
+        lastFpsTime = now;
+      }
       const dt = Math.min(clock.getDelta(), 0.1);
       stepScene(dt || 0.016, true);
     }

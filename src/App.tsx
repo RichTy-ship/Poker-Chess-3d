@@ -368,6 +368,8 @@ function renderSkin3DModelSilhouette(skin: (typeof CHESS_SKIN_CATALOG)[number]) 
 }
 
 interface PokerChessSyncState {
+  fps?: number;
+  performancePreset?: 'performance' | 'balanced' | 'ultra';
   currentTurn: 'w' | 'b';
   playerColor: 'w' | 'b';
   turnNumber?: number;
@@ -532,6 +534,10 @@ type WizardChessWindow = {
     executeSelectedMoveTo?: (toR: number, toC: number) => boolean;
     setTurnTimeRemaining?: (sec: number) => number;
     getPokerChessUIState?: () => PokerChessSyncState;
+    cyclePerformancePreset?: () => string;
+    setPerformancePreset?: (preset: 'performance' | 'balanced' | 'ultra') => void;
+    getPerformancePreset?: () => string;
+    getFPS?: () => number;
   };
 };
 
@@ -1005,6 +1011,48 @@ export default function App() {
 
         {/* Right Compact Quick Toolbar (Never wraps onto multiple rows) */}
         <div className="hud-quick-toolbar">
+          {/* Real-time FPS & Performance Mode Switcher */}
+          <button
+            type="button"
+            className={`hud-btn fps-perf-btn ${
+              gameState?.performancePreset === 'performance'
+                ? 'perf-mode'
+                : gameState?.performancePreset === 'ultra'
+                  ? 'ultra-mode'
+                  : 'balanced-mode'
+            }`}
+            id="btn-perf-preset"
+            title={`Tốc độ khung hình: ${gameState?.fps ?? 60} FPS | Cấu hình: ${
+              gameState?.performancePreset === 'performance'
+                ? '⚡ Siêu Mượt (Max FPS)'
+                : gameState?.performancePreset === 'ultra'
+                  ? '💎 Đồ Họa Cao (Ultra)'
+                  : '⚖ Cân Bằng (Balanced)'
+            } — Nhấp để đổi cấu hình tối ưu FPS`}
+            onMouseEnter={() => getEngine()?.playUIHover?.()}
+            onClick={() => {
+              getEngine()?.playUIClick?.();
+              getEngine()?.cyclePerformancePreset?.();
+            }}
+          >
+            <span
+              className={`fps-dot ${
+                (gameState?.fps ?? 60) >= 50
+                  ? 'fps-good'
+                  : (gameState?.fps ?? 60) >= 30
+                    ? 'fps-med'
+                    : 'fps-low'
+              }`}
+            />
+            <span className="fps-val">{gameState?.fps ?? 60} FPS</span>
+            <span className="perf-badge">
+              {gameState?.performancePreset === 'performance'
+                ? '⚡ Max'
+                : gameState?.performancePreset === 'ultra'
+                  ? '💎 Ultra'
+                  : '⚖ Chuẩn'}
+            </span>
+          </button>
           <button
             type="button"
             className="hud-btn elo-rank-top-pill"

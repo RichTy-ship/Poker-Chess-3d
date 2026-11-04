@@ -4788,3 +4788,73 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   margin: 2px 0 4px;
 }
 
+
+/* Real-time FPS & Performance Preset Switcher */
+.hud-btn.fps-perf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90));
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #f1f5f9;
+  font-weight: 700;
+  padding: 4px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.hud-btn.fps-perf-btn:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+  transform: translateY(-1px);
+}
+
+.hud-btn.fps-perf-btn.perf-mode {
+  border-color: rgba(34, 197, 94, 0.65);
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.85), rgba(15, 23, 42, 0.95));
+}
+
+.hud-btn.fps-perf-btn.ultra-mode {
+  border-color: rgba(217, 70, 239, 0.65);
+  background: linear-gradient(135deg, rgba(74, 4, 78, 0.85), rgba(15, 23, 42, 0.95));
+}
+
+.fps-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fps-dot.fps-good {
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+}
+
+.fps-dot.fps-med {
+  background: #eab308;
+  box-shadow: 0 0 8px #eab308;
+}
+
+.fps-dot.fps-low {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+
+.fps-val {
+  font-size: 0.74rem;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+
+.perf-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+}
