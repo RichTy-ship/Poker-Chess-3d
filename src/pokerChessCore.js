@@ -2379,6 +2379,91 @@ class SanctumSoundEngine {
       thunder.stop(now + 1.58);
     }
   }
+
+  setActiveSkin(skinId) {
+    this.activeSkinId = skinId || 'classic_sanctum';
+  }
+
+  playSkinFinisherSound(skinId = this.activeSkinId) {
+    const ctx = this.ensureCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const sId = skinId || this.activeSkinId || 'classic_sanctum';
+
+    if (sId === 'frost_valkyrie') {
+      const freqs = [1760, 2640, 3520, 5280];
+      for (let i = 0; i < freqs.length; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freqs[i], now);
+        osc.frequency.exponentialRampToValueAtTime(freqs[i] * 0.45, now + 0.65);
+        gain.gain.setValueAtTime(0.18 * this.sfxVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+        osc.connect(gain);
+        this._connectToSanctumSpace(gain, 0.95, 0.85, i % 2 === 0 ? -0.35 : 0.35);
+        osc.start(now);
+        osc.stop(now + 0.68);
+      }
+    } else if (sId === 'infernal_drake') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(105, now);
+      osc.frequency.exponentialRampToValueAtTime(26, now + 0.72);
+      gain.gain.setValueAtTime(0.35 * this.sfxVolume, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.72);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(450, now);
+      lp.frequency.exponentialRampToValueAtTime(60, now + 0.72);
+      osc.connect(lp).connect(gain);
+      this._connectToSanctumSpace(gain, 1.0, 0.75, 0);
+      osc.start(now);
+      osc.stop(now + 0.75);
+    } else if (sId === 'jade_dynasty') {
+      const freqs = [880, 1320, 1760];
+      for (let i = 0; i < freqs.length; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freqs[i], now);
+        gain.gain.setValueAtTime(0.22 * this.sfxVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+        osc.connect(gain);
+        this._connectToSanctumSpace(gain, 0.85, 0.90, 0);
+        osc.start(now);
+        osc.stop(now + 1.15);
+      }
+    } else if (sId === 'celestial_eternity') {
+      const freqs = [659.25, 987.77, 1318.51, 1975.53];
+      for (let i = 0; i < freqs.length; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freqs[i], now);
+        osc.frequency.exponentialRampToValueAtTime(freqs[i] * 1.45, now + 0.95);
+        gain.gain.setValueAtTime(0.15 * this.sfxVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+        osc.connect(gain);
+        this._connectToSanctumSpace(gain, 0.90, 0.95, 0);
+        osc.start(now);
+        osc.stop(now + 1.0);
+      }
+    } else if (sId === 'abyssal_necromancer') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(110, now + 0.85);
+      gain.gain.setValueAtTime(0.26 * this.sfxVolume, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.85);
+      osc.connect(gain);
+      this._connectToSanctumSpace(gain, 0.95, 0.85, 0);
+      osc.start(now);
+      osc.stop(now + 0.9);
+    }
+  }
 }
 
 export function triggerMeleeHapticVibration(options = {}) {

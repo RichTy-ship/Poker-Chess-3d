@@ -1010,6 +1010,7 @@ export function initWizardChess() {
       }
 
       const bodyMat = pieceObj.color === 'w' ? whitePieceMat : blackPieceMat;
+      const unitLvl = pieceObj.level || 1;
       const trimMat = goldTrimMat;
       const steelMat = forgedSteelMat;
       const glowMat = skinGlowAccentMat;
@@ -1081,6 +1082,32 @@ export function initWizardChess() {
         const platOrbit = new THREE.Mesh(new THREE.TorusGeometry(0.34 * S, 0.014 * S, 8, 32), trimMat);
         platOrbit.rotation.x = Math.PI / 2;
         baseGroup.add(starlightDisc, platOrbit);
+      }
+      // RPG LEVEL-UP 3D EVOLUTION (Tiers of honor directly visible on the piece)
+      if (unitLvl >= 2) {
+        // Level 2: Gilded elevated base ring tier & dual shoulder honor rivets
+        const lvl2Ring = new THREE.Mesh(new THREE.TorusGeometry(0.26 * S, 0.016 * S, 6, 20), trimMat);
+        lvl2Ring.position.set(0, 0.055, 0);
+        lvl2Ring.rotation.x = Math.PI / 2;
+        baseGroup.add(lvl2Ring);
+
+        const honorPipL = new THREE.Mesh(new THREE.OctahedronGeometry(0.024 * S, 0), trimMat);
+        honorPipL.position.set(-0.11 * S, 0.52 * H, 0.04 * S);
+        const honorPipR = honorPipL.clone();
+        honorPipR.position.x = 0.11 * S;
+        skinGroup.add(honorPipL, honorPipR);
+      }
+      if (unitLvl >= 3) {
+        // Level 3 (Champion Apex): Floating Golden Apex Diadem & ground aura ring
+        const apexHalo = new THREE.Mesh(new THREE.TorusGeometry(0.12 * S, 0.014 * S, 6, 16), trimMat);
+        apexHalo.position.set(0, 0.98 * H, 0);
+        apexHalo.rotation.x = Math.PI / 2;
+        skinGroup.add(apexHalo);
+
+        const groundAura = new THREE.Mesh(new THREE.RingGeometry(0.34 * S, 0.38 * S, 24), glowMat);
+        groundAura.position.set(0, 0.005, 0);
+        groundAura.rotation.x = -Math.PI / 2;
+        skinGroup.add(groundAura);
       }
       skinGroup.add(baseGroup);
 
@@ -3331,6 +3358,38 @@ export function initWizardChess() {
     );
 
     const sharedSparkGeo = new THREE.OctahedronGeometry(0.022, 0);
+
+    // =========================================================================
+    // THEMED AMBIENT MICRO-AURA & STARDUST PARTICLE ENGINE (64 instanced motes)
+    // =========================================================================
+    const AMBIENT_MOTE_COUNT = 64;
+    const ambientMoteGeo = new THREE.DodecahedronGeometry(0.014, 0);
+    const ambientMoteMat = new THREE.MeshBasicMaterial({
+      color: 0xfde047,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const ambientMoteInstanced = new THREE.InstancedMesh(ambientMoteGeo, ambientMoteMat, AMBIENT_MOTE_COUNT);
+    ambientMoteInstanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(ambientMoteInstanced);
+
+    const ambientMoteData = Array.from({ length: AMBIENT_MOTE_COUNT }, (_, idx) => ({
+      x: (Math.random() - 0.5) * 3.2,
+      y: BOARD_SURFACE_Y + 0.08 + Math.random() * 0.90,
+      z: (Math.random() - 0.5) * 3.2,
+      vx: (Math.random() - 0.5) * 0.08,
+      vy: 0.035 + Math.random() * 0.065,
+      vz: (Math.random() - 0.5) * 0.08,
+      rotSpeed: (Math.random() - 0.5) * 2.5,
+      scale: 0.6 + Math.random() * 0.7,
+      phase: idx * 0.28
+    }));
+    const dummyMoteMat4 = new THREE.Matrix4();
+    const dummyMotePos = new THREE.Vector3();
+    const dummyMoteScale = new THREE.Vector3();
+    const dummyMoteQuat = new THREE.Quaternion();
 
     function spawnCombatShockwave3D(worldPos, colorHex = 0xf5d76e, isKill = false, isEmpowered = false) {
       const primaryColor = isKill ? 0xef4444 : colorHex;
@@ -9362,6 +9421,30 @@ export function initWizardChess() {
       } else if (soundFX.isLowTimeTickingActive()) {
         soundFX.stopLowTimeTickingLoop(true);
       }
+
+      // Animate Themed Ambient Micro-Aura & Stardust motes
+      const currentSkinTrailHex = activeSkinSlashHex || 0xfde047;
+      if (ambientMoteMat.color.getHex() !== currentSkinTrailHex) {
+        ambientMoteMat.color.setHex(currentSkinTrailHex);
+      }
+      for (let i = 0; i < AMBIENT_MOTE_COUNT; i++) {
+        const m = ambientMoteData[i];
+        m.y += m.vy * dt;
+        m.x += Math.sin(elapsedTotal * 1.4 + m.phase) * dt * 0.10;
+        m.z += Math.cos(elapsedTotal * 1.3 + m.phase) * dt * 0.10;
+        if (m.y > BOARD_SURFACE_Y + 1.25) {
+          m.y = BOARD_SURFACE_Y + 0.05;
+          m.x = (Math.random() - 0.5) * 3.0;
+          m.z = (Math.random() - 0.5) * 3.0;
+        }
+        dummyMotePos.set(m.x, m.y, m.z);
+        const oscScale = m.scale * (0.8 + Math.sin(elapsedTotal * 2.8 + m.phase) * 0.22);
+        dummyMoteScale.set(oscScale, oscScale, oscScale);
+        dummyMoteQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), elapsedTotal * m.rotSpeed);
+        dummyMoteMat4.compose(dummyMotePos, dummyMoteQuat, dummyMoteScale);
+        ambientMoteInstanced.setMatrixAt(i, dummyMoteMat4);
+      }
+      ambientMoteInstanced.instanceMatrix.needsUpdate = true;
 
       // Animate 3D Floating Combat Texts (Damage, Armor Block, Heal, Level Up, Combo Seal)
       for (let i = floatingTexts3D.length - 1; i >= 0; i--) {
