@@ -4095,7 +4095,7 @@ export function initWizardChess() {
         typeof options.headingRad === 'number' ? options.headingRad : defaultHeading;
 
       piece.combatAnimState = 'MELEE_ATTACK';
-      piece.combatAnimTimer = 0.88;
+      piece.combatAnimTimer = 0.45;
 
       playPieceClip(piece, 'Attack', false, 0.06);
       if (!options.inDuel) {
@@ -4131,7 +4131,7 @@ export function initWizardChess() {
           homePos: homePos.clone(),
           headingRad,
           elapsed: 0,
-          duration: 0.78
+          duration: 0.42
         });
       }
 
@@ -4149,7 +4149,7 @@ export function initWizardChess() {
         typeof options.headingRad === 'number' ? options.headingRad : defaultHeading;
 
       piece.combatAnimState = 'MELEE_DEFEND';
-      piece.combatAnimTimer = 0.88;
+      piece.combatAnimTimer = 0.45;
 
       if (!options.isLethal) {
         const hasDefClip =
@@ -4157,7 +4157,7 @@ export function initWizardChess() {
           Object.keys(piece.actions).some((k) => k.toLowerCase().includes('defend'));
         playPieceClip(piece, hasDefClip ? 'Defend' : 'Attack', false, 0.06);
         if (piece.currentAction && !hasDefClip) {
-          piece.currentAction.timeScale = 0.74;
+          piece.currentAction.timeScale = 1.25;
         }
       }
 
@@ -4191,7 +4191,7 @@ export function initWizardChess() {
           homePos: homePos.clone(),
           headingRad,
           elapsed: 0,
-          duration: 0.78
+          duration: 0.42
         });
       }
 
@@ -4299,9 +4299,11 @@ export function initWizardChess() {
       nextAction.clampWhenFinished = !loop;
       if (isAttack) {
         const prof = ATTACK_SYNC_PROFILES[piece.type] || ATTACK_SYNC_PROFILES.queen;
-        nextAction.timeScale = prof.timeScale;
+        nextAction.timeScale = prof.timeScale * 1.35;
+      } else if (lowerKw.includes('move') || lowerKw.includes('walk') || lowerKw.includes('run')) {
+        nextAction.timeScale = 1.45;
       } else {
-        nextAction.timeScale = 0.81;
+        nextAction.timeScale = 1.15;
       }
       if (isIdle && (!fadeSeconds || fadeSeconds <= 0.01)) {
         nextAction.time = ((piece.r * 5 + piece.c * 3) % 16) * 0.11;
@@ -5723,9 +5725,11 @@ export function initWizardChess() {
       }
 
       const squaresMoved = Math.max(1, Math.hypot(toR - fromR, toC - fromC));
-      const stdMoveDuration = Number((0.64 + Math.max(0, squaresMoved - 1) * 0.14).toFixed(3));
+      const stdMoveDuration = Number((0.36 + Math.max(0, squaresMoved - 1) * 0.06).toFixed(3));
       const atkProfile = ATTACK_SYNC_PROFILES[piece.type] || ATTACK_SYNC_PROFILES.queen;
       const defProfile = ATTACK_SYNC_PROFILES[captured?.type] || ATTACK_SYNC_PROFILES.queen;
+      const atkSpeed = atkProfile.timeScale * 1.35;
+      const defSpeed = defProfile.timeScale * 1.35;
       const SWING_START_CLIP_TIME = atkProfile.swingStartClip;
       const CONTACT_CLIP_TIME = atkProfile.contactClip;
       const BLOW_CLIP_TIME = atkProfile.blowClip;
@@ -5733,30 +5737,26 @@ export function initWizardChess() {
       const DEF_BLOW_CLIP_TIME = defProfile.blowClip;
 
       const tApproach = isCapture
-        ? Number((0.66 + Math.max(0, squaresMoved - 1) * 0.125).toFixed(3))
+        ? Number((0.38 + Math.max(0, squaresMoved - 1) * 0.05).toFixed(3))
         : stdMoveDuration;
-      const tContact = isCapture ? (tApproach + CONTACT_CLIP_TIME / atkProfile.timeScale) : stdMoveDuration;
-      const tImpact = isCapture ? (tApproach + BLOW_CLIP_TIME / atkProfile.timeScale) : stdMoveDuration;
+      const tContact = isCapture ? (tApproach + CONTACT_CLIP_TIME / atkSpeed) : stdMoveDuration;
+      const tImpact = isCapture ? (tApproach + BLOW_CLIP_TIME / atkSpeed) : stdMoveDuration;
       const canCounterAttack = Boolean(
         isCapture && combatSim && !combatSim.firstStrikeTriggered && combatSim.defCounterDmg > 0
       );
-      // Beat 2 Counter-Attack Timing:
-      // Wait 0.34s after Beat 1 impact so Defender's HP bar drain is clearly visible first,
-      // then play Defender's full 3D Attack clip to its physical weapon blow (DEF_BLOW_CLIP_TIME)
-      // BEFORE deducting a single point of the Attacker's HP!
-      const tCounterStart = canCounterAttack ? Number((tImpact + 0.34).toFixed(3)) : tImpact;
+      const tCounterStart = canCounterAttack ? Number((tImpact + 0.14).toFixed(3)) : tImpact;
       const tCounterContact = canCounterAttack
-        ? Number((tCounterStart + DEF_CONTACT_CLIP_TIME / defProfile.timeScale).toFixed(3))
+        ? Number((tCounterStart + DEF_CONTACT_CLIP_TIME / defSpeed).toFixed(3))
         : tImpact;
       const tCounterImpact = canCounterAttack
-        ? Number((tCounterStart + DEF_BLOW_CLIP_TIME / defProfile.timeScale).toFixed(3))
+        ? Number((tCounterStart + DEF_BLOW_CLIP_TIME / defSpeed).toFixed(3))
         : tImpact;
       const tShatterResolve = isCapture
-        ? Number(((canCounterAttack ? tCounterImpact : tImpact) + 0.28).toFixed(3))
+        ? Number(((canCounterAttack ? tCounterImpact : tImpact) + 0.15).toFixed(3))
         : stdMoveDuration;
-      const tStrikeDone = isCapture ? Number((tShatterResolve + 0.36).toFixed(3)) : stdMoveDuration;
+      const tStrikeDone = isCapture ? Number((tShatterResolve + 0.18).toFixed(3)) : stdMoveDuration;
       const camReturnDist = savedCamPos.distanceTo(duelCamClose);
-      const returnDuration = isCapture ? Number((1.18 + Math.min(0.42, camReturnDist * 0.10)).toFixed(3)) : 0;
+      const returnDuration = isCapture ? Number((0.48 + Math.min(0.20, camReturnDist * 0.05)).toFixed(3)) : 0;
       const totalDuration = isCapture ? (tStrikeDone + returnDuration) : stdMoveDuration;
 
       const atkHpStart = piece.hp;
@@ -9871,18 +9871,8 @@ export function initWizardChess() {
       elapsedTotal += dt;
       const prevCamPos = camera.position.clone();
 
-      if (isAnimatingMove || checkmateState.active) {
-        for (let i = 0; i < activeMixers.length; i++) {
-          activeMixers[i].update(dt);
-        }
-      } else {
-        idleMixerFrameCounter = (idleMixerFrameCounter + 1) % 3;
-        if (idleMixerFrameCounter === 0) {
-          const idleDt = dt * 3;
-          for (let i = 0; i < activeMixers.length; i++) {
-            activeMixers[i].update(idleDt);
-          }
-        }
+      for (let i = 0; i < activeMixers.length; i++) {
+        activeMixers[i].update(dt);
       }
 
       // Feature 3c: Advance pre-move piece selection & valid-squares highlight beat before executing scripted move
