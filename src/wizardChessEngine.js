@@ -2640,6 +2640,7 @@ export function initWizardChess() {
     let hoveredSquare = null;
     let validMoves = [];
     let isAnimatingMove = false;
+    let moveAnimationStartTime = 0;
     let gameOver = false;
     let capturedByWhite = 0;
     let capturedByBlack = 0;
@@ -4940,6 +4941,7 @@ export function initWizardChess() {
         : null;
 
       isAnimatingMove = true;
+      moveAnimationStartTime = performance.now();
       soundFX.stopLowTimeTickingLoop(true);
       activeCamTransition = null;
       clearSquareHighlights();
@@ -5320,7 +5322,8 @@ export function initWizardChess() {
       }
 
       function finishMove() {
-        resetBystandersToHome();
+        try {
+          resetBystandersToHome();
         if (isCapture) {
           activeCombatBanner = null;
           soundFX.setBattleMusicIntensity('normal');
@@ -5673,7 +5676,14 @@ export function initWizardChess() {
         updateAllUnitBadges();
         updateTurnUI();
         maybeScheduleAIMove();
+      } catch (err) {
+        console.error('[FinishMove Error] Exception during finishMove:', err);
+      } finally {
+        isAnimatingMove = false;
+        updateTurnUI();
+        emitPokerChessSync();
       }
+    }
 
       function stepMove(dt) {
         elapsed += dt;
@@ -6333,12 +6343,28 @@ export function initWizardChess() {
           turnPhase = 'MOVE_OR_COMBAT';
         }
       }
-      const moved = executeChessMove(chosen.fromR, chosen.fromC, chosen.toR, chosen.toC, {
+      let moved = executeChessMove(chosen.fromR, chosen.fromC, chosen.toR, chosen.toC, {
         fromAI: true,
         skipAutoPoker: true
       });
-      if (!moved && autoMoveEnabled && !gameOver) {
-        maybeScheduleAIMove();
+      if (!moved) {
+        // Fallback: If chosen move failed execution, try any remaining legal moves on board
+        const allLegal = getAllLegalMoves(currentTurn);
+        for (const fb of allLegal) {
+          if (fb.fromR === chosen.fromR && fb.fromC === chosen.fromC && fb.toR === chosen.toR && fb.toC === chosen.toC) continue;
+          const ok = executeChessMove(fb.fromR, fb.fromC, fb.toR, fb.toC, {
+            fromAI: true,
+            skipAutoPoker: true
+          });
+          if (ok) {
+            moved = true;
+            break;
+          }
+        }
+      }
+      if (!moved) {
+        // Failsafe: if all legal moves failed or none exist, safely end turn rather than hang
+        return handleTurnTimeout();
       }
       return moved;
     }
@@ -8161,6 +8187,12 @@ export function initWizardChess() {
       if (gameMode === 'multi' && currentTurn !== playerColor) return;
       if (!scriptedGameActive && gameMode === 'single' && currentTurn !== playerColor && aiTimer !== null) return;
 
+      // If player clicks on board on their turn, cancel any pending auto-move timer so player's manual input takes immediate priority
+      if (currentTurn === playerColor && aiTimer !== null) {
+        clearTimeout(aiTimer);
+        aiTimer = null;
+      }
+
       const sq = raycastBoardSquare(e.clientX, e.clientY);
       if (!sq) {
         if (preMoveHighlightTask) preMoveHighlightTask = null;
@@ -8200,37 +8232,27 @@ export function initWizardChess() {
         return;
       }
 
-      // 2. Enforce Hearthstone Step 1 (DRAW_PHASE) & Step 2 (SELECT_CARDS) before allowing board movement!
-      if (turnPhase === 'DRAW_PHASE') {
-        if (clickedPiece) {
-          hoveredSquare = { r: clickedR, c: clickedC };
-          updateUnit3DBadge(clickedPiece);
+      // 2. Seamless Auto-Draw & Combo Selection if clicking friendly unit in DRAW_PHASE or SELECT_CARDS
+      if (turnPhase === 'DRAW_PHASE' || turnPhase === 'SELECT_CARDS') {
+        const pDeck = pokerDecks[currentTurn];
+        if (pDeck) {
+          if (turnPhase === 'DRAW_PHASE' || pDeck.hand.length < 5) {
+            drawUpToSevenCards(pDeck, true);
+            turnPhase = 'SELECT_CARDS';
+          }
+          if (turnPhase === 'SELECT_CARDS') {
+            const best = findBest5Of7(pDeck.hand);
+            pDeck.selectedIndices = best.indices;
+            commitSelected5CardCombo();
+          }
         }
-        soundFX.playWarningLocked();
-        spawnFloatingCombatText(
-          boardToWorld(clickedR, clickedC),
-          '🃏 BƯỚC 1: HÃY BỐC BÀI ĐẦU LƯỢT TRƯỚC!',
-          '#38bdf8',
-          0.88
-        );
-        emitPokerChessSync();
-        return;
-      }
-
-      if (turnPhase === 'SELECT_CARDS') {
-        if (clickedPiece) {
-          hoveredSquare = { r: clickedR, c: clickedC };
-          updateUnit3DBadge(clickedPiece);
+        if (turnPhase === 'EMPOWER_UNIT' && clickedPiece && clickedPiece.color === currentTurn) {
+          empowerFriendlyUnitAt(clickedR, clickedC);
+          return;
         }
-        soundFX.playWarningLocked();
-        spawnFloatingCombatText(
-          boardToWorld(clickedR, clickedC),
-          '🔥 BƯỚC 2: HÃY KÍCH HOẠT BÀI PHÉP TRƯỚC KHI ĐI QUÂN!',
-          '#f59e0b',
-          0.88
-        );
-        emitPokerChessSync();
-        return;
+        if (turnPhase === 'ULTIMATE_TARGETING') {
+          return;
+        }
       }
 
       // 3. Handle Step 3 (EMPOWER_UNIT): clicking any friendly unit attaches the active Hearthstone Buff
@@ -9369,9 +9391,43 @@ export function initWizardChess() {
         }
       }
 
+      // 1. Move Animation Watchdog: prevent isAnimatingMove from locking the engine indefinitely
+      if (isAnimatingMove) {
+        const animElapsedMs = performance.now() - moveAnimationStartTime;
+        if (animElapsedMs > 2500) {
+          console.warn('[Failsafe] Move animation exceeded 2.5s timeout! Force-finishing move animation lock.');
+          isAnimatingMove = false;
+          activeMoveTweens.length = 0;
+          if (activeDuelSavedCam) {
+            camera.position.copy(activeDuelSavedCam.pos);
+            orbitControls.target.copy(activeDuelSavedCam.target);
+            activeDuelSavedCam = null;
+          }
+          orbitControls.enabled = true;
+          orbitControls.update();
+          updateAllUnitBadges();
+          updateTurnUI();
+          emitPokerChessSync();
+        }
+      } else if (activeMoveTweens.length > 0 && !isAnimatingMove) {
+        isAnimatingMove = true;
+        moveAnimationStartTime = performance.now();
+      } else if (activeMoveTweens.length === 0 && isAnimatingMove) {
+        isAnimatingMove = false;
+      }
+
       for (let i = activeMoveTweens.length - 1; i >= 0; i--) {
-        const done = activeMoveTweens[i](dt);
-        if (done) activeMoveTweens.splice(i, 1);
+        try {
+          const done = activeMoveTweens[i](dt);
+          if (done) activeMoveTweens.splice(i, 1);
+        } catch (tweenErr) {
+          console.error('[Tween Error] Animation step threw error, clearing tween:', tweenErr);
+          activeMoveTweens.splice(i, 1);
+          if (activeMoveTweens.length === 0) {
+            isAnimatingMove = false;
+            updateTurnUI();
+          }
+        }
       }
 
       // 60-Second Deliberation Turn Timer Countdown, Low-Time Tension Audio Loop (<10s) & Automatic End-of-Turn on Expiry

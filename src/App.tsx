@@ -705,7 +705,7 @@ export default function App() {
   const isCardDockVisible = Boolean(
     poker &&
       !gameState?.gameOver &&
-      !gameState?.autoMoveEnabled &&
+      (!gameState?.autoMoveEnabled || peekDockDuringMove) &&
       (isCardPhase || (isPlayerTurn && peekDockDuringMove && !gameState?.activeCombatBanner))
   );
 
