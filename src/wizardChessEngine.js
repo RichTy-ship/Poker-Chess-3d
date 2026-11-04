@@ -996,17 +996,22 @@ export function initWizardChess() {
         pieceObj.skinAnimParts = null;
       }
 
-      const hMap = { pawn: 1.18, rook: 1.46, knight: 1.56, bishop: 1.60, queen: 1.72, king: 1.85 };
-      const badgeBaseY = hMap[pieceObj.type] || 1.45;
-      const H = badgeBaseY * 0.78;
-      const roleScaleMap = { pawn: 0.76, rook: 0.94, knight: 0.96, bishop: 0.98, queen: 1.10, king: 1.18 };
-      const S = roleScaleMap[pieceObj.type] || 0.92;
+      const dimMap = {
+        pawn:   { baseR: 0.36, headY: 0.96, guardPos: [-0.16, 0.52, 0.38], chestZ: 0.38, orbitR: 0.48 },
+        rook:   { baseR: 0.40, topY: 1.28, rimR: 0.42 },
+        knight: { baseR: 0.40, horseHead: [0, 1.26, 0.52], riderHead: [0, 1.47, 0.05] },
+        bishop: { baseR: 0.37, mitreY: 1.46 },
+        queen:  { baseR: 0.40, crownY: 1.40, backPos: [0, 0.85, -0.34], wingspan: 0.95 },
+        king:   { baseR: 0.43, crownY: 1.48, backPos: [0, 1.15, -0.38], ringR: 0.58 }
+      };
+      const dims = dimMap[pieceObj.type] || dimMap.pawn;
+      const baseR = dims.baseR;
       const role = pieceObj.type;
 
-      // Overhead badge positioning: keep clear of crowns, dragon horns, and wings
+      // Overhead badge positioning: float cleanly ABOVE crowns, dragon horns, and wing tips
+      const badgeYMap = { pawn: 1.38, rook: 1.68, knight: 1.88, bishop: 1.88, queen: 2.08, king: 2.28 };
       if (pieceObj.badgeSprite) {
-        const extraLift = (role === 'king' || role === 'queen') ? 0.35 * S : 0.12 * S;
-        pieceObj.badgeSprite.position.set(0, badgeBaseY + extraLift, 0);
+        pieceObj.badgeSprite.position.set(0, badgeYMap[pieceObj.type] || 1.85, 0);
       }
 
       const bodyMat = pieceObj.color === 'w' ? whitePieceMat : blackPieceMat;
@@ -1032,79 +1037,77 @@ export function initWizardChess() {
       };
 
       // -----------------------------------------------------------------------
-      // 1. ELEGANT PEDESTAL BASE (Every piece gets a clean architectural base ring)
+      // 1. ELEGANT PEDESTAL BASE (Fitted to actual GLTF base radius 0.36 - 0.43)
       // -----------------------------------------------------------------------
       const baseGroup = new THREE.Group();
       baseGroup.position.set(0, 0.02, 0);
 
       if (skinId === 'classic_sanctum') {
-        const octBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.32 * S, 0.045, 8), trimMat);
+        const octBase = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.95, baseR * 1.08, 0.045, 8), trimMat);
         baseGroup.add(octBase);
       } else if (skinId === 'royal_ivory_ebony') {
-        const ringBase = new THREE.Mesh(new THREE.TorusGeometry(0.28 * S, 0.022 * S, 8, 24), trimMat);
+        const ringBase = new THREE.Mesh(new THREE.TorusGeometry(baseR * 0.98, 0.024, 8, 24), trimMat);
         ringBase.rotation.x = Math.PI / 2;
         baseGroup.add(ringBase);
       } else if (skinId === 'jade_dynasty') {
-        // Lotus Petal Pedestal Base
-        const lotusRing = new THREE.Mesh(new THREE.CylinderGeometry(0.29 * S, 0.33 * S, 0.04, 12), bodyMat);
-        const goldRim = new THREE.Mesh(new THREE.TorusGeometry(0.33 * S, 0.015 * S, 6, 24), trimMat);
+        const lotusRing = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.98, baseR * 1.10, 0.04, 12), bodyMat);
+        const goldRim = new THREE.Mesh(new THREE.TorusGeometry(baseR * 1.10, 0.018, 6, 24), trimMat);
         goldRim.rotation.x = Math.PI / 2;
         baseGroup.add(lotusRing, goldRim);
       } else if (skinId === 'crimson_inquisitor') {
-        const ironOct = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.32 * S, 0.045, 8), steelMat);
-        const redBand = new THREE.Mesh(new THREE.TorusGeometry(0.29 * S, 0.016 * S, 6, 8), trimMat);
+        const ironOct = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.95, baseR * 1.08, 0.045, 8), steelMat);
+        const redBand = new THREE.Mesh(new THREE.TorusGeometry(baseR * 1.02, 0.020, 6, 8), trimMat);
         redBand.rotation.x = Math.PI / 2;
         baseGroup.add(ironOct, redBand);
       } else if (skinId === 'frost_valkyrie') {
-        const iceHex = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.33 * S, 0.045, 6), crystalMat);
-        const silverRim = new THREE.Mesh(new THREE.TorusGeometry(0.32 * S, 0.014 * S, 6, 18), trimMat);
+        const iceHex = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.95, baseR * 1.08, 0.045, 6), crystalMat);
+        const silverRim = new THREE.Mesh(new THREE.TorusGeometry(baseR * 1.06, 0.018, 6, 18), trimMat);
         silverRim.rotation.x = Math.PI / 2;
         baseGroup.add(iceHex, silverRim);
       } else if (skinId === 'solar_seraphim') {
-        const sunRing = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.33 * S, 0.045, 16), trimMat);
+        const sunRing = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.95, baseR * 1.08, 0.045, 16), trimMat);
         baseGroup.add(sunRing);
       } else if (skinId === 'abyssal_necromancer') {
-        const cryptBase = new THREE.Mesh(new THREE.BoxGeometry(0.48 * S, 0.04, 0.48 * S), bodyMat);
-        const slateBand = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.31 * S, 0.03, 8), trimMat);
+        const cryptBase = new THREE.Mesh(new THREE.BoxGeometry(baseR * 2.1, 0.04, baseR * 2.1), bodyMat);
+        const slateBand = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.95, baseR * 1.05, 0.03, 8), trimMat);
         baseGroup.add(cryptBase, slateBand);
       } else if (skinId === 'arcane_archmage') {
-        const runeDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.29 * S, 0.32 * S, 0.035, 18), bodyMat);
-        const brassOrbit = new THREE.Mesh(new THREE.TorusGeometry(0.32 * S, 0.015 * S, 6, 24), trimMat);
+        const runeDisc = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.98, baseR * 1.08, 0.035, 18), bodyMat);
+        const brassOrbit = new THREE.Mesh(new THREE.TorusGeometry(baseR * 1.08, 0.018, 6, 24), trimMat);
         brassOrbit.rotation.x = Math.PI / 2;
         baseGroup.add(runeDisc, brassOrbit);
       } else if (skinId === 'infernal_drake') {
-        const basaltPlinth = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.33 * S, 0.045, 7), bodyMat);
-        const copperVein = new THREE.Mesh(new THREE.TorusGeometry(0.31 * S, 0.016 * S, 6, 14), trimMat);
+        const basaltPlinth = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.96, baseR * 1.10, 0.05, 8), bodyMat);
+        const copperVein = new THREE.Mesh(new THREE.TorusGeometry(baseR * 1.06, 0.022, 6, 16), trimMat);
         copperVein.rotation.x = Math.PI / 2;
         baseGroup.add(basaltPlinth, copperVein);
       } else if (skinId === 'celestial_eternity') {
-        const starlightDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.29 * S, 0.33 * S, 0.035, 24), bodyMat);
-        const platOrbit = new THREE.Mesh(new THREE.TorusGeometry(0.34 * S, 0.014 * S, 8, 32), trimMat);
+        const starlightDisc = new THREE.Mesh(new THREE.CylinderGeometry(baseR * 0.98, baseR * 1.12, 0.04, 24), bodyMat);
+        const platOrbit = new THREE.Mesh(new THREE.TorusGeometry(baseR * 1.12, 0.018, 8, 32), trimMat);
         platOrbit.rotation.x = Math.PI / 2;
         baseGroup.add(starlightDisc, platOrbit);
       }
+
       // RPG LEVEL-UP 3D EVOLUTION (Tiers of honor directly visible on the piece)
       if (unitLvl >= 2) {
-        // Level 2: Gilded elevated base ring tier & dual shoulder honor rivets
-        const lvl2Ring = new THREE.Mesh(new THREE.TorusGeometry(0.26 * S, 0.016 * S, 6, 20), trimMat);
-        lvl2Ring.position.set(0, 0.055, 0);
+        const lvl2Ring = new THREE.Mesh(new THREE.TorusGeometry(baseR * 0.92, 0.020, 6, 20), trimMat);
+        lvl2Ring.position.set(0, 0.065, 0);
         lvl2Ring.rotation.x = Math.PI / 2;
         baseGroup.add(lvl2Ring);
 
-        const honorPipL = new THREE.Mesh(new THREE.OctahedronGeometry(0.024 * S, 0), trimMat);
-        honorPipL.position.set(-0.11 * S, 0.52 * H, 0.04 * S);
+        const honorPipL = new THREE.Mesh(new THREE.OctahedronGeometry(0.045, 0), trimMat);
+        honorPipL.position.set(-0.22, 0.60, 0.18);
         const honorPipR = honorPipL.clone();
-        honorPipR.position.x = 0.11 * S;
+        honorPipR.position.x = 0.22;
         skinGroup.add(honorPipL, honorPipR);
       }
       if (unitLvl >= 3) {
-        // Level 3 (Champion Apex): Floating Golden Apex Diadem & ground aura ring
-        const apexHalo = new THREE.Mesh(new THREE.TorusGeometry(0.12 * S, 0.014 * S, 6, 16), trimMat);
-        apexHalo.position.set(0, 0.98 * H, 0);
+        const apexHalo = new THREE.Mesh(new THREE.TorusGeometry(0.20, 0.018, 6, 16), trimMat);
+        apexHalo.position.set(0, (dims.headY || dims.topY || dims.crownY || 1.40) + 0.12, 0);
         apexHalo.rotation.x = Math.PI / 2;
         skinGroup.add(apexHalo);
 
-        const groundAura = new THREE.Mesh(new THREE.RingGeometry(0.34 * S, 0.38 * S, 24), glowMat);
+        const groundAura = new THREE.Mesh(new THREE.RingGeometry(baseR * 1.15, baseR * 1.30, 24), glowMat);
         groundAura.position.set(0, 0.005, 0);
         groundAura.rotation.x = -Math.PI / 2;
         skinGroup.add(groundAura);
@@ -1112,95 +1115,96 @@ export function initWizardChess() {
       skinGroup.add(baseGroup);
 
       // -----------------------------------------------------------------------
-      // 2. PAWNS (TỐT): Sleek, disciplined heraldic crest & planetary orbits
+      // 2. PAWNS (TỐT): Prominent shields & true-radius planetary orbits
       // -----------------------------------------------------------------------
       if (role === 'pawn') {
         const crestGroup = new THREE.Group();
-        crestGroup.position.set(0, 0.44 * H, 0.25 * S);
+        crestGroup.position.set(0, 0.52, 0.38);
 
         if (skinId === 'classic_sanctum') {
           // Classic Gothic cruciform heater shield
-          const shield = new THREE.Mesh(new THREE.BoxGeometry(0.14 * S, 0.18 * S, 0.022 * S), bodyMat);
-          const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.028 * S, 0.16 * S, 0.028 * S), trimMat);
-          const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.10 * S, 0.028 * S, 0.028 * S), trimMat);
-          crossH.position.y = 0.02 * S;
+          const shield = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.36, 0.04), bodyMat);
+          const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.32, 0.048), trimMat);
+          const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.05, 0.048), trimMat);
+          crossH.position.y = 0.04;
           shield.add(crossV, crossH);
           crestGroup.add(shield);
         } else if (skinId === 'royal_ivory_ebony') {
           // Roman Parma round buckler with golden imperial boss
-          const buckler = new THREE.Mesh(new THREE.CylinderGeometry(0.095 * S, 0.095 * S, 0.022 * S, 16), bodyMat);
+          const buckler = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.04, 18), bodyMat);
           buckler.rotation.x = Math.PI / 2;
-          const boss = new THREE.Mesh(new THREE.SphereGeometry(0.038 * S, 8, 8), trimMat);
-          boss.position.z = 0.016 * S;
+          const boss = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 10), trimMat);
+          boss.position.z = 0.03;
           buckler.add(boss);
           crestGroup.add(buckler);
         } else if (skinId === 'jade_dynasty') {
           // Carved Jade Lotus Medallion with gold trim
-          const lotusDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * S, 0.09 * S, 0.02 * S, 8), crystalMat);
+          const lotusDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.035, 10), crystalMat);
           lotusDisc.rotation.x = Math.PI / 2;
-          const goldTrim = new THREE.Mesh(new THREE.TorusGeometry(0.09 * S, 0.014 * S, 6, 16), trimMat);
+          const goldTrim = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.024, 6, 20), trimMat);
           crestGroup.add(lotusDisc, goldTrim);
         } else if (skinId === 'crimson_inquisitor') {
           // Black Iron triangular kite shield with dark ruby edge
-          const kite = new THREE.Mesh(new THREE.ConeGeometry(0.09 * S, 0.19 * S, 3), steelMat);
+          const kite = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.38, 3), steelMat);
           kite.rotation.z = Math.PI;
-          const stud = new THREE.Mesh(new THREE.SphereGeometry(0.028 * S, 6, 6), trimMat);
-          stud.position.y = 0.02 * S;
+          const stud = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), trimMat);
+          stud.position.y = 0.04;
           kite.add(stud);
           crestGroup.add(kite);
         } else if (skinId === 'frost_valkyrie') {
           // Nordic snowflake ice rune roundel
-          const runeDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.095 * S, 0.095 * S, 0.022 * S, 6), crystalMat);
+          const runeDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.04, 6), crystalMat);
           runeDisc.rotation.x = Math.PI / 2;
-          const iceStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.048 * S, 0), trimMat);
-          iceStar.position.z = 0.016 * S;
+          const iceStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), trimMat);
+          iceStar.position.z = 0.03;
           crestGroup.add(runeDisc, iceStar);
         } else if (skinId === 'solar_seraphim') {
           // Solar sunburst medallion
-          const sunDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * S, 0.09 * S, 0.02 * S, 12), trimMat);
+          const sunDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.035, 12), trimMat);
           sunDisc.rotation.x = Math.PI / 2;
-          const core = new THREE.Mesh(new THREE.SphereGeometry(0.038 * S, 8, 8), bodyMat);
-          core.position.z = 0.014 * S;
+          const core = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 10), bodyMat);
+          core.position.z = 0.025;
           crestGroup.add(sunDisc, core);
         } else if (skinId === 'abyssal_necromancer') {
           // Crypt skull crest
-          const skullDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.085 * S, 0.085 * S, 0.022 * S, 8), bodyMat);
+          const skullDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 8), bodyMat);
           skullDisc.rotation.x = Math.PI / 2;
-          const boneRivet = new THREE.Mesh(new THREE.OctahedronGeometry(0.035 * S, 0), trimMat);
-          boneRivet.position.z = 0.016 * S;
+          const boneRivet = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), trimMat);
+          boneRivet.position.z = 0.03;
           crestGroup.add(skullDisc, boneRivet);
         } else if (skinId === 'arcane_archmage') {
           // Arcane runic pentagram disc
-          const arcaneDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * S, 0.09 * S, 0.02 * S, 10), trimMat);
+          const arcaneDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.035, 10), trimMat);
           arcaneDisc.rotation.x = Math.PI / 2;
-          const runeCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.042 * S, 0), crystalMat);
-          runeCore.position.z = 0.015 * S;
+          const runeCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), crystalMat);
+          runeCore.position.z = 0.03;
           crestGroup.add(arcaneDisc, runeCore);
         } else if (skinId === 'infernal_drake') {
           // Dragon scale shield (Khiên Vảy Rồng Hỏa Tộc) with molten copper rim & glowing core
-          const scaleShield = new THREE.Mesh(new THREE.OctahedronGeometry(0.12 * S, 0), bodyMat);
-          scaleShield.scale.set(0.95, 1.45, 0.26);
+          const scaleShield = new THREE.Mesh(new THREE.OctahedronGeometry(0.20, 0), bodyMat);
+          scaleShield.scale.set(1.1, 1.6, 0.28);
+          scaleShield.position.set(-0.06, 0, 0);
           scaleShield.rotation.x = -0.10;
-          const copperTrim = new THREE.Mesh(new THREE.TorusGeometry(0.095 * S, 0.016 * S, 4, 4), trimMat);
+          const copperTrim = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.026, 4, 4), trimMat);
           copperTrim.rotation.z = Math.PI / 4;
-          const magmaCore = new THREE.Mesh(new THREE.ConeGeometry(0.045 * S, 0.12 * S, 4), glowMat);
+          const magmaCore = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 4), glowMat);
           magmaCore.rotation.z = Math.PI;
-          magmaCore.position.z = 0.025 * S;
+          magmaCore.position.z = 0.045;
           scaleShield.add(copperTrim, magmaCore);
           crestGroup.add(scaleShield);
         } else if (skinId === 'celestial_eternity') {
           // Planetary Orbit Rings with orbiting Starlight Pearl Moon (Quỹ Đạo Tinh Cầu)
           const orbitGroup = new THREE.Group();
-          const platOrbit = new THREE.Mesh(new THREE.TorusGeometry(0.25 * S, 0.012 * S, 8, 32), trimMat);
-          platOrbit.rotation.x = 0.38;
-          platOrbit.rotation.z = 0.20;
-          const subOrbit = new THREE.Mesh(new THREE.TorusGeometry(0.22 * S, 0.007 * S, 6, 28), crystalMat);
+          const platOrbit = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.020, 8, 36), trimMat);
+          platOrbit.rotation.x = 0.42;
+          platOrbit.rotation.z = 0.25;
+          const subOrbit = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.010, 6, 32), crystalMat);
           platOrbit.add(subOrbit);
-          const pearlMoon = new THREE.Mesh(new THREE.SphereGeometry(0.045 * S, 10, 10), crystalMat);
-          pearlMoon.position.set(0.25 * S, 0, 0);
+          const pearlMoon = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), crystalMat);
+          pearlMoon.position.set(0.48, 0, 0);
           platOrbit.add(pearlMoon);
           orbitGroup.add(platOrbit);
-          orbitGroup.position.set(0, 0, -0.25 * S); // Center around pawn body
+          orbitGroup.position.set(0, 0, -0.38); // Center cleanly around pawn body
           crestGroup.add(orbitGroup);
           animParts.orbitGroup = platOrbit;
         }
@@ -1208,59 +1212,58 @@ export function initWizardChess() {
       }
 
       // -----------------------------------------------------------------------
-      // 3. KNIGHTS (MÃ): Armored Chanfron steed visor & warhorse plume
+      // 3. KNIGHTS (MÃ): Armored Chanfron steed visor on real horse head (Z=0.52, Y=1.26)
       // -----------------------------------------------------------------------
       else if (role === 'knight') {
         const headGroup = new THREE.Group();
-        headGroup.position.set(0, 0.72 * H, 0.12 * S);
+        headGroup.position.set(0, 1.26, 0.52);
 
         // Forehead Chanfron armor plate
-        const chanfron = new THREE.Mesh(new THREE.BoxGeometry(0.13 * S, 0.20 * S, 0.06 * S), trimMat);
-        chanfron.rotation.x = 0.25;
+        const chanfron = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.36, 0.12), trimMat);
+        chanfron.rotation.x = 0.35;
         headGroup.add(chanfron);
 
-        // Skin-specific crest on horse forehead / mane
         if (skinId === 'jade_dynasty') {
-          const qilinHorns = new THREE.Mesh(new THREE.ConeGeometry(0.028 * S, 0.16 * S, 6), crystalMat);
-          qilinHorns.position.set(0, 0.14 * S, -0.04 * S);
-          qilinHorns.rotation.x = -0.3;
+          const qilinHorns = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.34, 6), crystalMat);
+          qilinHorns.position.set(0, 0.26, -0.08);
+          qilinHorns.rotation.x = -0.35;
           headGroup.add(qilinHorns);
         } else if (skinId === 'crimson_inquisitor') {
-          const dreadSpike = new THREE.Mesh(new THREE.ConeGeometry(0.025 * S, 0.15 * S, 4), steelMat);
-          dreadSpike.position.set(0, 0.12 * S, -0.02 * S);
+          const dreadSpike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.32, 4), steelMat);
+          dreadSpike.position.set(0, 0.24, -0.04);
           headGroup.add(dreadSpike);
         } else if (skinId === 'frost_valkyrie') {
-          const iceHorn = new THREE.Mesh(new THREE.ConeGeometry(0.028 * S, 0.18 * S, 5), crystalMat);
-          iceHorn.position.set(0, 0.14 * S, -0.03 * S);
-          iceHorn.rotation.x = -0.2;
+          const iceHorn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.38, 5), crystalMat);
+          iceHorn.position.set(0, 0.28, -0.06);
+          iceHorn.rotation.x = -0.25;
           headGroup.add(iceHorn);
         } else if (skinId === 'solar_seraphim') {
-          const sunPlume = new THREE.Mesh(new THREE.BoxGeometry(0.04 * S, 0.16 * S, 0.10 * S), trimMat);
-          sunPlume.position.set(0, 0.12 * S, -0.06 * S);
+          const sunPlume = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.32, 0.20), trimMat);
+          sunPlume.position.set(0, 0.24, -0.10);
           headGroup.add(sunPlume);
         } else if (skinId === 'infernal_drake') {
           // Draconic Warhorse: Twin curved dragon horns & fiery plume
-          const dHornL = new THREE.Mesh(new THREE.ConeGeometry(0.030 * S, 0.22 * S, 5), trimMat);
-          dHornL.position.set(-0.08 * S, 0.15 * S, -0.06 * S);
-          dHornL.rotation.z = 0.40;
-          dHornL.rotation.x = -0.32;
-          const dHornR = new THREE.Mesh(new THREE.ConeGeometry(0.030 * S, 0.22 * S, 5), trimMat);
-          dHornR.position.set(0.08 * S, 0.15 * S, -0.06 * S);
-          dHornR.rotation.z = -0.40;
-          dHornR.rotation.x = -0.32;
-          const flamePlume = new THREE.Mesh(new THREE.ConeGeometry(0.032 * S, 0.18 * S, 4), glowMat);
-          flamePlume.position.set(0, 0.18 * S, -0.10 * S);
-          flamePlume.rotation.x = -0.65;
+          const dHornL = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.45, 5), trimMat);
+          dHornL.position.set(-0.14, 0.28, -0.10);
+          dHornL.rotation.z = 0.45;
+          dHornL.rotation.x = -0.55;
+          const dHornR = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.45, 5), trimMat);
+          dHornR.position.set(0.14, 0.28, -0.10);
+          dHornR.rotation.z = -0.45;
+          dHornR.rotation.x = -0.55;
+          const flamePlume = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.36, 4), glowMat);
+          flamePlume.position.set(0, 0.32, -0.18);
+          flamePlume.rotation.x = -0.75;
           headGroup.add(dHornL, dHornR, flamePlume);
         } else if (skinId === 'celestial_eternity') {
           // Celestial Pegasus: Midnight sapphire horn & crystal ear winglets
-          const starHorn = new THREE.Mesh(new THREE.ConeGeometry(0.030 * S, 0.24 * S, 6), crystalMat);
-          starHorn.position.set(0, 0.16 * S, 0.02 * S);
-          starHorn.rotation.x = -0.25;
+          const starHorn = new THREE.Mesh(new THREE.ConeGeometry(0.050, 0.50, 6), crystalMat);
+          starHorn.position.set(0, 0.28, 0.06);
+          starHorn.rotation.x = -0.30;
           for (const side of [-1, 1]) {
-            const winglet = new THREE.Mesh(new THREE.BoxGeometry(0.015 * S, 0.16 * S, 0.05 * S), crystalMat);
-            winglet.position.set(side * 0.10 * S, 0.13 * S, -0.04 * S);
-            winglet.rotation.z = -side * 0.50;
+            const winglet = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.32, 0.10), crystalMat);
+            winglet.position.set(side * 0.16, 0.22, -0.06);
+            winglet.rotation.z = -side * 0.55;
             winglet.rotation.x = -0.30;
             headGroup.add(winglet);
           }
@@ -1270,58 +1273,58 @@ export function initWizardChess() {
       }
 
       // -----------------------------------------------------------------------
-      // 4. BISHOPS (TƯỢNG): Liturgical finial / spire / sacred crosier
+      // 4. BISHOPS (TƯỢNG): Liturgical finial atop real mitre (Y = 1.46)
       // -----------------------------------------------------------------------
       else if (role === 'bishop') {
         const mitreGroup = new THREE.Group();
-        mitreGroup.position.set(0, 0.88 * H, 0);
+        mitreGroup.position.set(0, 1.46, 0);
 
         if (skinId === 'classic_sanctum' || skinId === 'royal_ivory_ebony') {
-          const crossFinial = new THREE.Mesh(new THREE.BoxGeometry(0.022 * S, 0.14 * S, 0.022 * S), trimMat);
-          const crossBar = new THREE.Mesh(new THREE.BoxGeometry(0.08 * S, 0.022 * S, 0.022 * S), trimMat);
-          crossBar.position.y = 0.025 * S;
+          const crossFinial = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.04), trimMat);
+          const crossBar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.04, 0.04), trimMat);
+          crossBar.position.y = 0.05;
           crossFinial.add(crossBar);
           mitreGroup.add(crossFinial);
         } else if (skinId === 'jade_dynasty') {
-          const chimeDisc = new THREE.Mesh(new THREE.TorusGeometry(0.07 * S, 0.014 * S, 6, 16), crystalMat);
+          const chimeDisc = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.026, 6, 20), crystalMat);
           chimeDisc.rotation.y = Math.PI / 4;
-          const goldPin = new THREE.Mesh(new THREE.CylinderGeometry(0.012 * S, 0.012 * S, 0.14 * S, 6), trimMat);
+          const goldPin = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.28, 6), trimMat);
           mitreGroup.add(chimeDisc, goldPin);
         } else if (skinId === 'crimson_inquisitor') {
-          const reliquaryCross = new THREE.Mesh(new THREE.OctahedronGeometry(0.055 * S, 0), trimMat);
-          const ironSpire = new THREE.Mesh(new THREE.ConeGeometry(0.024 * S, 0.14 * S, 4), steelMat);
-          ironSpire.position.y = 0.06 * S;
+          const reliquaryCross = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), trimMat);
+          const ironSpire = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.26, 4), steelMat);
+          ironSpire.position.y = 0.12;
           mitreGroup.add(reliquaryCross, ironSpire);
         } else if (skinId === 'frost_valkyrie') {
-          const icePrism = new THREE.Mesh(new THREE.OctahedronGeometry(0.065 * S, 0), crystalMat);
+          const icePrism = new THREE.Mesh(new THREE.OctahedronGeometry(0.13, 0), crystalMat);
           icePrism.scale.set(0.8, 1.8, 0.8);
           mitreGroup.add(icePrism);
         } else if (skinId === 'solar_seraphim') {
-          const monstrance = new THREE.Mesh(new THREE.TorusGeometry(0.08 * S, 0.014 * S, 6, 16), trimMat);
-          const sunSphere = new THREE.Mesh(new THREE.SphereGeometry(0.035 * S, 8, 8), bodyMat);
+          const monstrance = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.026, 6, 20), trimMat);
+          const sunSphere = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 10), bodyMat);
           monstrance.add(sunSphere);
           mitreGroup.add(monstrance);
         } else if (skinId === 'abyssal_necromancer') {
-          const soulLantern = new THREE.Mesh(new THREE.OctahedronGeometry(0.06 * S, 0), trimMat);
-          const soulCore = new THREE.Mesh(new THREE.SphereGeometry(0.028 * S, 6, 6), glowMat);
+          const soulLantern = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), trimMat);
+          const soulCore = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), glowMat);
           soulLantern.add(soulCore);
           mitreGroup.add(soulLantern);
         } else if (skinId === 'arcane_archmage') {
-          const astrolabeSphere = new THREE.Mesh(new THREE.TorusGeometry(0.075 * S, 0.012 * S, 6, 16), trimMat);
+          const astrolabeSphere = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.022, 6, 20), trimMat);
           astrolabeSphere.rotation.x = Math.PI / 3;
-          const runeCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.04 * S, 0), crystalMat);
+          const runeCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), crystalMat);
           mitreGroup.add(astrolabeSphere, runeCore);
           animParts.haloRing = astrolabeSphere;
         } else if (skinId === 'infernal_drake') {
           // Liturgical Volcanic Brazier (Đỉnh lư đồng tế nham thạch nung chảy)
-          const brazier = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * S, 0.045 * S, 0.10 * S, 6), trimMat);
-          const magmaOrb = new THREE.Mesh(new THREE.SphereGeometry(0.048 * S, 8, 8), glowMat);
-          magmaOrb.position.y = 0.05 * S;
+          const brazier = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.08, 0.20, 6), trimMat);
+          const magmaOrb = new THREE.Mesh(new THREE.SphereGeometry(0.10, 12, 12), glowMat);
+          magmaOrb.position.y = 0.10;
           brazier.add(magmaOrb);
           for (let i = 0; i < 3; i++) {
             const a = (i * Math.PI * 2) / 3;
-            const fang = new THREE.Mesh(new THREE.ConeGeometry(0.022 * S, 0.14 * S, 4), bodyMat);
-            fang.position.set(Math.cos(a) * 0.08 * S, 0.04 * S, Math.sin(a) * 0.08 * S);
+            const fang = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.28, 4), bodyMat);
+            fang.position.set(Math.cos(a) * 0.16, 0.08, Math.sin(a) * 0.16);
             fang.rotation.z = Math.cos(a) * -0.25;
             fang.rotation.x = Math.sin(a) * 0.25;
             brazier.add(fang);
@@ -1330,13 +1333,13 @@ export function initWizardChess() {
         } else if (skinId === 'celestial_eternity') {
           // Armillary Sphere / Planetarium (Mô hình quả cầu thiên thể)
           const armillary = new THREE.Group();
-          const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.10 * S, 0.012 * S, 6, 24), trimMat);
+          const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.20, 0.020, 6, 28), trimMat);
           ring1.rotation.y = Math.PI / 4;
-          const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.088 * S, 0.010 * S, 6, 24), trimMat);
+          const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.016, 6, 28), trimMat);
           ring2.rotation.x = Math.PI / 3;
-          const ring3 = new THREE.Mesh(new THREE.TorusGeometry(0.076 * S, 0.008 * S, 6, 20), crystalMat);
+          const ring3 = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.012, 6, 24), crystalMat);
           ring3.rotation.z = Math.PI / 3;
-          const sapphireOrb = new THREE.Mesh(new THREE.SphereGeometry(0.044 * S, 8, 8), glowMat);
+          const sapphireOrb = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 12), glowMat);
           armillary.add(ring1, ring2, ring3, sapphireOrb);
           mitreGroup.add(armillary);
           animParts.haloRing = armillary;
@@ -1345,17 +1348,17 @@ export function initWizardChess() {
       }
 
       // -----------------------------------------------------------------------
-      // 5. ROOKS (XE): Architectural battlements & fortress corner turrets
+      // 5. ROOKS (XE): Crown battlements atop real tower (Y = 1.28, R = 0.42)
       // -----------------------------------------------------------------------
       else if (role === 'rook') {
         const battlements = new THREE.Group();
-        battlements.position.set(0, 0.85 * H, 0);
+        battlements.position.set(0, 1.28, 0);
 
         if (skinId === 'jade_dynasty') {
           // Multi-tiered Pagoda roof eaves
-          const eave1 = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * S, 0.30 * S, 0.035, 4), bodyMat);
+          const eave1 = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.60, 0.07, 4), bodyMat);
           eave1.rotation.y = Math.PI / 4;
-          const goldEaveTrim = new THREE.Mesh(new THREE.TorusGeometry(0.26 * S, 0.014 * S, 4, 4), trimMat);
+          const goldEaveTrim = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.026, 4, 4), trimMat);
           goldEaveTrim.rotation.x = Math.PI / 2;
           goldEaveTrim.rotation.z = Math.PI / 4;
           battlements.add(eave1, goldEaveTrim);
@@ -1363,59 +1366,59 @@ export function initWizardChess() {
           // 4-corner spiked iron battlements
           for (let i = 0; i < 4; i++) {
             const a = (i * Math.PI) / 2 + Math.PI / 4;
-            const spike = new THREE.Mesh(new THREE.ConeGeometry(0.03 * S, 0.12 * S, 4), steelMat);
-            spike.position.set(Math.cos(a) * 0.20 * S, 0.06 * S, Math.sin(a) * 0.20 * S);
+            const spike = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.24, 4), steelMat);
+            spike.position.set(Math.cos(a) * 0.40, 0.12, Math.sin(a) * 0.40);
             battlements.add(spike);
           }
         } else if (skinId === 'frost_valkyrie') {
           // 4 Glacier crystal corner spire turrets
           for (let i = 0; i < 4; i++) {
             const a = (i * Math.PI) / 2 + Math.PI / 4;
-            const iceSpire = new THREE.Mesh(new THREE.OctahedronGeometry(0.045 * S, 0), crystalMat);
+            const iceSpire = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), crystalMat);
             iceSpire.scale.set(0.7, 1.8, 0.7);
-            iceSpire.position.set(Math.cos(a) * 0.20 * S, 0.06 * S, Math.sin(a) * 0.20 * S);
+            iceSpire.position.set(Math.cos(a) * 0.40, 0.12, Math.sin(a) * 0.40);
             battlements.add(iceSpire);
           }
         } else if (skinId === 'infernal_drake') {
           // Fortified Volcanic Caldera (Miệng Núi Lửa kiên cố)
           const calderaFort = new THREE.Group();
-          const calderaRim = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * S, 0.26 * S, 0.06 * S, 8), bodyMat);
+          const calderaRim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.40, 0.12, 8), bodyMat);
           calderaFort.add(calderaRim);
-          const lavaPool = new THREE.Mesh(new THREE.CylinderGeometry(0.21 * S, 0.21 * S, 0.03 * S, 16), glowMat);
-          lavaPool.position.y = 0.02 * S;
+          const lavaPool = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.04, 16), glowMat);
+          lavaPool.position.y = 0.05;
           calderaFort.add(lavaPool);
           for (let i = 0; i < 6; i++) {
             const a = (i * Math.PI * 2) / 6;
-            const crag = new THREE.Mesh(new THREE.ConeGeometry(0.035 * S, 0.12 * S, 4), trimMat);
-            crag.position.set(Math.cos(a) * 0.23 * S, 0.05 * S, Math.sin(a) * 0.23 * S);
+            const crag = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.22, 4), trimMat);
+            crag.position.set(Math.cos(a) * 0.39, 0.10, Math.sin(a) * 0.39);
             calderaFort.add(crag);
           }
           battlements.add(calderaFort);
         } else if (skinId === 'celestial_eternity') {
           // Cosmic Observatory Dome (Đài Thiên Văn Vũ Trụ mái vòm)
           const obsTower = new THREE.Group();
-          const baseRing = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * S, 0.26 * S, 0.04 * S, 16), trimMat);
+          const baseRing = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.08, 20), trimMat);
           obsTower.add(baseRing);
-          const obsDome = new THREE.Mesh(new THREE.SphereGeometry(0.22 * S, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), bodyMat);
-          obsDome.position.y = 0.02 * S;
+          const obsDome = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), bodyMat);
+          obsDome.position.y = 0.04;
           obsTower.add(obsDome);
-          const meridianArch = new THREE.Mesh(new THREE.TorusGeometry(0.225 * S, 0.015 * S, 6, 24, Math.PI), trimMat);
+          const meridianArch = new THREE.Mesh(new THREE.TorusGeometry(0.39, 0.024, 6, 28, Math.PI), trimMat);
           meridianArch.rotation.x = Math.PI / 2;
           meridianArch.rotation.y = Math.PI / 2;
-          meridianArch.position.y = 0.02 * S;
+          meridianArch.position.y = 0.04;
           obsTower.add(meridianArch);
-          const horizonRing = new THREE.Mesh(new THREE.TorusGeometry(0.24 * S, 0.012 * S, 6, 28), crystalMat);
-          horizonRing.position.y = 0.03 * S;
+          const horizonRing = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.018, 6, 32), crystalMat);
+          horizonRing.position.y = 0.06;
           horizonRing.rotation.x = Math.PI / 2;
           obsTower.add(horizonRing);
           animParts.haloRing = horizonRing;
-          const starlightBeacon = new THREE.Mesh(new THREE.OctahedronGeometry(0.05 * S, 0), glowMat);
-          starlightBeacon.position.y = 0.24 * S;
+          const starlightBeacon = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), glowMat);
+          starlightBeacon.position.y = 0.44;
           obsTower.add(starlightBeacon);
           battlements.add(obsTower);
         } else {
           // Classic / Imperial / Seraph crenellated parapet
-          const parapetRing = new THREE.Mesh(new THREE.TorusGeometry(0.22 * S, 0.016 * S, 6, 16), trimMat);
+          const parapetRing = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.028, 6, 20), trimMat);
           parapetRing.rotation.x = Math.PI / 2;
           battlements.add(parapetRing);
         }
@@ -1423,7 +1426,7 @@ export function initWizardChess() {
       }
 
       // -----------------------------------------------------------------------
-      // 6. QUEENS (HẬU): Majestic royal tiara & graceful swept-back wing mantle
+      // 6. QUEENS (HẬU): Majestic royal wings (Z = -0.34, Span = 1.9) & tiara (Y = 1.40)
       // -----------------------------------------------------------------------
       else if (role === 'queen') {
         if (skinId === 'infernal_drake') {
@@ -1432,30 +1435,31 @@ export function initWizardChess() {
           const membraneMat = glowMat;
           for (const side of [-1, 1]) {
             const wing = new THREE.Group();
-            wing.position.set(side * 0.12 * S, 0.65 * H, -0.10 * S);
+            wing.position.set(side * 0.18, 0.85, -0.34);
 
-            const arm = new THREE.Mesh(new THREE.BoxGeometry(0.035 * S, 0.32 * H, 0.035 * S), bodyMat);
-            arm.position.set(side * 0.14 * S, 0.16 * H, 0);
-            arm.rotation.z = -side * 0.65;
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.65, 0.06), bodyMat);
+            arm.position.set(side * 0.25, 0.30, 0);
+            arm.rotation.z = -side * 0.75;
+            arm.rotation.y = -side * 0.20;
             wing.add(arm);
 
-            const claw = new THREE.Mesh(new THREE.ConeGeometry(0.022 * S, 0.10 * S, 4), wingMat);
-            claw.position.set(side * 0.28 * S, 0.32 * H, 0.01 * S);
-            claw.rotation.z = -side * 0.85;
+            const claw = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.20, 4), wingMat);
+            claw.position.set(side * 0.52, 0.58, 0.02);
+            claw.rotation.z = -side * 0.95;
             wing.add(claw);
 
             const fAngles = [-0.15, 0.35, 0.80];
-            const fLengths = [0.42, 0.38, 0.30];
+            const fLengths = [0.85, 0.75, 0.60];
             for (let f = 0; f < 3; f++) {
-              const strutLen = fLengths[f] * H;
-              const strut = new THREE.Mesh(new THREE.BoxGeometry(0.020 * S, strutLen, 0.020 * S), wingMat);
-              strut.position.set(side * (0.28 + f * 0.08) * S, (0.22 - f * 0.12) * H, 0);
-              strut.rotation.z = -side * (0.65 + fAngles[f]);
+              const strutLen = fLengths[f];
+              const strut = new THREE.Mesh(new THREE.BoxGeometry(0.035, strutLen, 0.035), wingMat);
+              strut.position.set(side * (0.50 + f * 0.14), 0.35 - f * 0.20, 0);
+              strut.rotation.z = -side * (0.75 + fAngles[f]);
               wing.add(strut);
 
-              const web = new THREE.Mesh(new THREE.PlaneGeometry(0.12 * S, strutLen * 0.75), membraneMat);
-              web.position.set(side * (0.24 + f * 0.07) * S, (0.18 - f * 0.10) * H, 0.005 * S);
-              web.rotation.z = -side * (0.60 + fAngles[f]);
+              const web = new THREE.Mesh(new THREE.PlaneGeometry(0.24, strutLen * 0.80), membraneMat);
+              web.position.set(side * (0.42 + f * 0.12), 0.30 - f * 0.16, 0.01);
+              web.rotation.z = -side * (0.70 + fAngles[f]);
               wing.add(web);
             }
 
@@ -1466,15 +1470,15 @@ export function initWizardChess() {
 
           // Volcanic Queen Horned Diadem
           const vDiadem = new THREE.Group();
-          vDiadem.position.set(0, 0.88 * H, 0);
-          const vCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.15 * S, 0.016 * S, 6, 20), trimMat);
+          vDiadem.position.set(0, 1.40, 0);
+          const vCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.030, 6, 20), trimMat);
           vCirclet.rotation.x = Math.PI / 2;
           vDiadem.add(vCirclet);
           for (let i = -2; i <= 2; i++) {
             const a = i * 0.45;
-            const spLen = (0.13 - Math.abs(i) * 0.025) * S;
-            const sp = new THREE.Mesh(new THREE.ConeGeometry(0.024 * S, spLen, 4), glowMat);
-            sp.position.set(Math.sin(a) * 0.15 * S, spLen * 0.45, Math.cos(a) * 0.15 * S);
+            const spLen = 0.26 - Math.abs(i) * 0.05;
+            const sp = new THREE.Mesh(new THREE.ConeGeometry(0.045, spLen, 4), glowMat);
+            sp.position.set(Math.sin(a) * 0.24, spLen * 0.45, Math.cos(a) * 0.24);
             sp.rotation.z = -i * 0.15;
             vDiadem.add(sp);
           }
@@ -1483,25 +1487,25 @@ export function initWizardChess() {
           // Prismatic Starlight Crystal Wings (Cánh Tinh Tú Lăng Kính)
           for (const side of [-1, 1]) {
             const wing = new THREE.Group();
-            wing.position.set(side * 0.12 * S, 0.65 * H, -0.10 * S);
+            wing.position.set(side * 0.18, 0.85, -0.34);
 
             const bladeConfigs = [
-              { len: 0.52 * H, angle: 0.45, thick: 0.045 * S, mat: crystalMat, lift: 0.20 * H, xOff: 0.14 * S },
-              { len: 0.42 * H, angle: 0.75, thick: 0.038 * S, mat: trimMat,    lift: 0.10 * H, xOff: 0.22 * S },
-              { len: 0.32 * H, angle: 1.05, thick: 0.032 * S, mat: crystalMat, lift: 0.00 * H, xOff: 0.28 * S },
-              { len: 0.22 * H, angle: 1.35, thick: 0.026 * S, mat: glowMat,    lift: -0.10 * H, xOff: 0.32 * S }
+              { len: 0.95, angle: 0.45, thick: 0.08, mat: crystalMat, lift: 0.35, xOff: 0.24 },
+              { len: 0.80, angle: 0.75, thick: 0.07, mat: trimMat,    lift: 0.18, xOff: 0.38 },
+              { len: 0.65, angle: 1.05, thick: 0.06, mat: crystalMat, lift: 0.00, xOff: 0.48 },
+              { len: 0.45, angle: 1.35, thick: 0.05, mat: glowMat,    lift: -0.18, xOff: 0.55 }
             ];
 
             for (const bc of bladeConfigs) {
               const blade = new THREE.Mesh(new THREE.OctahedronGeometry(bc.thick, 0), bc.mat);
-              blade.scale.set(0.6, bc.len / bc.thick, 0.25);
+              blade.scale.set(0.65, bc.len / bc.thick, 0.28);
               blade.position.set(side * bc.xOff, bc.lift, 0);
               blade.rotation.z = -side * bc.angle;
               wing.add(blade);
             }
 
-            const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.010 * S, 0.010 * S, 0.60 * H, 6), trimMat);
-            lance.position.set(side * 0.18 * S, 0.12 * H, -0.015 * S);
+            const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.10, 6), trimMat);
+            lance.position.set(side * 0.32, 0.20, -0.02);
             lance.rotation.z = -side * 0.30;
             wing.add(lance);
 
@@ -1512,34 +1516,34 @@ export function initWizardChess() {
 
           // Empress Starlight Diadem
           const starCrown = new THREE.Group();
-          starCrown.position.set(0, 0.88 * H, 0);
-          const starCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.15 * S, 0.015 * S, 8, 24), trimMat);
+          starCrown.position.set(0, 1.40, 0);
+          const starCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.026, 8, 24), trimMat);
           starCirclet.rotation.x = Math.PI / 2;
           starCrown.add(starCirclet);
           for (let i = 0; i < 8; i++) {
             const a = (i * Math.PI * 2) / 8;
             const isCard = i % 2 === 0;
-            const hSp = (isCard ? 0.12 : 0.07) * S;
-            const starSpire = new THREE.Mesh(new THREE.OctahedronGeometry(0.024 * S, 0), crystalMat);
-            starSpire.scale.set(0.6, hSp / 0.024, 0.6);
-            starSpire.position.set(Math.cos(a) * 0.15 * S, hSp * 0.45, Math.sin(a) * 0.15 * S);
+            const hSp = isCard ? 0.22 : 0.13;
+            const starSpire = new THREE.Mesh(new THREE.OctahedronGeometry(0.045, 0), crystalMat);
+            starSpire.scale.set(0.6, hSp / 0.045, 0.6);
+            starSpire.position.set(Math.cos(a) * 0.24, hSp * 0.45, Math.sin(a) * 0.24);
             starCrown.add(starSpire);
           }
           skinGroup.add(starCrown);
         } else {
           // Standard / Seraphim / Valkyrie wings & Tiara
           const tiaraGroup = new THREE.Group();
-          tiaraGroup.position.set(0, 0.88 * H, 0);
+          tiaraGroup.position.set(0, 1.40, 0);
 
-          const tiaraCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.15 * S, 0.016 * S, 6, 20), trimMat);
+          const tiaraCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.028, 6, 20), trimMat);
           tiaraCirclet.rotation.x = Math.PI / 2;
           tiaraGroup.add(tiaraCirclet);
 
           for (let i = -2; i <= 2; i++) {
             const a = (i * 0.35);
-            const spLen = (0.10 - Math.abs(i) * 0.02) * S;
-            const sp = new THREE.Mesh(new THREE.ConeGeometry(0.02 * S, spLen, 4), trimMat);
-            sp.position.set(Math.sin(a) * 0.15 * S, spLen * 0.45, Math.cos(a) * 0.15 * S);
+            const spLen = 0.18 - Math.abs(i) * 0.035;
+            const sp = new THREE.Mesh(new THREE.ConeGeometry(0.038, spLen, 4), trimMat);
+            sp.position.set(Math.sin(a) * 0.24, spLen * 0.45, Math.cos(a) * 0.24);
             tiaraGroup.add(sp);
           }
           skinGroup.add(tiaraGroup);
@@ -1547,14 +1551,14 @@ export function initWizardChess() {
           const wingMat = (skinId === 'frost_valkyrie') ? crystalMat : trimMat;
           for (const side of [-1, 1]) {
             const wing = new THREE.Group();
-            wing.position.set(side * 0.08 * S, 0.60 * H, -0.12 * S);
+            wing.position.set(side * 0.16, 0.85, -0.34);
             wing.rotation.y = -side * 0.25;
 
             for (let f = 0; f < 3; f++) {
-              const fLen = (0.38 - f * 0.06) * H;
-              const feather = new THREE.Mesh(new THREE.BoxGeometry(0.018 * S, fLen, 0.035 * S), wingMat);
-              feather.position.set(side * (0.08 + f * 0.05) * S, (0.08 - f * 0.05) * H, 0);
-              feather.rotation.z = -side * (0.35 + f * 0.18);
+              const fLen = 0.70 - f * 0.12;
+              const feather = new THREE.Mesh(new THREE.BoxGeometry(0.032, fLen, 0.065), wingMat);
+              feather.position.set(side * (0.16 + f * 0.10), 0.16 - f * 0.10, 0);
+              feather.rotation.z = -side * (0.45 + f * 0.20);
               wing.add(feather);
             }
             skinGroup.add(wing);
@@ -1565,30 +1569,30 @@ export function initWizardChess() {
       }
 
       // -----------------------------------------------------------------------
-      // 7. KINGS (VUA): Imperial sovereign crown & regal halo / astrolabe
+      // 7. KINGS (VUA): Imperial crown (Y = 1.48) & regal halo / Saturnian ring (Y = 1.15)
       // -----------------------------------------------------------------------
       else if (role === 'king') {
         const crownGroup = new THREE.Group();
-        crownGroup.position.set(0, 0.90 * H, 0);
+        crownGroup.position.set(0, 1.48, 0);
 
         if (skinId === 'infernal_drake') {
           // Ancient Draconic Horned Crown (Vương miện Sừng Rồng cổ đại)
-          const drakeCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.17 * S, 0.022 * S, 8, 24), trimMat);
+          const drakeCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.035, 8, 24), trimMat);
           drakeCirclet.rotation.x = Math.PI / 2;
           crownGroup.add(drakeCirclet);
 
-          const magmaCore = new THREE.Mesh(new THREE.SphereGeometry(0.055 * S, 12, 12), glowMat);
-          magmaCore.position.y = 0.08 * S;
+          const magmaCore = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 14), glowMat);
+          magmaCore.position.y = 0.12;
           crownGroup.add(magmaCore);
 
           const hornConfigs = [
-            { x: -0.12 * S, z: 0.08 * S, rotZ: 0.42, rotX: -0.25, len: 0.24 * S },
-            { x: 0.12 * S,  z: 0.08 * S, rotZ: -0.42, rotX: -0.25, len: 0.24 * S },
-            { x: -0.14 * S, z: -0.06 * S, rotZ: 0.55, rotX: 0.35, len: 0.30 * S },
-            { x: 0.14 * S,  z: -0.06 * S, rotZ: -0.55, rotX: 0.35, len: 0.30 * S }
+            { x: -0.18, z: 0.12,  rotZ: 0.45,  rotX: -0.35, len: 0.42 },
+            { x: 0.18,  z: 0.12,  rotZ: -0.45, rotX: -0.35, len: 0.42 },
+            { x: -0.22, z: -0.10, rotZ: 0.55,  rotX: 0.40,  len: 0.55 },
+            { x: 0.22,  z: -0.10, rotZ: -0.55, rotX: 0.40,  len: 0.55 }
           ];
           for (const hc of hornConfigs) {
-            const horn = new THREE.Mesh(new THREE.ConeGeometry(0.032 * S, hc.len, 5), trimMat);
+            const horn = new THREE.Mesh(new THREE.ConeGeometry(0.055, hc.len, 5), trimMat);
             horn.position.set(hc.x, hc.len * 0.45, hc.z);
             horn.rotation.z = hc.rotZ;
             horn.rotation.x = hc.rotX;
@@ -1598,13 +1602,13 @@ export function initWizardChess() {
 
           // Sovereign Halo: Volcanic Basalt Caldera Ring with 6 Spikes of Molten Flame
           const calderaHalo = new THREE.Group();
-          calderaHalo.position.set(0, 0.78 * H, -0.16 * S);
-          const magmaHaloRing = new THREE.Mesh(new THREE.TorusGeometry(0.28 * S, 0.022 * S, 8, 24), trimMat);
+          calderaHalo.position.set(0, 1.15, -0.38);
+          const magmaHaloRing = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.035, 8, 28), trimMat);
           calderaHalo.add(magmaHaloRing);
           for (let i = 0; i < 6; i++) {
             const a = (i * Math.PI * 2) / 6;
-            const flameSpike = new THREE.Mesh(new THREE.ConeGeometry(0.028 * S, 0.11 * S, 4), glowMat);
-            flameSpike.position.set(Math.cos(a) * 0.29 * S, Math.sin(a) * 0.29 * S, 0);
+            const flameSpike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.20, 4), glowMat);
+            flameSpike.position.set(Math.cos(a) * 0.48, Math.sin(a) * 0.48, 0);
             flameSpike.rotation.z = a - Math.PI / 2;
             calderaHalo.add(flameSpike);
           }
@@ -1613,37 +1617,37 @@ export function initWizardChess() {
 
         } else if (skinId === 'celestial_eternity') {
           // Imperial Starlight Crown (Vương Miện Tinh Đế)
-          const astralCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.17 * S, 0.020 * S, 8, 24), trimMat);
+          const astralCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.032, 8, 24), trimMat);
           astralCirclet.rotation.x = Math.PI / 2;
           crownGroup.add(astralCirclet);
 
           for (let i = 0; i < 8; i++) {
             const a = (i * Math.PI * 2) / 8;
             const isMain = i % 2 === 0;
-            const spLen = (isMain ? 0.16 : 0.09) * S;
-            const spire = new THREE.Mesh(new THREE.ConeGeometry(0.024 * S, spLen, 4), trimMat);
-            spire.position.set(Math.cos(a) * 0.17 * S, spLen * 0.45, Math.sin(a) * 0.17 * S);
-            const gem = new THREE.Mesh(new THREE.SphereGeometry(0.016 * S, 6, 6), crystalMat);
-            gem.position.set(Math.cos(a) * 0.17 * S, spLen * 0.85, Math.sin(a) * 0.17 * S);
+            const spLen = isMain ? 0.32 : 0.18;
+            const spire = new THREE.Mesh(new THREE.ConeGeometry(0.042, spLen, 4), trimMat);
+            spire.position.set(Math.cos(a) * 0.26, spLen * 0.45, Math.sin(a) * 0.26);
+            const gem = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), crystalMat);
+            gem.position.set(Math.cos(a) * 0.26, spLen * 0.85, Math.sin(a) * 0.26);
             crownGroup.add(spire, gem);
           }
-          const apexStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.05 * S, 0), crystalMat);
-          apexStar.position.y = 0.20 * S;
+          const apexStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), crystalMat);
+          apexStar.position.y = 0.38;
           apexStar.scale.set(0.7, 1.4, 0.7);
           crownGroup.add(apexStar);
           skinGroup.add(crownGroup);
 
           // Tilted Saturnian Planetary Ring with Orbiting Starlight Moon (Vành Đai Sao Thổ)
-          const saturnRing = new THREE.Mesh(new THREE.TorusGeometry(0.34 * S, 0.016 * S, 8, 36), trimMat);
-          saturnRing.position.set(0, 0.78 * H, 0);
+          const saturnRing = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.025, 8, 40), trimMat);
+          saturnRing.position.set(0, 1.05, 0); // Cleanly encircles the 0.43 King body
           saturnRing.rotation.x = 0.48;
           saturnRing.rotation.z = 0.22;
 
-          const innerDustRing = new THREE.Mesh(new THREE.TorusGeometry(0.30 * S, 0.008 * S, 6, 32), crystalMat);
+          const innerDustRing = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.012, 6, 36), crystalMat);
           saturnRing.add(innerDustRing);
 
-          const moonOrb = new THREE.Mesh(new THREE.SphereGeometry(0.048 * S, 10, 10), crystalMat);
-          moonOrb.position.set(0.34 * S, 0, 0);
+          const moonOrb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 12), crystalMat);
+          moonOrb.position.set(0.58, 0, 0);
           saturnRing.add(moonOrb);
 
           skinGroup.add(saturnRing);
@@ -1651,73 +1655,73 @@ export function initWizardChess() {
 
         } else {
           // Classic imperial crown with sovereign cross
-          const crownCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.17 * S, 0.020 * S, 8, 24), trimMat);
+          const crownCirclet = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.032, 8, 24), trimMat);
           crownCirclet.rotation.x = Math.PI / 2;
           crownGroup.add(crownCirclet);
 
           for (let i = 0; i < 8; i++) {
             const a = (i * Math.PI * 2) / 8;
             const isMain = i % 2 === 0;
-            const spH = (isMain ? 0.14 : 0.09) * S;
-            const spike = new THREE.Mesh(new THREE.ConeGeometry(0.025 * S, spH, 4), trimMat);
-            spike.position.set(Math.cos(a) * 0.17 * S, spH * 0.45, Math.sin(a) * 0.17 * S);
+            const spH = isMain ? 0.26 : 0.16;
+            const spike = new THREE.Mesh(new THREE.ConeGeometry(0.042, spH, 4), trimMat);
+            spike.position.set(Math.cos(a) * 0.26, spH * 0.45, Math.sin(a) * 0.26);
             crownGroup.add(spike);
           }
-          const sovereignCross = new THREE.Mesh(new THREE.BoxGeometry(0.022 * S, 0.12 * S, 0.022 * S), trimMat);
-          sovereignCross.position.y = 0.14 * S;
-          const crossArm = new THREE.Mesh(new THREE.BoxGeometry(0.07 * S, 0.022 * S, 0.022 * S), trimMat);
-          crossArm.position.y = 0.14 * S;
+          const sovereignCross = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.24, 0.038), trimMat);
+          sovereignCross.position.y = 0.26;
+          const crossArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.038, 0.038), trimMat);
+          crossArm.position.y = 0.26;
           crownGroup.add(sovereignCross, crossArm);
           skinGroup.add(crownGroup);
 
           // Sovereign Regalia / Halo behind King
           const haloGroup = new THREE.Group();
-          haloGroup.position.set(0, 0.78 * H, -0.15 * S);
+          haloGroup.position.set(0, 1.15, -0.38);
 
           if (skinId === 'classic_sanctum') {
-            const roseHalo = new THREE.Mesh(new THREE.TorusGeometry(0.24 * S, 0.018 * S, 8, 24), trimMat);
+            const roseHalo = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.030, 8, 24), trimMat);
             haloGroup.add(roseHalo);
           } else if (skinId === 'royal_ivory_ebony') {
             for (const side of [-1, 1]) {
-              const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.014 * S, 0.014 * S, 0.72 * H, 6), trimMat);
-              pole.position.set(side * 0.14 * S, 0.08 * H, 0);
+              const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 1.10, 6), trimMat);
+              pole.position.set(side * 0.24, 0.15, 0);
               pole.rotation.z = -side * 0.18;
-              const flag = new THREE.Mesh(new THREE.BoxGeometry(0.16 * S, 0.32 * H, 0.01 * S), bodyMat);
-              flag.position.set(side * 0.08 * S, 0.12 * H, 0);
+              const flag = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.55, 0.015), bodyMat);
+              flag.position.set(side * 0.14, 0.20, 0);
               pole.add(flag);
               haloGroup.add(pole);
             }
           } else if (skinId === 'jade_dynasty') {
-            const biDisc = new THREE.Mesh(new THREE.TorusGeometry(0.25 * S, 0.035 * S, 8, 24), crystalMat);
-            const goldTrim = new THREE.Mesh(new THREE.TorusGeometry(0.29 * S, 0.012 * S, 6, 24), trimMat);
+            const biDisc = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.055, 8, 24), crystalMat);
+            const goldTrim = new THREE.Mesh(new THREE.TorusGeometry(0.50, 0.022, 6, 24), trimMat);
             haloGroup.add(biDisc, goldTrim);
           } else if (skinId === 'crimson_inquisitor') {
-            const ironHalo = new THREE.Mesh(new THREE.TorusGeometry(0.24 * S, 0.018 * S, 6, 16), steelMat);
+            const ironHalo = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.030, 6, 16), steelMat);
             for (let i = 0; i < 8; i++) {
               const a = (i * Math.PI * 2) / 8;
-              const spike = new THREE.Mesh(new THREE.ConeGeometry(0.02 * S, 0.08 * S, 4), trimMat);
-              spike.position.set(Math.cos(a) * 0.25 * S, Math.sin(a) * 0.25 * S, 0);
+              const spike = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.16, 4), trimMat);
+              spike.position.set(Math.cos(a) * 0.44, Math.sin(a) * 0.44, 0);
               spike.rotation.z = a - Math.PI / 2;
               ironHalo.add(spike);
             }
             haloGroup.add(ironHalo);
           } else if (skinId === 'solar_seraphim') {
-            const sunHalo = new THREE.Mesh(new THREE.TorusGeometry(0.24 * S, 0.018 * S, 8, 24), trimMat);
+            const sunHalo = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.030, 8, 24), trimMat);
             for (let i = 0; i < 12; i++) {
               const a = (i * Math.PI * 2) / 12;
-              const ray = new THREE.Mesh(new THREE.ConeGeometry(0.02 * S, 0.09 * S, 4), trimMat);
-              ray.position.set(Math.cos(a) * 0.25 * S, Math.sin(a) * 0.25 * S, 0);
+              const ray = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.18, 4), trimMat);
+              ray.position.set(Math.cos(a) * 0.46, Math.sin(a) * 0.46, 0);
               ray.rotation.z = a - Math.PI / 2;
               sunHalo.add(ray);
             }
             haloGroup.add(sunHalo);
             animParts.haloRing = sunHalo;
           } else if (skinId === 'arcane_archmage') {
-            const gyroRing = new THREE.Mesh(new THREE.TorusGeometry(0.26 * S, 0.014 * S, 8, 24), trimMat);
+            const gyroRing = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.024, 8, 24), trimMat);
             haloGroup.add(gyroRing);
             animParts.haloRing = gyroRing;
           } else {
-            const sovereignHalo = new THREE.Mesh(new THREE.TorusGeometry(0.24 * S, 0.016 * S, 8, 24), trimMat);
+            const sovereignHalo = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.028, 8, 24), trimMat);
             haloGroup.add(sovereignHalo);
           }
           skinGroup.add(haloGroup);
