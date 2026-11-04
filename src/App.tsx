@@ -526,6 +526,8 @@ type WizardChessWindow = {
     };
     setInspectedUnitHpPercent?: (pct: number, r?: number, c?: number) => boolean;
     toggleBattleMusic?: () => boolean;
+    nextBattleTrack?: () => unknown;
+    getCurrentTrackInfo?: () => unknown;
     toggleSoundMute?: () => boolean;
     playUIHover?: () => void;
     playUIClick?: () => void;
@@ -1110,16 +1112,18 @@ export default function App() {
             type="button"
             className={`hud-btn audio-pill-btn ${gameState?.bgmPlaying ? 'active bgm-playing' : ''}`}
             id="btn-bgm-toggle"
-            title="Bật / Tắt Nhạc Nền Chiến Đấu Tráng Lệ"
+            title={`${(gameState as any)?.bgmTrack?.title || 'Symphony Battle Orchestra'} — Bấm để Bật/Tắt`}
             onMouseEnter={() => getEngine()?.playUIHover?.()}
             onClick={() => {
               getEngine()?.toggleBattleMusic?.();
             }}
           >
             <span className="audio-icon" aria-hidden="true">
-              {gameState?.bgmPlaying ? '🎵' : '🎼'}
+              {gameState?.bgmPlaying ? '🎻' : '🎼'}
             </span>
-            <span className="audio-btn-label">Nhạc</span>
+            <span className="audio-btn-label">
+              {gameState?.bgmPlaying ? 'Nhạc Chiến Trận' : 'Bật Nhạc'}
+            </span>
             {gameState?.bgmPlaying && (
               <span className="bgm-eq-bars" aria-hidden="true">
                 <i />
@@ -1128,6 +1132,21 @@ export default function App() {
               </span>
             )}
           </button>
+
+          {gameState?.bgmPlaying && (
+            <button
+              type="button"
+              className="hud-btn audio-next-track-btn"
+              id="btn-bgm-next"
+              title={`Đổi bài tiếp theo: ${(gameState as any)?.bgmTrack?.title || 'Kế tiếp'}`}
+              onMouseEnter={() => getEngine()?.playUIHover?.()}
+              onClick={() => {
+                getEngine()?.nextBattleTrack?.();
+              }}
+            >
+              ⏭ Đổi Bài
+            </button>
+          )}
 
           <button
             type="button"

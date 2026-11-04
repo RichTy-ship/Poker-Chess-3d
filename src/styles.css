@@ -4858,3 +4858,24 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   font-family: 'Inter', sans-serif;
   font-weight: 600;
 }
+
+.hud-btn.audio-next-track-btn {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  color: #fef08a;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.hud-btn.audio-next-track-btn:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(180, 83, 9, 0.95));
+  color: #ffffff;
+  border-color: #fde047;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.6);
+  transform: translateY(-1px);
+}

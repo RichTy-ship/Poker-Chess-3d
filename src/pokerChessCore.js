@@ -1001,6 +1001,23 @@ export function grantUnitXP(piece, xpAmount) {
 // AAA PHYSICAL ACOUSTIC COMBAT FOLEY & CATHEDRAL ORCHESTRAL AUDIO ENGINE
 // (Stereo Convolution Reverb, Analog Saturation, Modal Steel Waveguides & Stone Shatter Foley)
 // ============================================================================
+export const BATTLE_SOUNDTRACK_PLAYLIST = [
+  {
+    id: 'mars_war',
+    title: 'Hành Quân Chiến Thần (Mars, the Bringer of War)',
+    composer: 'Gustav Holst (The Planets — Live Symphony)',
+    src: '/assets/audio/mars_bringer_of_war.ogg',
+    intensityMultiplier: 1.05
+  },
+  {
+    id: 'valkyrie_ride',
+    title: 'Khúc Khải Hoàn Valkyrie (Ride of the Valkyries)',
+    composer: 'Richard Wagner (Die Walküre — Live Symphony)',
+    src: '/assets/audio/ride_of_valkyries.ogg',
+    intensityMultiplier: 1.0
+  }
+];
+
 class SanctumSoundEngine {
   constructor() {
     this.ctx = null;
@@ -1027,13 +1044,12 @@ class SanctumSoundEngine {
     this.tickStepParity = 0;
     this.tickSecondsRemaining = 10;
 
-    // Majestic Cathedral Orchestral Score State
+    // Majestic Live Orchestral Battle Soundtrack State
     this.bgmPlaying = false;
     this.bgmUserDisabled = false;
     this.bgmIntensity = 'normal'; // 'normal' | 'combat' | 'urgent'
-    this.bgmTimer = null;
-    this.bgmStep = 0;
-    this.bgmMasterGain = null;
+    this.bgmAudio = null;
+    this.currentTrackIndex = 0;
     this._lastHoverSoundMs = 0;
     this._gestureHookBound = false;
 
@@ -1046,7 +1062,10 @@ class SanctumSoundEngine {
     const onFirstGesture = () => {
       if (!this.muted && !this.bgmUserDisabled && !this.bgmPlaying) {
         this.startBattleMusic();
-      } else if (this.ctx && this.ctx.state === 'suspended') {
+      } else if (this.bgmAudio && this.bgmPlaying && this.bgmAudio.paused) {
+        this.bgmAudio.play().catch(() => {});
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
         this.ctx.resume().catch(() => {});
       }
     };
@@ -1291,65 +1310,86 @@ class SanctumSoundEngine {
     return Boolean(this.bgmPlaying && !this.muted);
   }
 
+  getCurrentTrackInfo() {
+    return BATTLE_SOUNDTRACK_PLAYLIST[this.currentTrackIndex % BATTLE_SOUNDTRACK_PLAYLIST.length];
+  }
+
+  nextBattleTrack() {
+    this.currentTrackIndex = (this.currentTrackIndex + 1) % BATTLE_SOUNDTRACK_PLAYLIST.length;
+    if (this.bgmPlaying) {
+      this._pauseBattleMusicInternal();
+      this.startBattleMusic(this.currentTrackIndex);
+    }
+    return this.getCurrentTrackInfo();
+  }
+
   setBattleMusicIntensity(mode = 'normal') {
     if (mode === 'combat' || mode === 'urgent' || mode === 'normal') {
       this.bgmIntensity = mode;
+      if (this.bgmAudio && this.bgmPlaying) {
+        try {
+          const track = this.getCurrentTrackInfo();
+          const baseVol = this.bgmVolume * (track?.intensityMultiplier || 1);
+          if (mode === 'combat') {
+            this.bgmAudio.playbackRate = 1.06;
+            this.bgmAudio.volume = Math.min(1.0, baseVol * 1.25);
+          } else if (mode === 'urgent') {
+            this.bgmAudio.playbackRate = 1.03;
+            this.bgmAudio.volume = Math.min(1.0, baseVol * 1.15);
+          } else {
+            this.bgmAudio.playbackRate = 1.0;
+            this.bgmAudio.volume = Math.min(1.0, baseVol);
+          }
+        } catch (e) {}
+      }
     }
     return this.bgmIntensity;
   }
 
-  startBattleMusic() {
+  startBattleMusic(trackIdx) {
     if (typeof window === 'undefined') return false;
     this.bgmUserDisabled = false;
     if (this.muted) return false;
-    if (this.bgmPlaying) return true;
 
-    const ctx = this.ensureCtx();
-    if (!ctx) return false;
+    if (typeof trackIdx === 'number') {
+      this.currentTrackIndex = Math.abs(trackIdx) % BATTLE_SOUNDTRACK_PLAYLIST.length;
+    }
 
-    this.bgmPlaying = true;
-    this.bgmStep = 0;
+    const track = this.getCurrentTrackInfo();
 
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0.0001, ctx.currentTime);
-    master.gain.linearRampToValueAtTime(this.bgmVolume, ctx.currentTime + 0.85);
-    this._connectToSanctumSpace(master, 0.72, 0.65, 0);
-    this.bgmMasterGain = master;
+    if (!this.bgmAudio) {
+      this.bgmAudio = new Audio();
+      this.bgmAudio.loop = true;
+      this.bgmAudio.preload = 'auto';
+    }
 
-    const scheduleStep = () => {
-      if (!this.bgmPlaying || this.muted) return;
-      this._triggerBattleMusicStep(this.bgmStep);
-      this.bgmStep = (this.bgmStep + 1) % 64;
-
-      const isCombat = this.bgmIntensity === 'combat';
-      const isUrgent = this.bgmIntensity === 'urgent';
-      const stepMs = isCombat ? 106 : isUrgent ? 118 : 130;
-      this.bgmTimer = setTimeout(scheduleStep, stepMs);
-    };
-
-    scheduleStep();
+    try {
+      const targetSrc = track.src;
+      if (!this.bgmAudio.src || !this.bgmAudio.src.includes(targetSrc)) {
+        this.bgmAudio.src = targetSrc;
+        this.bgmAudio.currentTime = 0;
+      }
+      this.bgmAudio.playbackRate = this.bgmIntensity === 'combat' ? 1.06 : 1.0;
+      this.bgmAudio.volume = Math.max(0, Math.min(1, this.bgmVolume * (track.intensityMultiplier || 1)));
+      const playPromise = this.bgmAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((e) => {
+          console.warn('[SanctumAudio] Autoplay waiting for user touch/click:', e.message);
+        });
+      }
+      this.bgmPlaying = true;
+    } catch (e) {
+      console.warn('[SanctumAudio] Play failed:', e);
+      return false;
+    }
     return true;
   }
 
   _pauseBattleMusicInternal() {
-    if (this.bgmTimer) {
-      clearTimeout(this.bgmTimer);
-      this.bgmTimer = null;
-    }
     this.bgmPlaying = false;
-    const gainNode = this.bgmMasterGain;
-    this.bgmMasterGain = null;
-    if (gainNode && this.ctx) {
+    if (this.bgmAudio) {
       try {
-        const now = this.ctx.currentTime;
-        gainNode.gain.cancelScheduledValues(now);
-        gainNode.gain.setValueAtTime(Math.max(0.0001, gainNode.gain.value || 0.2), now);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-        setTimeout(() => {
-          try {
-            gainNode.disconnect();
-          } catch (e) {}
-        }, 340);
+        this.bgmAudio.pause();
       } catch (e) {}
     }
   }
@@ -1369,457 +1409,6 @@ class SanctumSoundEngine {
       this.muted = false;
     }
     return this.startBattleMusic();
-  }
-
-  // ==========================================================================
-  // CINEMATIC DARK-FANTASY CATHEDRAL ORCHESTRAL SCORE (NO 8-BIT BEEPS)
-  // ==========================================================================
-  _triggerBattleMusicStep(step) {
-    const ctx = this.ensureCtx();
-    if (!ctx || !this.bgmMasterGain) return;
-
-    const now = ctx.currentTime;
-    const bar = Math.floor(step / 16) % 4;
-    const stepInBar = step % 16;
-    const isCombat = this.bgmIntensity === 'combat';
-    const isUrgent = this.bgmIntensity === 'urgent';
-    const intensityGain = isCombat ? 1.35 : isUrgent ? 1.18 : 1.0;
-
-    // 1. Kinetic Continuous Shaker & Chainmail March (16th-note groove on every single step!)
-    const isAccent = stepInBar === 4 || stepInBar === 12;
-    const isUpbeat = stepInBar % 4 === 2;
-    const shakerGain = (isAccent ? 0.052 : isUpbeat ? 0.036 : 0.022) * intensityGain;
-    this._playKineticWarShaker(now, stepInBar, shakerGain);
-
-    // 2. Powerful War Drums & Military Kick
-    if (isCombat) {
-      // Double-time war cadence during active combat clash!
-      if (stepInBar === 0 || stepInBar === 3 || stepInBar === 6 || stepInBar === 8 || stepInBar === 10 || stepInBar === 12 || stepInBar === 14) {
-        this._playDrivingWarKick(now, (stepInBar === 0 || stepInBar === 8 ? 0.32 : 0.22) * intensityGain, stepInBar === 0);
-      }
-    } else {
-      // Driving 4-on-the-floor martial march with syncopated push on step 14
-      if (stepInBar === 0 || stepInBar === 4 || stepInBar === 8 || stepInBar === 12 || stepInBar === 14) {
-        this._playDrivingWarKick(now, (stepInBar === 0 ? 0.30 : stepInBar === 8 ? 0.26 : 0.20) * intensityGain, stepInBar === 0 || stepInBar === 8);
-      }
-    }
-
-    // 3. Battle Snare / Shield Rimshot on backbeats (beats 4 & 12) + rapid rolls before bar end
-    if (stepInBar === 4 || stepInBar === 12) {
-      this._playBattleSnare(now, 0.17 * intensityGain, false);
-    } else if (isCombat && (stepInBar === 7 || stepInBar === 15)) {
-      this._playBattleSnare(now, 0.11 * intensityGain, true);
-    } else if (bar === 3 && (stepInBar === 13 || stepInBar === 15)) {
-      this._playBattleSnare(now, 0.12 * intensityGain, true);
-    }
-
-    // 4. Driving Cello & Contrabass Action Ostinato (8th-note pulse: steps 0, 2, 4, 6, 8, 10, 12, 14)
-    // Scale: D Natural / Harmonic Minor
-    const ostinatoPatterns = [
-      // Bar 0: D minor drive (D - D - F - D - G - D - F - E)
-      [73.42, 73.42, 87.31, 73.42, 98.00, 73.42, 87.31, 82.41],
-      // Bar 1: Bb major push (Bb - Bb - D - Bb - F - Bb - D - C)
-      [58.27, 58.27, 73.42, 58.27, 87.31, 58.27, 73.42, 65.41],
-      // Bar 2: C major heroic lift (C - C - E - C - G - C - E - D)
-      [65.41, 65.41, 82.41, 65.41, 98.00, 65.41, 82.41, 73.42],
-      // Bar 3: A7 harmonic minor climax (A - A - C# - E - G - E - C# - A)
-      [55.00, 55.00, 69.30, 82.41, 98.00, 82.41, 69.30, 55.00]
-    ];
-
-    if (stepInBar % 2 === 0) {
-      const eighthIdx = stepInBar / 2;
-      const noteFreq = ostinatoPatterns[bar][eighthIdx];
-      const isDownbeat = eighthIdx === 0 || eighthIdx === 4;
-      const bassGain = (isDownbeat ? 0.20 : 0.16) * intensityGain;
-      this._playActionBassOstinato(now, noteFreq, isCombat ? 0.12 : 0.17, bassGain);
-    }
-
-    // 5. Staccato Strings Arpeggio (Syncopated 3-3-2 action accents on steps 0, 3, 6, 8, 11, 14)
-    const stringChords = [
-      // Bar 0: Dm [D4, F4, A4]
-      [293.66, 349.23, 440.00],
-      // Bar 1: Bb [D4, F4, Bb4]
-      [293.66, 349.23, 466.16],
-      // Bar 2: C [E4, G4, C5]
-      [329.63, 392.00, 523.25],
-      // Bar 3: A [E4, G4, C#5]
-      [329.63, 392.00, 554.37]
-    ];
-    if (stepInBar === 0 || stepInBar === 3 || stepInBar === 6 || stepInBar === 8 || stepInBar === 11 || stepInBar === 14) {
-      const chord = stringChords[bar];
-      const noteIdx = (stepInBar === 0 || stepInBar === 8) ? 0 : (stepInBar === 3 || stepInBar === 11) ? 1 : 2;
-      this._playStaccatoString(now, chord[noteIdx], 0.082 * intensityGain);
-      if (isCombat) {
-        this._playStaccatoString(now, chord[noteIdx] * 0.5, 0.055 * intensityGain);
-      }
-    }
-
-    // 6. Heroic French Horn & War Brass Fanfares
-    if (stepInBar === 0) {
-      const hornThemes = [293.66, 233.08, 261.63, 220.00]; // D4, Bb3, C4, A3
-      this._playHeroicBrassHit(now, hornThemes[bar], 1.2, 0.13 * intensityGain);
-    } else if (stepInBar === 8) {
-      const hornCounter = [349.23, 293.66, 392.00, 277.18]; // F4, D4, G4, C#4
-      this._playHeroicBrassHit(now, hornCounter[bar], 0.85, 0.11 * intensityGain);
-    }
-
-    // 7. Majestic Gothic Choir Pads on Bar Downbeats
-    if (stepInBar === 0) {
-      const choirChords = [
-        [146.83, 220.00, 293.66, 349.23],
-        [116.54, 174.61, 233.08, 293.66],
-        [130.81, 196.00, 261.63, 329.63],
-        [110.00, 164.81, 220.00, 277.18]
-      ];
-      this._playGothicChoirPad(now, choirChords[bar], 2.2, 0.048 * intensityGain);
-    }
-  }
-
-  _playDrivingWarKick(now, peakGain = 0.28, isDownbeat = true) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const dur = isDownbeat ? 0.28 : 0.18;
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(isDownbeat ? 108 : 92, now);
-    osc.frequency.exponentialRampToValueAtTime(32, now + dur);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
-    osc.connect(gain);
-    gain.connect(this.bgmMasterGain);
-    osc.start(now);
-    osc.stop(now + dur + 0.02);
-
-    const brownBuf = this._getBrownNoiseBuffer();
-    if (brownBuf) {
-      const noise = ctx.createBufferSource();
-      noise.buffer = brownBuf;
-      const filter = ctx.createBiquadFilter();
-      const nGain = ctx.createGain();
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(isDownbeat ? 240 : 180, now);
-
-      nGain.gain.setValueAtTime(peakGain * 0.55, now);
-      nGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-
-      noise.connect(filter);
-      filter.connect(nGain);
-      nGain.connect(this.bgmMasterGain);
-      noise.start(now);
-      noise.stop(now + 0.09);
-    }
-  }
-
-  _playBattleSnare(now, peakGain = 0.16, isGhost = false) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-    const noiseBuf = this._getNoiseBuffer();
-    if (!noiseBuf) return;
-
-    const dur = isGhost ? 0.06 : 0.14;
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuf;
-    const filter = ctx.createBiquadFilter();
-    const nGain = ctx.createGain();
-
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(isGhost ? 2400 : 1750, now);
-    filter.Q.setValueAtTime(1.8, now);
-
-    nGain.gain.setValueAtTime(0.0001, now);
-    nGain.gain.linearRampToValueAtTime(peakGain, now + 0.002);
-    nGain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
-    noise.connect(filter);
-    filter.connect(nGain);
-    nGain.connect(this.bgmMasterGain);
-    noise.start(now);
-    noise.stop(now + dur + 0.02);
-
-    if (!isGhost) {
-      const osc = ctx.createOscillator();
-      const toneGain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(185, now);
-      osc.frequency.exponentialRampToValueAtTime(110, now + 0.08);
-
-      toneGain.gain.setValueAtTime(peakGain * 0.42, now);
-      toneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-
-      osc.connect(toneGain);
-      toneGain.connect(this.bgmMasterGain);
-      osc.start(now);
-      osc.stop(now + 0.09);
-    }
-  }
-
-  _playKineticWarShaker(now, step, peakGain = 0.03) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-    const noiseBuf = this._getNoiseBuffer();
-    if (!noiseBuf) return;
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuf;
-    const filter = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-
-    filter.type = 'highpass';
-    filter.frequency.setValueAtTime(5500, now);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.002);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.038);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.bgmMasterGain);
-    noise.start(now);
-    noise.stop(now + 0.045);
-  }
-
-  _playActionBassOstinato(now, freq, dur = 0.16, peakGain = 0.18) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-
-    const oscSaw = ctx.createOscillator();
-    const oscSub = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-
-    oscSaw.type = 'sawtooth';
-    oscSaw.frequency.setValueAtTime(freq, now);
-
-    oscSub.type = 'sine';
-    oscSub.frequency.setValueAtTime(freq * 0.5, now);
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(450, now);
-    filter.frequency.exponentialRampToValueAtTime(140, now + dur);
-    filter.Q.setValueAtTime(2.4, now);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
-    oscSaw.connect(filter);
-    oscSub.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.bgmMasterGain);
-
-    oscSaw.start(now);
-    oscSub.start(now);
-    oscSaw.stop(now + dur + 0.02);
-    oscSub.stop(now + dur + 0.02);
-  }
-
-  _playStaccatoString(now, freq, peakGain = 0.08) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-
-    const osc = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-    const dur = 0.09;
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq, now);
-    osc.detune.setValueAtTime(4, now);
-
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(1100, now);
-    filter.Q.setValueAtTime(1.6, now);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.006);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.bgmMasterGain);
-
-    osc.start(now);
-    osc.stop(now + dur + 0.02);
-  }
-
-  _playHeroicBrassHit(now, freq, dur = 0.85, peakGain = 0.13) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-
-    osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(freq, now);
-
-    osc2.type = 'square';
-    osc2.frequency.setValueAtTime(freq, now);
-    osc2.detune.setValueAtTime(7, now);
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(320, now);
-    filter.frequency.linearRampToValueAtTime(1650, now + 0.18);
-    filter.frequency.exponentialRampToValueAtTime(420, now + dur);
-    filter.Q.setValueAtTime(1.8, now);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
-    osc1.connect(filter);
-    osc2.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.bgmMasterGain);
-
-    osc1.start(now);
-    osc2.start(now);
-    osc1.stop(now + dur + 0.03);
-    osc2.stop(now + dur + 0.03);
-  }
-
-  _playCathedralOrganBass(now, freq, duration, peakGain) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-
-    const oscSub = ctx.createOscillator();
-    const oscCello = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-
-    oscSub.type = 'sine';
-    oscSub.frequency.setValueAtTime(freq, now);
-
-    oscCello.type = 'sawtooth';
-    oscCello.frequency.setValueAtTime(freq, now);
-    oscCello.detune.setValueAtTime(5, now);
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(220, now);
-    filter.frequency.exponentialRampToValueAtTime(115, now + duration);
-    filter.Q.setValueAtTime(1.4, now);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-    oscSub.connect(filter);
-    oscCello.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.bgmMasterGain);
-
-    oscSub.start(now);
-    oscCello.start(now);
-    oscSub.stop(now + duration + 0.03);
-    oscCello.stop(now + duration + 0.03);
-  }
-
-  _playGothicChoirPad(now, freqs, duration, perVoiceGain) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-
-    freqs.forEach((f, idx) => {
-      const osc = ctx.createOscillator();
-      const filter = ctx.createBiquadFilter();
-      const gain = ctx.createGain();
-
-      osc.type = idx % 2 === 0 ? 'sawtooth' : 'triangle';
-      osc.frequency.setValueAtTime(f, now);
-      osc.detune.setValueAtTime((idx - 1.5) * 8, now);
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(480 + idx * 95, now);
-      filter.Q.setValueAtTime(1.2, now);
-
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(perVoiceGain, now + 0.35);
-      gain.gain.setValueAtTime(perVoiceGain * 0.82, now + duration * 0.65);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.bgmMasterGain);
-
-      osc.start(now);
-      osc.stop(now + duration + 0.04);
-    });
-  }
-
-  _playWarDrumHit(now, startPitch = 82, peakGain = 0.25, isHeavyDownbeat = true) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const dur = isHeavyDownbeat ? 0.46 : 0.28;
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(startPitch, now);
-    osc.frequency.exponentialRampToValueAtTime(28, now + dur);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.006);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
-    osc.connect(gain);
-    gain.connect(this.bgmMasterGain);
-    osc.start(now);
-    osc.stop(now + dur + 0.02);
-
-    const brownBuf = this._getBrownNoiseBuffer();
-    if (brownBuf) {
-      const noise = ctx.createBufferSource();
-      noise.buffer = brownBuf;
-      const filter = ctx.createBiquadFilter();
-      const nGain = ctx.createGain();
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(isHeavyDownbeat ? 190 : 280, now);
-
-      nGain.gain.setValueAtTime(peakGain * 0.65, now);
-      nGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
-
-      noise.connect(filter);
-      filter.connect(nGain);
-      nGain.connect(this.bgmMasterGain);
-      noise.start(now);
-      noise.stop(now + 0.1);
-    }
-  }
-
-  _playMartialRimShot(now, peakGain = 0.08) {
-    const ctx = this.ctx;
-    if (!ctx || !this.bgmMasterGain) return;
-    const noiseBuf = this._getNoiseBuffer();
-    if (!noiseBuf) return;
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuf;
-    const filter = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(820, now);
-    filter.Q.setValueAtTime(2.2, now);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peakGain, now + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.bgmMasterGain);
-    noise.start(now);
-    noise.stop(now + 0.12);
   }
 
   // ==========================================================================

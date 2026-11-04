@@ -7778,6 +7778,7 @@ export function initWizardChess() {
         capturedByWhite,
         capturedByBlack,
         bgmPlaying: soundFX.isBattleMusicPlaying(),
+        bgmTrack: soundFX.getCurrentTrackInfo?.() || null,
         sfxMuted: soundFX.isMuted(),
         autoMoveEnabled,
         activeCombatBanner,
@@ -8990,6 +8991,12 @@ export function initWizardChess() {
         emitPokerChessSync();
         return playing;
       },
+      nextBattleTrack: () => {
+        const track = soundFX.nextBattleTrack?.();
+        emitPokerChessSync();
+        return track;
+      },
+      getCurrentTrackInfo: () => soundFX.getCurrentTrackInfo?.() || null,
       toggleSoundMute: () => {
         const muted = soundFX.toggleMute();
         emitPokerChessSync();
