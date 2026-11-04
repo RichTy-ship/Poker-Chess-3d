@@ -898,6 +898,7 @@ export function initWizardChess() {
       metalness: 0.18
     });
 
+    let boardState = Array.from({ length: 8 }, () => Array(8).fill(null));
     let commercialProfile = loadCommercialProfile();
     let activeSkinSlashHex = 0xfde047;
     let activeRenderedSkinId = commercialProfile.equippedSkinId || 'classic_sanctum';
@@ -1985,7 +1986,7 @@ export function initWizardChess() {
     }
 
     function syncAllBoardPieceSkinModels(skinId) {
-      if (typeof boardState === 'undefined' || !Array.isArray(boardState)) return;
+      if (!boardState || !Array.isArray(boardState)) return;
       for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
           const p = boardState[r]?.[c];
@@ -3120,7 +3121,7 @@ export function initWizardChess() {
     // =========================================================================
     // Chess Game State, Complete Move Rules, and AI Engine
     // =========================================================================
-    let boardState = Array.from({ length: 8 }, () => Array(8).fill(null));
+    boardState = Array.from({ length: 8 }, () => Array(8).fill(null));
     let currentTurn = 'w';
     let selectedSquare = null;
     let hoveredSquare = null;
