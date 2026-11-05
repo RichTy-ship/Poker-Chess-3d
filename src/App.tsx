@@ -2932,6 +2932,61 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              {/* DONATE / COFFEE SUPPORT SECTION IN MAIN MENU */}
+              <div className="checkmate-donate-card" style={{ margin: '8px 0 0', maxWidth: '100%' }}>
+                <div className="donate-header">
+                  <span className="donate-badge">☕ ỦNG HỘ TÁC GIẢ (DONATE)</span>
+                  <span className="donate-tagline">Tiếp lửa phát triển &amp; duy trì máy chủ Poker Chess 3D</span>
+                </div>
+                <div className="donate-body">
+                  <div className="donate-qr-wrapper">
+                    <img
+                      src="/assets/donate_qr.jpg"
+                      alt="Mã VietQR Donate - TRƯƠNG MINH HOÀNG"
+                      className="donate-qr-img"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="donate-info">
+                    <p className="donate-message">
+                      Cảm ơn bạn đã trải nghiệm trò chơi! Nếu yêu thích Poker Chess 3D, hãy ủng hộ tác giả một ly cà phê nhé!
+                    </p>
+                    <div className="donate-details">
+                      <div className="donate-row">
+                        <span className="d-label">Chủ TK:</span>
+                        <span className="d-val d-name">TRUONG MINH HOANG</span>
+                      </div>
+                      <div className="donate-row">
+                        <span className="d-label">Ngân hàng:</span>
+                        <span className="d-val">MB Bank (Quân Đội)</span>
+                      </div>
+                      <div className="donate-row">
+                        <span className="d-label">Số TK:</span>
+                        <span className="d-val d-acc">0937057055</span>
+                        <button
+                          type="button"
+                          className="donate-copy-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (navigator.clipboard) {
+                              navigator.clipboard.writeText('0937057055');
+                            }
+                            const target = e.currentTarget;
+                            target.textContent = '✓ Đã chép!';
+                            setTimeout(() => {
+                              target.textContent = '📋 Chép STK';
+                            }, 2000);
+                          }}
+                          title="Sao chép số tài khoản"
+                        >
+                          📋 Chép STK
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
