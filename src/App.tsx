@@ -997,9 +997,9 @@ export default function App() {
   const isConsideringMove = gameState
     ? Boolean(gameState.isConsideringMove ?? (!gameState.gameOver && !gameState.isAnimatingMove))
     : true;
-  const turnSeconds = gameState?.turnTimeRemaining ?? 60;
-  const turnLimit = gameState?.turnTimeLimit ?? 60;
-  const isTimerLow = Boolean(gameState?.isTimerLow || (!gameState?.gameOver && turnSeconds < 10));
+  const turnSeconds = gameState?.turnTimeRemaining ?? 30;
+  const turnLimit = gameState?.turnTimeLimit ?? 30;
+  const isTimerLow = Boolean(gameState?.isTimerLow || (!gameState?.gameOver && turnSeconds < 8));
   const timerPct = Math.max(0, Math.min(100, (turnSeconds / Math.max(1, turnLimit)) * 100));
   const forecast = gameState?.combatForecast || null;
   const friendlyUnits = gameState?.friendlyUnits || [];
@@ -1393,13 +1393,13 @@ export default function App() {
             <span className="mode-badge" id="mode-badge">Playing as White</span>
           </div>
 
-          {/* Compact Single-Line 60s Turn Timer */}
+          {/* Compact Single-Line 30s Turn Timer */}
           <div
             className={`turn-timer-pill ${isTimerLow ? 'low-time-pulse' : ''}`}
             id="turn-timer-pill"
             role="timer"
             aria-live="off"
-            title="Thời gian suy nghĩ mỗi lượt (60 giây). Tự động kết thúc lượt khi về 0s."
+            title="Thời gian suy nghĩ mỗi lượt (30 giây). Tự động kết thúc lượt khi về 0s."
           >
             <span className="timer-icon" aria-hidden="true">
               {isTimerLow ? '⚠' : '⏳'}
@@ -2094,7 +2094,7 @@ export default function App() {
           </div>
           <div className="timeout-toast-body">
             <div className="timeout-toast-title">
-              TIME EXPIRED • HẾT GIỜ SUY NGHĨ (60s)
+              TIME EXPIRED • HẾT GIỜ SUY NGHĨ (30s)
             </div>
             <div className="timeout-toast-desc">
               {timeoutToast.expiredSide === (gameState?.playerColor || 'w') ? (

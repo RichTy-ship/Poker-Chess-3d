@@ -561,42 +561,49 @@ export function getUnitArmorCap(piece) {
 }
 
 export function applyComboEmpowermentToUnit(piece, comboEval, boardState, turnNumber = 1) {
-  if (!piece || !comboEval || comboEval.isUltimate) return null;
+  if (!piece) return null;
+  const safeCombo = comboEval || POKER_COMBO_DEFS.HIGH_CARD;
 
   // Enforce max 3 active Combo Seals per side to prevent indefinite passive stalling (RISK-02)
-  const friendlyBuffed = [];
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      const p = boardState[r]?.[c];
-      if (p && p.color === piece.color && p !== piece && p.activeCombo) {
-        friendlyBuffed.push(p);
+  if (Array.isArray(boardState)) {
+    const friendlyBuffed = [];
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const p = boardState[r]?.[c];
+        if (p && p.color === piece.color && p !== piece && p.activeCombo) {
+          friendlyBuffed.push(p);
+        }
       }
     }
+    if (friendlyBuffed.length >= 3) {
+      friendlyBuffed.sort((a, b) => (a.activeCombo.turnApplied || 0) - (b.activeCombo.turnApplied || 0));
+      if (friendlyBuffed[0]) friendlyBuffed[0].activeCombo = null;
+    }
   }
-  if (friendlyBuffed.length >= 3) {
-    friendlyBuffed.sort((a, b) => (a.activeCombo.turnApplied || 0) - (b.activeCombo.turnApplied || 0));
-    friendlyBuffed[0].activeCombo = null;
-  }
+
+  const rawAtk = Number(safeCombo.totalAtkBonus ?? safeCombo.atkBonus ?? 2);
+  const rawArmor = Number(safeCombo.totalArmorBonus ?? safeCombo.armorBonus ?? 0);
+  const healInst = Number(safeCombo.healInstant ?? 0);
 
   // Queen Signature Passive: "Nữ Hoàng Huyết Ấn" (+2 bonus to any Poker Seal)
   const queenResonanceAtk = piece.type === 'queen' ? 2 : 0;
-  const queenResonanceArmor = piece.type === 'queen' && comboEval.totalArmorBonus > 0 ? 2 : 0;
+  const queenResonanceArmor = piece.type === 'queen' && rawArmor > 0 ? 2 : 0;
 
-  const finalAtkBonus = comboEval.totalAtkBonus + queenResonanceAtk;
-  const finalArmorBonus = comboEval.totalArmorBonus + queenResonanceArmor;
+  const finalAtkBonus = (isNaN(rawAtk) ? 2 : rawAtk) + queenResonanceAtk;
+  const finalArmorBonus = (isNaN(rawArmor) ? 0 : rawArmor) + queenResonanceArmor;
 
   // Replace old combo with new combo (No infinite combo stacking per Rule 4.3)
   piece.activeCombo = {
-    id: comboEval.id,
-    rank: comboEval.rank,
-    name: comboEval.name,
-    role: comboEval.role,
+    id: safeCombo.id || 'HIGH_CARD',
+    rank: safeCombo.rank || 1,
+    name: safeCombo.name || 'Mậu Thầu',
+    role: safeCombo.role || 'Buff Công',
     atkBonus: finalAtkBonus,
     armorBonus: finalArmorBonus,
-    colorHex: comboEval.colorHex,
-    ringColor: comboEval.ringColor,
-    cardsSummary: comboEval.cardsSummary,
-    desc: comboEval.desc,
+    colorHex: safeCombo.colorHex || '#f5d76e',
+    ringColor: safeCombo.ringColor || 0xf5d76e,
+    cardsSummary: safeCombo.cardsSummary || '',
+    desc: safeCombo.desc || `+${finalAtkBonus}⚔ Công`,
     turnApplied: turnNumber
   };
 
@@ -604,16 +611,16 @@ export function applyComboEmpowermentToUnit(piece, comboEval, boardState, turnNu
   if (finalArmorBonus > 0) {
     piece.armor = Math.min(cap, (piece.armor || 0) + finalArmorBonus);
   }
-  if (comboEval.healInstant > 0) {
-    piece.hp = Math.min(piece.maxHp, piece.hp + comboEval.healInstant);
+  if (healInst > 0) {
+    piece.hp = Math.min(piece.maxHp || 100, (piece.hp || 1) + healInst);
   }
 
   return {
     unitName: UNIT_BASE_STATS[piece.type]?.name || piece.type,
-    comboName: comboEval.name,
+    comboName: safeCombo.name || 'Buff Phép',
     atkBonus: finalAtkBonus,
     armorBonus: finalArmorBonus,
-    healInstant: comboEval.healInstant || 0
+    healInstant: healInst
   };
 }
 

@@ -2957,7 +2957,7 @@ export function initWizardChess() {
     let capturedByWhite = 0;
     let capturedByBlack = 0;
     let turnNumber = 1;
-    const TURN_TIME_LIMIT = 60;
+    const TURN_TIME_LIMIT = 30;
     let turnTimeRemaining = TURN_TIME_LIMIT;
     let lastSyncedTurnSecond = TURN_TIME_LIMIT;
     let lastTimeoutNotice = null;
@@ -6395,8 +6395,19 @@ export function initWizardChess() {
     }
 
     function empowerFriendlyUnitAt(r, c, options = {}) {
-      const piece = boardState[r]?.[c];
-      if (!piece || piece.color !== currentTurn) return false;
+      r = Number(r);
+      c = Number(c);
+      let piece = boardState[r]?.[c];
+      if (!piece || piece.color !== currentTurn) {
+        const alt = findBestMovableFriendlyUnit(currentTurn);
+        if (alt) {
+          r = alt.r;
+          c = alt.c;
+          piece = boardState[r]?.[c];
+        }
+      }
+      if (!piece) return false;
+
       const appliedCombo =
         pendingComboEval ||
         pokerDecks[currentTurn]?.committedComboThisTurn || {
@@ -6409,44 +6420,79 @@ export function initWizardChess() {
           colorHex: '#f5d76e',
           ringColor: 0xf5d76e
         };
-      const res = applyComboEmpowermentToUnit(piece, appliedCombo, boardState, turnNumber);
-      if (gameMode === 'multi' && !options?.fromRemote) {
-        multiplayerClient.sendPokerBuff({
-          targetRow: r,
-          targetCol: c,
-          targetPieceType: piece.type,
-          comboId: appliedCombo.id,
-          comboName: appliedCombo.name,
-          atkBonus: res.atkBonus,
-          armorBonus: res.armorBonus,
-          healInstant: res.healInstant,
-          colorHex: appliedCombo.colorHex
-        });
+
+      let res = null;
+      try {
+        res = applyComboEmpowermentToUnit(piece, appliedCombo, boardState, turnNumber);
+      } catch (err) {
+        console.warn('applyComboEmpowermentToUnit warning:', err);
       }
-      soundFX.playComboEmpower(appliedCombo.rank || 1);
-      const wPos = boardToWorld(r, c);
-      spawnDivineLightningBeam(wPos, appliedCombo.ringColor || 0xf5d76e, 0.075);
-      spawnFloatingCombatText(
-        wPos,
-        `✦ BUFF ${appliedCombo.name.toUpperCase()}: +${res.atkBonus}⚔${res.armorBonus > 0 ? ` +${res.armorBonus}🛡` : ''}${res.healInstant > 0 ? ` +${res.healInstant}❤` : ''}`,
-        appliedCombo.colorHex || '#f5d76e',
-        0.95
-      );
+      if (!res) {
+        const bAtk = Number(appliedCombo.totalAtkBonus || appliedCombo.atkBonus || 2);
+        const bArm = Number(appliedCombo.totalArmorBonus || appliedCombo.armorBonus || 0);
+        res = {
+          unitName: UNIT_BASE_STATS[piece.type]?.name || piece.type,
+          comboName: appliedCombo.name || 'Mậu Thầu',
+          atkBonus: isNaN(bAtk) ? 2 : bAtk,
+          armorBonus: isNaN(bArm) ? 0 : bArm,
+          healInstant: appliedCombo.healInstant || 0
+        };
+      }
+
+      if (gameMode === 'multi' && !options?.fromRemote) {
+        try {
+          multiplayerClient.sendPokerBuff({
+            targetRow: r,
+            targetCol: c,
+            targetPieceType: piece.type,
+            comboId: appliedCombo.id || 'HIGH_CARD',
+            comboName: appliedCombo.name || 'Mậu Thầu',
+            atkBonus: res.atkBonus,
+            armorBonus: res.armorBonus,
+            healInstant: res.healInstant,
+            colorHex: appliedCombo.colorHex || '#f5d76e'
+          });
+        } catch (e) {
+          console.warn('sendPokerBuff failed:', e);
+        }
+      }
+
+      try {
+        soundFX.playComboEmpower(appliedCombo.rank || 1);
+      } catch {}
+
+      try {
+        const wPos = boardToWorld(r, c);
+        spawnDivineLightningBeam(wPos, appliedCombo.ringColor || 0xf5d76e, 0.075);
+        spawnFloatingCombatText(
+          wPos,
+          `✦ BUFF ${appliedCombo.name.toUpperCase()}: +${res.atkBonus}⚔${res.armorBonus > 0 ? ` +${res.armorBonus}🛡` : ''}${res.healInstant > 0 ? ` +${res.healInstant}❤` : ''}`,
+          appliedCombo.colorHex || '#f5d76e',
+          0.95
+        );
+      } catch {}
+
       addCombatLog(
         `✦ Bước 3 [Gắn Buff]: ${res.unitName} (${String.fromCharCode(97 + c)}${8 - r}) nhận Buff [${res.comboName}] (+${res.atkBonus}⚔ Công${res.armorBonus ? `, +${res.armorBonus}🛡 Giáp` : ''}${res.healInstant ? `, Hồi +${res.healInstant}❤ HP` : ''}) → Bước 4: Đi Quân & Combat mở khóa!`,
         'empower'
       );
+
       lastEmpoweredSquare = { r, c };
       pendingComboEval = null;
       turnPhase = 'MOVE_OR_COMBAT';
-      const buffPingIdx = activeTacticalPings.findIndex(
-        (p) => p.r === r && p.c === c && p.intent === 'BUFF'
-      );
-      if (buffPingIdx !== -1) {
-        const [fulfilledBuffPing] = activeTacticalPings.splice(buffPingIdx, 1);
-        disposePingEntry3D(fulfilledBuffPing);
-      }
+
+      try {
+        const buffPingIdx = activeTacticalPings.findIndex(
+          (p) => p.r === r && p.c === c && p.intent === 'BUFF'
+        );
+        if (buffPingIdx !== -1) {
+          const [fulfilledBuffPing] = activeTacticalPings.splice(buffPingIdx, 1);
+          disposePingEntry3D(fulfilledBuffPing);
+        }
+      } catch {}
+
       updateAllUnitBadges();
+
       // Immediately select the empowered unit (or a frontline movable unit if the empowered unit is blocked) so legal moves glow right away!
       let selR = r;
       let selC = c;
@@ -6463,6 +6509,7 @@ export function initWizardChess() {
       validMoves = moves || [];
       showSquareHighlights(selR, selC, validMoves);
       updateTurnUI();
+      emitPokerChessSync();
       return true;
     }
 
