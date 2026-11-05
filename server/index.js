@@ -292,6 +292,10 @@ function createBotMatchSession(humanPlayer) {
   };
 
   matches.set(matchId, matchState);
+  console.log(`[BOT MATCH] 🤖 Paired ${humanPlayer.name} (${humanPlayer.elo} Elo) vs Bot ${botPlayer.name} (${botPlayer.elo} Elo) [Match: ${matchId}]`);
+  try {
+    recordTrafficEvent(null, { event: 'BOT_MATCH_CREATED', human: humanPlayer.name, bot: botPlayer.name, humanElo: humanPlayer.elo });
+  } catch (e) {}
 
   // Notify human player with rich opponent profile
   sendMsg(humanPlayer.ws, 'MATCH_FOUND', {
@@ -405,6 +409,10 @@ function createMatchSession(playerA, playerB, matchType = 'ranked_match', roomCo
   };
 
   matches.set(matchId, matchState);
+  console.log(`[PVP MATCH] ⚔️ Paired ${player1.name} (${player1.elo} Elo) vs ${player2.name} (${player2.elo} Elo) [Match: ${matchId}]`);
+  try {
+    recordTrafficEvent(null, { event: 'PVP_MATCH_CREATED', p1: player1.name, p2: player2.name, p1Elo: player1.elo, p2Elo: player2.elo });
+  } catch (e) {}
 
   // Notify White player
   sendMsg(whitePlayer.ws, 'MATCH_FOUND', {
