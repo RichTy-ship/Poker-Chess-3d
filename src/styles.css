@@ -8034,3 +8034,31 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   color: #fef08a !important;
   font-weight: 700 !important;
 }
+
+/* Combat Target Alert Chip in Move Bar */
+.combat-target-alert-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.28);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.72rem;
+  margin-left: 8px;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+  animation: pulseCombatChip 1.4s infinite ease-in-out;
+}
+
+@keyframes pulseCombatChip {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 12px 3px rgba(239, 68, 68, 0.65);
+  }
+}

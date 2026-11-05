@@ -2420,6 +2420,17 @@ export default function App() {
                     ) : (
                       <>
                         ⚔ <strong>Đã mở khóa bàn cờ!</strong> Click quân cờ đồng minh trên bàn 3D để di chuyển hoặc tấn công
+                        {(() => {
+                          const capMoves = (gameState?.validMoves || []).filter((m) => m.capture);
+                          if (capMoves.length > 0) {
+                            return (
+                              <span className="combat-target-alert-chip">
+                                🔥 <strong>{capMoves.length} Địch Trong Vùng Combat!</strong>
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                         {empoweredUnit && poker.committedCombo && (
                           <>
                             {' · '}Buff:{' '}
@@ -2573,6 +2584,61 @@ export default function App() {
               </>
             );
           })()}
+        </div>
+      )}
+
+      {/* LIVE COMBAT FORECAST CARD (Hovering Enemy Combat Target) */}
+      {forecast && (
+        <div className={`combat-forecast-card ${outcomeMeta[forecast.outcome]?.colorClass || ''}`}>
+          <div className="forecast-header">
+            <span className="forecast-outcome-title">
+              {outcomeMeta[forecast.outcome]?.label || '⚔ GIAO CHIẾN'}
+            </span>
+            <span className="forecast-coords">
+              {forecast.fromAlgebraic.toUpperCase()} ➔ {forecast.toAlgebraic.toUpperCase()}
+            </span>
+          </div>
+          <div className="forecast-sub">{outcomeMeta[forecast.outcome]?.sub}</div>
+          <div className="forecast-duel-row">
+            <div className="forecast-fighter">
+              <span className="fighter-name">
+                {forecast.attackerUnit?.nameVi || 'Quân Ta'}
+              </span>
+              <div className="fighter-stats">
+                <span>
+                  HP: {forecast.attackerUnit?.hp} ➔{' '}
+                  <strong className={forecast.attAfterHp > 0 ? 'alive-num' : 'dead-num'}>
+                    {forecast.attAfterHp}
+                  </strong>
+                </span>
+                <span>Công: +{forecast.attTotalAtk}</span>
+              </div>
+            </div>
+            <div className="forecast-vs">⚔</div>
+            <div className="forecast-fighter right">
+              <span className="fighter-name">
+                {forecast.defenderUnit?.nameVi || 'Quân Địch'}
+              </span>
+              <div className="fighter-stats">
+                <span>
+                  HP: {forecast.defenderUnit?.hp} ➔{' '}
+                  <strong className={forecast.defAfterHp > 0 ? 'alive-num' : 'dead-num'}>
+                    {forecast.defAfterHp}
+                  </strong>
+                </span>
+                <span>Phản: +{forecast.defTotalAtk}</span>
+              </div>
+            </div>
+          </div>
+          {forecast.notes && forecast.notes.length > 0 && (
+            <div className="forecast-notes">
+              {forecast.notes.map((note, idx) => (
+                <span key={idx} className="forecast-note-tag">
+                  {note}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

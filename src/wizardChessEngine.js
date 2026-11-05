@@ -4799,6 +4799,13 @@ export function initWizardChess() {
     const sharedMoveOuterRingGeo = new THREE.RingGeometry(0.072, 0.094, 32);
     sharedMoveOuterRingGeo.rotateX(-Math.PI / 2);
 
+    // 3D Combat Target Lock Geometries & State Tracking
+    const sharedCombatTargetRingGeo = new THREE.RingGeometry(0.18, 0.22, 32);
+    sharedCombatTargetRingGeo.rotateX(-Math.PI / 2);
+    const sharedCombatCrosshairTickGeo = new THREE.BoxGeometry(0.024, 0.008, 0.075);
+    const sharedCombatBeaconGeo = new THREE.CylinderGeometry(0.10, 0.20, 1.35, 16, 1, true);
+    const markedCombatEnemies = [];
+
     function createFloorTileGlowTexture(cfg) {
       const canvas = document.createElement('canvas');
       canvas.width = 256;
@@ -5523,6 +5530,10 @@ export function initWizardChess() {
     }
 
     function clearSquareHighlights() {
+      while (markedCombatEnemies.length > 0) {
+        const ep = markedCombatEnemies.pop();
+        if (ep) updateUnit3DBadge(ep);
+      }
       while (squareHighlightsGroup.children.length > 0) {
         const child = squareHighlightsGroup.children[0];
         child.traverse((node) => {
@@ -5533,6 +5544,147 @@ export function initWizardChess() {
         squareHighlightsGroup.remove(child);
       }
       rebuildUnitPathing3D();
+    }
+
+    function createEnemyCombatTargetMarker3D(attackerPiece, enemyPiece, r, c) {
+      if (!enemyPiece) return null;
+      const markerGroup = new THREE.Group();
+      const pos = boardToWorld(r, c);
+      markerGroup.position.set(pos.x, 0, pos.z);
+
+      const hMap = { pawn: 1.18, rook: 1.46, knight: 1.56, bishop: 1.60, queen: 1.72, king: 1.85 };
+      const pieceHeight = hMap[enemyPiece.type] || 1.45;
+
+      // 1. Overhead Floating 3D Combat Badge
+      const canvas = document.createElement('canvas');
+      canvas.width = 384;
+      canvas.height = 112;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Dark Crimson / Ruby Gradient Background
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        grad.addColorStop(0, 'rgba(185, 28, 28, 0.94)');
+        grad.addColorStop(0.5, 'rgba(127, 29, 29, 0.96)');
+        grad.addColorStop(1, 'rgba(185, 28, 28, 0.94)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 14);
+        ctx.fill();
+
+        // Glowing Gold/Ruby Border with Corner Brackets
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 14);
+        ctx.stroke();
+
+        // Inner glowing border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(14, 14, canvas.width - 28, canvas.height - 28, 10);
+        ctx.stroke();
+
+        // Title: ⚔️ VÙNG COMBAT ⚔️
+        ctx.font = '800 26px "Cinzel", "Inter", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#fef08a';
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 6;
+        ctx.fillText('⚔️ VÙNG COMBAT ⚔️', canvas.width / 2, 16);
+
+        // Subtitle: Piece name, HP & Atk
+        ctx.font = '700 20px "Inter", system-ui, sans-serif';
+        const typeVi = enemyPiece.nameVi || enemyPiece.type.toUpperCase();
+        const hpVal = Math.ceil(enemyPiece.hp || 100);
+        const atkVal = enemyPiece.attack || (enemyPiece.type === 'queen' ? 90 : enemyPiece.type === 'rook' ? 50 : 30);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`[${typeVi}] • MÁU: ${hpVal} • CÔNG: ${atkVal}`, canvas.width / 2, 58);
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const spMat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      });
+      const badgeSprite = new THREE.Sprite(spMat);
+      badgeSprite.scale.set(0.96, 0.28, 1);
+      const baseY = pieceHeight + 0.38;
+      badgeSprite.position.set(0, baseY, 0);
+      badgeSprite.renderOrder = 22;
+      badgeSprite.userData = {
+        isCombatBadge: true,
+        baseY,
+        phaseOffset: (r * 3 + c * 5) * 0.45
+      };
+      markerGroup.add(badgeSprite);
+
+      // 2. Rotating 3D Red Holographic Targeting Reticle Ring
+      const reticleMat = new THREE.MeshBasicMaterial({
+        color: 0xff1744,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const reticleMesh = new THREE.Mesh(sharedCombatTargetRingGeo, reticleMat);
+      reticleMesh.position.set(0, BOARD_SURFACE_Y + 0.08, 0);
+      reticleMesh.renderOrder = 14;
+
+      // Add 4 cardinal tick marks / crosshairs to the reticle
+      const tickMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, depthWrite: false });
+      const tickOffsets = [
+        { x: 0, z: 0.20, rot: 0 },
+        { x: 0, z: -0.20, rot: 0 },
+        { x: 0.20, z: 0, rot: Math.PI / 2 },
+        { x: -0.20, z: 0, rot: Math.PI / 2 }
+      ];
+      for (const t of tickOffsets) {
+        const tick = new THREE.Mesh(sharedCombatCrosshairTickGeo, tickMat);
+        tick.position.set(t.x, 0, t.z);
+        tick.rotation.y = t.rot;
+        reticleMesh.add(tick);
+      }
+
+      reticleMesh.userData = {
+        isCombatReticle: true,
+        phaseOffset: (r * 2 + c) * 0.5
+      };
+      markerGroup.add(reticleMesh);
+
+      // 3. Vertical Tactical Laser Beacon (Satellite Target Lock Cylinder)
+      const beaconMat = new THREE.MeshBasicMaterial({
+        color: 0xff1744,
+        transparent: true,
+        opacity: 0.26,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const beaconMesh = new THREE.Mesh(sharedCombatBeaconGeo, beaconMat);
+      beaconMesh.position.set(0, BOARD_SURFACE_Y + 0.68, 0);
+      beaconMesh.renderOrder = 10;
+      beaconMesh.userData = {
+        isCombatBeacon: true,
+        phaseOffset: (r + c) * 0.3
+      };
+      markerGroup.add(beaconMesh);
+
+      // 4. Light up enemy pedestal ring with warning pulse
+      if (enemyPiece.sealRingMesh) {
+        enemyPiece.sealRingMesh.material.color.setHex(0xff1744);
+        enemyPiece.sealRingMesh.material.opacity = 0.96;
+        enemyPiece.sealRingMesh.visible = true;
+        markedCombatEnemies.push(enemyPiece);
+      }
+
+      return markerGroup;
     }
 
     function createFloorTileHighlightMesh(r, c, mode, customTintHex = null) {
@@ -5654,10 +5806,23 @@ export function initWizardChess() {
       const selMesh = createFloorTileHighlightMesh(r, c, 'selected');
       squareHighlightsGroup.add(selMesh);
 
+      const attackerPiece = boardState[r]?.[c];
+
       for (const m of moves) {
         const mode = m.capture ? 'capture' : m.castle ? 'castle' : 'move';
         const moveTileMesh = createFloorTileHighlightMesh(m.r, m.c, mode);
         squareHighlightsGroup.add(moveTileMesh);
+
+        // Highlight enemies in combat range with 3D combat target reticle and beacon
+        if (m.capture) {
+          const enemyPiece = boardState[m.r]?.[m.c] || (m.enPassant ? boardState[r]?.[m.c] : null);
+          if (enemyPiece && enemyPiece.color !== currentTurn) {
+            const combatMarker = createEnemyCombatTargetMarker3D(attackerPiece, enemyPiece, m.r, m.c);
+            if (combatMarker) {
+              squareHighlightsGroup.add(combatMarker);
+            }
+          }
+        }
       }
       rebuildUnitPathing3D();
     }
@@ -12129,6 +12294,26 @@ export function initWizardChess() {
             const s = isHovered ? 1.14 : 1.0 + wave * 0.06;
             ud.innerMarker.scale.set(s, s, 1);
           }
+
+          // Animate nested or direct 3D Combat Target Markers
+          hlMesh.traverse((childNode) => {
+            const cud = childNode.userData;
+            if (!cud) return;
+            if (cud.isCombatReticle) {
+              childNode.rotation.z += dt * 3.2;
+              const pulse = 1.0 + Math.sin(elapsedTotal * 6.0 + cud.phaseOffset) * 0.09;
+              childNode.scale.set(pulse, pulse, 1);
+            }
+            if (cud.isCombatBeacon) {
+              childNode.rotation.y += dt * 1.1;
+              const bPulse = 0.24 + Math.sin(elapsedTotal * 4.5 + cud.phaseOffset) * 0.08;
+              if (childNode.material) childNode.material.opacity = bPulse;
+            }
+            if (cud.isCombatBadge) {
+              const floatY = cud.baseY + Math.sin(elapsedTotal * 3.6 + cud.phaseOffset) * 0.04;
+              childNode.position.y = floatY;
+            }
+          });
         }
       }
 
