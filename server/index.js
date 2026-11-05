@@ -58,8 +58,15 @@ const server = createServer((req, res) => {
   // Static files serving if dist/ exists
   if (existsSync(distDir)) {
     let filePath = join(distDir, urlPath === '/' ? 'index.html' : urlPath);
+
     if (!existsSync(filePath)) {
-      // SPA Fallback to index.html
+      // If requesting a specific asset that doesn't exist, return 404 rather than HTML
+      if (urlPath.startsWith('/assets/') || extname(urlPath)) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Asset Not Found');
+        return;
+      }
+      // SPA Fallback to index.html for client-side routing
       filePath = join(distDir, 'index.html');
     }
 
@@ -67,7 +74,16 @@ const server = createServer((req, res) => {
       const ext = extname(filePath).toLowerCase();
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
       const fileData = readFileSync(filePath);
-      res.writeHead(200, { 'Content-Type': contentType });
+
+      // Cache policies: 1 year for static hashed assets and 3D GLBs, no-cache for index.html
+      const cacheControl = (ext === '.html')
+        ? 'no-cache, no-store, must-revalidate'
+        : 'public, max-age=31536000, immutable';
+
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': cacheControl
+      });
       res.end(fileData);
       return;
     } catch {
@@ -546,3 +562,26 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`📡 Healthcheck API: http://localhost:${PORT}/api/health`);
   console.log(`================================================================`);
 });
+
+// Graceful shutdown on termination signals (Railway / Docker lifecycle)
+function handleShutdown(signal) {
+  console.log(`[Server] Received ${signal}. Closing all WebSocket connections and server...`);
+  for (const [ws] of clients) {
+    try {
+      ws.close(1001, 'Server is restarting or deploying update.');
+    } catch {
+      // Ignore error during shutdown
+    }
+  }
+  wss.close(() => {
+    server.close(() => {
+      console.log('[Server] Successfully shut down.');
+      process.exit(0);
+    });
+  });
+  // Force exit after 5 seconds if connections linger
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
