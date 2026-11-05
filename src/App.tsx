@@ -727,6 +727,29 @@ export default function App() {
   const [timeoutToast, setTimeoutToast] = useState<TurnTimeoutNoticeUI | null>(null);
   const [phaseAnnouncement, setPhaseAnnouncement] = useState<PhaseAnnouncementUI | null>(null);
   const [realtimeFps] = useState<number>(60);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
+
+  const handleShareGame = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareData = {
+      title: 'Vương Quyền • Poker Chess 3D',
+      text: 'Vào chiến cờ Vương Quyền Poker Chess 3D cùng mình nhé! Chơi mượt ngay trên trình duyệt điện thoại và PC:',
+      url: 'https://web-production-f6397.up.railway.app/'
+    };
+    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err) {
+        // Fallback to clipboard
+      }
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText('https://web-production-f6397.up.railway.app/');
+      setCopiedShareLink(true);
+      setTimeout(() => setCopiedShareLink(false), 2500);
+    }
+  };
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [smartDockCollapsed, setSmartDockCollapsed] = useState(false);
 
@@ -1702,6 +1725,15 @@ export default function App() {
 
         <button
           type="button"
+          className="hud-btn share-drawer-btn"
+          id="btn-share-game"
+          onClick={handleShareGame}
+        >
+          {copiedShareLink ? '✓ Đã Sao Chép Link!' : '📢 Mời Bạn Bè Chơi'}
+        </button>
+
+        <button
+          type="button"
           className="hud-btn main-menu-drawer-btn"
           id="btn-main-menu-trigger"
           onClick={() => {
@@ -2596,6 +2628,14 @@ export default function App() {
                 </span>
               </div>
               <div className="profile-ribbon-right">
+                <button
+                  type="button"
+                  className="profile-share-btn"
+                  onClick={handleShareGame}
+                  title="Chia sẻ link game cho bạn bè"
+                >
+                  {copiedShareLink ? '✓ Đã chép link!' : '📢 Mời Bạn Bè'}
+                </button>
                 <span className="profile-gold-badge">
                   🪙 {(gameState?.commercial?.gold ?? 0).toLocaleString()} Vàng
                 </span>
