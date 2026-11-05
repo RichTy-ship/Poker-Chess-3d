@@ -727,6 +727,17 @@ export default function App() {
   const [timeoutToast, setTimeoutToast] = useState<TurnTimeoutNoticeUI | null>(null);
   const [phaseAnnouncement, setPhaseAnnouncement] = useState<PhaseAnnouncementUI | null>(null);
 
+  // PWA Add to Home Screen (A2HS) states
+  const deferredPromptRef = useRef<any>(null);
+  const [showA2HSModal, setShowA2HSModal] = useState<boolean>(false);
+  const [isA2HSSupported, setIsA2HSSupported] = useState<boolean>(false);
+  const [isInstalledApp, setIsInstalledApp] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           (window.navigator as any).standalone === true;
+  });
+  const isIOSDevice = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
   const finishHandsOnTutorial = () => {
     try {
       localStorage.setItem('pokerchess_hands_on_publish_v2', 'true');
@@ -794,6 +805,72 @@ export default function App() {
       }
     };
   }, []);
+
+  // Check and trigger A2HS (Add to Home Screen) immediately on first visit
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         (window.navigator as any).standalone === true;
+    setIsInstalledApp(isStandalone);
+    if (isStandalone) return;
+
+    const hasDismissed = localStorage.getItem('pokerchess_a2hs_dismissed_v1');
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      deferredPromptRef.current = e;
+      setIsA2HSSupported(true);
+
+      // Force prompt on first browser visit
+      if (!hasDismissed) {
+        setShowA2HSModal(true);
+        try {
+          e.prompt().catch(() => {});
+        } catch {
+          // Handled via user tap
+        }
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // If mobile device, ensure A2HS prompt/modal is displayed immediately on first open
+    if (isMobile && !hasDismissed) {
+      const timer = setTimeout(() => {
+        setShowA2HSModal(true);
+      }, 1000);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      };
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallAppClick = async () => {
+    if (deferredPromptRef.current) {
+      try {
+        await deferredPromptRef.current.prompt();
+        const choice = await deferredPromptRef.current.userChoice;
+        if (choice?.outcome === 'accepted') {
+          setShowA2HSModal(false);
+          localStorage.setItem('pokerchess_a2hs_dismissed_v1', 'true');
+        }
+      } catch (err) {
+        console.warn('Install prompt error:', err);
+      }
+    } else {
+      alert('Để cài đặt: Nhấn vào biểu tượng 3 chấm ⋮ (góc trên trình duyệt) ➔ Chọn "Cài đặt ứng dụng" hoặc "Thêm vào màn hình chính".');
+    }
+  };
+
+  const handleDismissA2HS = () => {
+    setShowA2HSModal(false);
+    localStorage.setItem('pokerchess_a2hs_dismissed_v1', 'true');
+  };
 
   // Realtime 1vs1 Multiplayer WebSocket Connection & Lifecycle
   useEffect(() => {
@@ -2739,6 +2816,65 @@ export default function App() {
             </div>
           </div>
         </aside>
+      )}
+
+      {/* PWA ADD TO HOME SCREEN FIRST-TIME PROMPT MODAL */}
+      {showA2HSModal && !isInstalledApp && (
+        <div
+          className="a2hs-modal-backdrop"
+          onClick={handleDismissA2HS}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="a2hs-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="a2hs-badge-row">
+              <span className="a2hs-app-icon">👑</span>
+              <div className="a2hs-app-info">
+                <h3 className="a2hs-title">CÀI ĐẶT POKER CHESS 3D</h3>
+                <span className="a2hs-subtitle">Thêm Vào Màn Hình Chính (Web App Native)</span>
+              </div>
+            </div>
+
+            <p className="a2hs-benefit-text">
+              ✨ <strong>Trải nghiệm tối đa:</strong> Chơi mượt mà toàn màn hình, đồ họa sắc nét, không bị che bởi thanh công cụ và mở game ngay lập tức từ màn hình chính!
+            </p>
+
+            {isIOSDevice ? (
+              <div className="a2hs-ios-guide">
+                <div className="ios-step">
+                  <span className="step-num">1</span>
+                  <span>Nhấn nút <strong>Chia sẻ</strong> <span className="ios-icon">⎋</span> ở thanh dưới Safari</span>
+                </div>
+                <div className="ios-step">
+                  <span className="step-num">2</span>
+                  <span>Cuộn xuống chọn <strong>Thêm vào MH chính</strong> <span className="ios-icon">➕</span></span>
+                </div>
+                <div className="ios-step">
+                  <span className="step-num">3</span>
+                  <span>Bấm <strong>Thêm (Add)</strong> ở góc trên bên phải để hoàn tất</span>
+                </div>
+              </div>
+            ) : (
+              <div className="a2hs-actions">
+                <button
+                  type="button"
+                  className="a2hs-install-btn"
+                  onClick={handleInstallAppClick}
+                >
+                  📲 Cài Đặt Vào Màn Hình Chính Ngay
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="a2hs-dismiss-btn"
+              onClick={handleDismissA2HS}
+            >
+              Để Sau • Chơi Tiếp Tục Trên Trình Duyệt ➔
+            </button>
+          </div>
+        </div>
       )}
 
       {/* COMPREHENSIVE MAIN MENU MODAL */}
