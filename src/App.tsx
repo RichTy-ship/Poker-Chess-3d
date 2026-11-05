@@ -699,7 +699,6 @@ export default function App() {
   const [spSide, setSpSide] = useState<'w' | 'b'>('w');
   const [spBotLevel, setSpBotLevel] = useState<number>(1);
   const [serverStats, setServerStats] = useState({ onlinePlayers: 1, activeMatches: 0, queuedPlayers: 0 });
-  const [menuTilt, setMenuTilt] = useState<{ rx: number; ry: number }>({ rx: 0, ry: 0 });
   const initialMenuShownRef = useRef(false);
   const [pokerDockMinimized, setPokerDockMinimized] = useState(false);
   const [peekDockDuringMove, setPeekDockDuringMove] = useState(false);
@@ -870,21 +869,6 @@ export default function App() {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
-
-  const handleMenuMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rx = ((centerY - y) / centerY) * 3.5;
-    const ry = ((x - centerX) / centerX) * 3.5;
-    setMenuTilt({ rx, ry });
-  };
-
-  const handleMenuMouseLeave = () => {
-    setMenuTilt({ rx: 0, ry: 0 });
-  };
 
   const getEngine = () => (window as unknown as WizardChessWindow).wizardChess;
 
@@ -2699,15 +2683,27 @@ export default function App() {
           role="dialog"
           aria-modal="true"
         >
+          {/* Ethereal background floating mana motes */}
+          <div className="menu-magic-particles" aria-hidden="true">
+            <span className="magic-spark spark-1" />
+            <span className="magic-spark spark-2" />
+            <span className="magic-spark spark-3" />
+            <span className="magic-spark spark-4" />
+            <span className="magic-spark spark-5" />
+            <span className="magic-spark spark-6" />
+          </div>
+
           <div
             className="main-menu-card"
-            style={{
-              transform: `perspective(1000px) rotateX(${menuTilt.rx + 1.5}deg) rotateY(${menuTilt.ry}deg) translateZ(12px)`
-            }}
-            onMouseMove={handleMenuMouseMove}
-            onMouseLeave={handleMenuMouseLeave}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Ornamental gold corner runes & ambient gleam */}
+            <div className="card-corner-rune top-left" aria-hidden="true" />
+            <div className="card-corner-rune top-right" aria-hidden="true" />
+            <div className="card-corner-rune bottom-left" aria-hidden="true" />
+            <div className="card-corner-rune bottom-right" aria-hidden="true" />
+            <div className="menu-light-sweep" aria-hidden="true" />
+
             <div className="main-menu-header">
               <div className="main-menu-title-wrap">
                 <span className="main-menu-crest">👑</span>
@@ -2750,7 +2746,7 @@ export default function App() {
             <div className="main-menu-body">
               <div className="main-menu-grid">
                 {/* 1. Single Player vs AI Card */}
-                <div className="menu-card-btn">
+                <div className="menu-card-btn card-ai">
                   <div className="menu-card-header">
                     <span className="menu-card-icon">🤖</span>
                     <span className="menu-card-badge bot-badge">Chơi Đơn • AI</span>
@@ -2853,7 +2849,7 @@ export default function App() {
 
                 {/* 3. Skin Store Card */}
                 <div
-                  className="menu-card-btn"
+                  className="menu-card-btn card-skin"
                   onClick={() => {
                     setStoreTab('skins');
                     setSkinStoreOpen(true);
@@ -2875,7 +2871,7 @@ export default function App() {
 
                 {/* 4. Elo Leaderboard Card */}
                 <div
-                  className="menu-card-btn"
+                  className="menu-card-btn card-leaderboard"
                   onClick={() => {
                     setStoreTab('elo');
                     setSkinStoreOpen(true);
@@ -2897,7 +2893,7 @@ export default function App() {
 
                 {/* 5. Rules & Codex Card */}
                 <div
-                  className="menu-card-btn"
+                  className="menu-card-btn card-codex"
                   onClick={() => {
                     setRulesModalOpen(true);
                     setMainMenuOpen(false);
