@@ -76,8 +76,8 @@ export function initWizardChess() {
       (window.innerWidth <= 850 && window.matchMedia('(pointer: coarse)').matches);
 
     const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      powerPreference: 'high-performance',
+      antialias: !isMobileDevice,
+      powerPreference: isMobileDevice ? 'default' : 'high-performance',
       preserveDrawingBuffer: isAutomatedTest
     });
 
@@ -102,10 +102,10 @@ export function initWizardChess() {
 
       if (preset === 'performance') {
         // Performance: 1.0 DPR on laptop/desktop, 1.25 on mobile, shadows off
-        renderer.setPixelRatio(isMobile ? Math.min(dpr, 1.25) : 1.0);
+        renderer.setPixelRatio(isMobile ? Math.min(dpr, 1.0) : 1.0);
         renderer.shadowMap.enabled = false;
       } else if (preset === 'ultra') {
-        renderer.setPixelRatio(isMobile ? Math.min(dpr, 2.5) : Math.min(dpr, 1.5));
+        renderer.setPixelRatio(isMobile ? Math.min(dpr, 2.0) : Math.min(dpr, 1.5));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.shadowMap.needsUpdate = true;
@@ -113,7 +113,7 @@ export function initWizardChess() {
         // Balanced (default):
         // Crystal sharp graphics up to 2.0 DPR on Mobile & 1.15 on Laptop/PC
         // Uses hardware PCFShadowMap for silky-smooth 60 FPS on integrated & dedicated PC GPUs alike
-        const targetDpr = isMobile ? Math.min(dpr, 2.0) : Math.min(dpr, 1.15);
+        const targetDpr = isMobile ? Math.min(dpr, 1.5) : Math.min(dpr, 1.15);
         renderer.setPixelRatio(targetDpr);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -7183,6 +7183,8 @@ export function initWizardChess() {
       }
 
       function finishMove() {
+        const sideAtFinishStart = currentTurn;
+        let finishMoveFailed = false;
         try {
           resetBystandersToHome();
         if (isCapture) {
@@ -7644,9 +7646,20 @@ export function initWizardChess() {
         updateTurnUI();
         maybeScheduleAIMove();
       } catch (err) {
+        finishMoveFailed = true;
         console.error('[FinishMove Error] Exception during finishMove:', err);
       } finally {
         isAnimatingMove = false;
+        // Camera failsafe: never leave the orbit camera locked after a duel
+        if (activeDuelSavedCam) {
+          camera.position.copy(activeDuelSavedCam.pos);
+          orbitControls.target.copy(activeDuelSavedCam.target);
+          activeDuelSavedCam = null;
+        }
+        orbitControls.enabled = true;
+        if (finishMoveFailed) {
+          try { recoverStalledTurn(sideAtFinishStart); } catch (e) { console.error('[Recover] failed', e); }
+        }
         updateTurnUI();
         emitPokerChessSync();
       }
@@ -8177,6 +8190,85 @@ export function initWizardChess() {
     }
 
     const activeMoveTweens = [];
+
+    // Returns true if a King is dead/missing and the game was ended.
+    function checkKingDeathAndEndGame() {
+      if (gameOver) return true;
+      let whiteKing = null;
+      let blackKing = null;
+      for (let rr = 0; rr < 8; rr++) {
+        for (let cc = 0; cc < 8; cc++) {
+          const p = boardState[rr]?.[cc];
+          if (p && p.type === 'king') {
+            if (p.color === 'w') whiteKing = p;
+            else blackKing = p;
+          }
+        }
+      }
+      const blackDead = !blackKing || blackKing.hp <= 0;
+      const whiteDead = !whiteKing || whiteKing.hp <= 0;
+      if (!blackDead && !whiteDead) return false;
+      gameOver = true;
+      isAnimatingMove = false;
+      if (aiTimer) {
+        clearTimeout(aiTimer);
+        aiTimer = null;
+      }
+      orbitControls.enabled = true;
+      const defeated = blackDead ? 'b' : 'w';
+      const winner = defeated === 'b' ? 'w' : 'b';
+      try {
+        triggerCheckmateSequence(defeated, winner);
+      } catch (e) {
+        console.error('[Victory] triggerCheckmateSequence failed, forcing banner', e);
+        try { showCheckmateBanner(winner, defeated); } catch (e2) {}
+      }
+      updateTurnUI();
+      emitPokerChessSync();
+      return true;
+    }
+
+    // Called when a move resolution crashed midway: end the game if a King fell, otherwise pass the turn.
+    function recoverStalledTurn(sideThatMoved) {
+      if (checkKingDeathAndEndGame()) return;
+      if (currentTurn !== sideThatMoved) {
+        maybeScheduleAIMove();
+        return;
+      }
+      currentTurn = sideThatMoved === 'w' ? 'b' : 'w';
+      if (currentTurn === 'w') turnNumber += 1;
+      try {
+        prepareNextTurnDrawState(pokerDecks[sideThatMoved], turnNumber);
+        prepareNextTurnDrawState(pokerDecks[currentTurn], turnNumber);
+      } catch (e) {}
+      turnPhase = 'DRAW_PHASE';
+      resetTurnTimer();
+      pendingComboEval = null;
+      lastEmpoweredSquare = null;
+      ultimateTargetSquares = [];
+      updateAllUnitBadges();
+      updateTurnUI();
+      maybeScheduleAIMove();
+    }
+
+    // Fast-forward all running tweens to completion (so finishMove() always runs).
+    function fastForwardActiveTweens() {
+      let safety = 0;
+      while (activeMoveTweens.length > 0 && safety < 400) {
+        safety++;
+        for (let i = activeMoveTweens.length - 1; i >= 0; i--) {
+          let done = true;
+          try {
+            done = activeMoveTweens[i](0.05);
+          } catch (e) {
+            console.error('[Tween FF] tween threw, dropping', e);
+            done = true;
+          }
+          if (done) activeMoveTweens.splice(i, 1);
+        }
+      }
+      activeMoveTweens.length = 0;
+    }
 
     // =========================================================================
     // Single-Player Tactical AI (Elo-Scaled Poker Combo + RPG Combat Scoring)
@@ -9330,10 +9422,15 @@ export function initWizardChess() {
       } else {
         if (!checkmateState.rankedRewardGranted) {
           checkmateState.rankedRewardGranted = true;
-          const matchRec = recordRankedMatchOutcome(winnerColor);
-          const sign = matchRec.eloDelta >= 0 ? '+' : '';
-          if (subEl) {
-            subEl.textContent = `${winnerName} Triumphs • Elo ${sign}${matchRec.eloDelta} (${matchRec.eloAfter} Elo) • +${matchRec.goldReward} Vàng`;
+          try {
+            const matchRec = recordRankedMatchOutcome(winnerColor);
+            const sign = matchRec.eloDelta >= 0 ? '+' : '';
+            if (subEl) {
+              subEl.textContent = `${winnerName} Triumphs • Elo ${sign}${matchRec.eloDelta} (${matchRec.eloAfter} Elo) • +${matchRec.goldReward} Vàng`;
+            }
+          } catch (e) {
+            console.error('[Ranked] record outcome failed', e);
+            if (subEl) subEl.textContent = `${winnerName} Triumphs • The ${defeatedName} King Has Fallen`;
           }
           emitPokerChessSync();
         } else if (subEl) {
@@ -9379,6 +9476,13 @@ export function initWizardChess() {
         }
       }
       checkmateState.fallenKingPiece = kingPiece;
+
+      // Failsafe: banner must appear even if the fall animation is interrupted
+      setTimeout(() => {
+        if (checkmateState.active && !checkmateState.bannerVisible) {
+          try { showCheckmateBanner(actualWinner, defeatedColor); } catch (e) { console.error(e); }
+        }
+      }, 2600);
 
       checkmateState.active = true;
       checkmateState.defeatedColor = defeatedColor;
@@ -10448,7 +10552,18 @@ export function initWizardChess() {
 
     renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos = { x: e.clientX, y: e.clientY };
+      lastUserInteractionMs = performance.now();
+      if (!isAnimatingMove && activeMoveTweens.length === 0) {
+        orbitControls.enabled = true;
+        activeCamTransition = null; // user grabs camera => cancel auto camera glide
+      }
     });
+    renderer.domElement.addEventListener('pointermove', () => {
+      lastUserInteractionMs = performance.now();
+    }, { passive: true });
+    renderer.domElement.addEventListener('wheel', () => {
+      lastUserInteractionMs = performance.now();
+    }, { passive: true });
 
     renderer.domElement.addEventListener('pointerup', (e) => {
       const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
@@ -11923,6 +12038,7 @@ export function initWizardChess() {
     // =========================================================================
     let elapsedTotal = 0;
     let mixerBatchParity = 0;
+    let idleGuardAccum = 0;
     function stepScene(dt, doRender = true) {
       elapsedTotal += dt;
       const prevCamPos = camera.position.clone();
@@ -11949,10 +12065,14 @@ export function initWizardChess() {
       // 1. Move Animation Watchdog: prevent isAnimatingMove from locking the engine indefinitely
       if (isAnimatingMove) {
         const animElapsedMs = performance.now() - moveAnimationStartTime;
-        if (animElapsedMs > 2500) {
-          console.warn('[Failsafe] Move animation exceeded 2.5s timeout! Force-finishing move animation lock.');
+        if (animElapsedMs > 4500) {
+          console.warn('[Failsafe] Move animation exceeded 4.5s timeout! Fast-forwarding to completion.');
+          const sideBeforeFF = currentTurn;
+          fastForwardActiveTweens();
           isAnimatingMove = false;
-          activeMoveTweens.length = 0;
+          if (!gameOver && currentTurn === sideBeforeFF && !checkmateState.active) {
+            checkKingDeathAndEndGame();
+          }
           if (activeDuelSavedCam) {
             camera.position.copy(activeDuelSavedCam.pos);
             orbitControls.target.copy(activeDuelSavedCam.target);
@@ -11980,7 +12100,23 @@ export function initWizardChess() {
           activeMoveTweens.splice(i, 1);
           if (activeMoveTweens.length === 0) {
             isAnimatingMove = false;
+            orbitControls.enabled = true;
+            if (!gameOver && !checkmateState.active) {
+              try { recoverStalledTurn(currentTurn); } catch (e) {}
+            }
             updateTurnUI();
+          }
+        }
+      }
+
+      // Idle integrity guard (every ~0.5s): end match if a King died outside of finishMove, unlock camera
+      if (!isAnimatingMove && activeMoveTweens.length === 0) {
+        idleGuardAccum += dt;
+        if (idleGuardAccum >= 0.5) {
+          idleGuardAccum = 0;
+          if (!orbitControls.enabled) orbitControls.enabled = true;
+          if (!gameOver && !checkmateState.active && !preMoveHighlightTask) {
+            checkKingDeathAndEndGame();
           }
         }
       }
@@ -12718,11 +12854,13 @@ export function initWizardChess() {
     };
 
     let lastRenderTime = 0;
+    let lastUserInteractionMs = 0;
     // CRITICAL FPS FIX:
     // On mobile devices with 120Hz/144Hz high-refresh displays, cap to 60 FPS using a 12.0ms threshold (~83 FPS cutoff).
     // This cleanly halves 120Hz (8.33ms) to 60 FPS to prevent battery heating, while NEVER skipping frames on 60Hz displays (16.6ms).
     // On PC / Desktop (isMobileDevice === false), do NOT throttle at all (targetIntervalMs = 0) so desktop GPUs render at native monitor refresh rate smoothly without frame skipping.
-    const targetIntervalMs = isMobileDevice ? 12.0 : 0;
+    const targetIntervalMs = isMobileDevice ? 1000 / 60 : 0;
+    const idleIntervalMs = isMobileDevice ? 1000 / 30 : 0;
 
     function animate(timestamp) {
       if (!navigator.webdriver && !manualStepMode) {
@@ -12731,10 +12869,20 @@ export function initWizardChess() {
       if (manualStepMode || document.hidden) return;
 
       const now = timestamp || performance.now();
-      if (targetIntervalMs > 0 && now - lastRenderTime < targetIntervalMs) {
-        return;
+      if (targetIntervalMs > 0) {
+        const sceneBusy =
+          isAnimatingMove ||
+          activeMoveTweens.length > 0 ||
+          activeCamTransition ||
+          checkmateState.active ||
+          heldCameraKeys.size > 0 ||
+          now - lastUserInteractionMs < 2500;
+        const interval = sceneBusy ? targetIntervalMs : idleIntervalMs;
+        const since = now - lastRenderTime;
+        // 1.5ms tolerance absorbs rAF jitter so 120/144Hz screens lock cleanly at 60 (or 30 when idle)
+        if (since < interval - 1.5) return;
+        lastRenderTime = since > interval * 3 ? now : now - (since % interval);
       }
-      lastRenderTime = now;
 
       frameCount++;
       if (now - lastFpsTime >= 500) {
