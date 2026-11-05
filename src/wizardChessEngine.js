@@ -71,9 +71,13 @@ export function initWizardChess() {
     const isAutomatedTest = Boolean(
       navigator.webdriver || new URLSearchParams(window.location.search).get('autotest') === '1'
     );
+    const isMobileDevice =
+      /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (window.innerWidth <= 850 && window.matchMedia('(pointer: coarse)').matches);
+
     const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      powerPreference: 'high-performance',
+      antialias: !isMobileDevice, // Disable MSAA on mobile (400+ PPI AMOLED makes MSAA redundant while preventing TBDR GPU thermal throttling)
+      powerPreference: isMobileDevice ? 'default' : 'high-performance',
       preserveDrawingBuffer: isAutomatedTest
     });
 
@@ -97,19 +101,19 @@ export function initWizardChess() {
         (window.innerWidth <= 850 && window.matchMedia('(pointer: coarse)').matches);
 
       if (preset === 'performance') {
-        // Performance: 1.0 DPR on laptop/desktop, no shadows for solid 60 FPS
-        renderer.setPixelRatio(isMobile ? Math.min(dpr, 1.25) : 1.0);
+        // Performance / Cool Battery Saver: 1.0 DPR, shadows off
+        renderer.setPixelRatio(1.0);
         renderer.shadowMap.enabled = false;
       } else if (preset === 'ultra') {
-        renderer.setPixelRatio(isMobile ? Math.min(dpr, 2.0) : Math.min(dpr, 1.5));
+        renderer.setPixelRatio(isMobile ? Math.min(dpr, 1.5) : Math.min(dpr, 1.25));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.shadowMap.needsUpdate = true;
       } else {
         // Balanced (default):
-        // Laptop/desktop: cap at 1.0 DPR to prevent 4K fillrate strain on integrated GPUs (Intel UHD / Iris Xe / AMD Vega)
-        // Mobile: 1.5 - 1.75 DPR for crisp text & models without blurriness
-        const targetDpr = isMobile ? Math.min(dpr, 1.75) : 1.0;
+        // Mobile: 1.25 DPR (ultra-sharp on 1.5K/1080p phones while cutting pixel fillrate by 50% vs 1.75x to keep phone cool)
+        // Laptop/desktop: 1.0 DPR (smooth 60 FPS on integrated GPUs)
+        const targetDpr = isMobile ? Math.min(dpr, 1.25) : 1.0;
         renderer.setPixelRatio(targetDpr);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -292,8 +296,8 @@ export function initWizardChess() {
     const keyLight = new THREE.DirectionalLight(0xfff0d6, 2.55);
     keyLight.position.set(3.8, 8.5, 4.2);
     keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 1024;
-    keyLight.shadow.mapSize.height = 1024;
+    keyLight.shadow.mapSize.width = isMobileDevice ? 512 : 1024;
+    keyLight.shadow.mapSize.height = isMobileDevice ? 512 : 1024;
     keyLight.shadow.camera.near = 1.0;
     keyLight.shadow.camera.far = 22.0;
     const d = 3.2;
@@ -3660,7 +3664,7 @@ export function initWizardChess() {
     // =========================================================================
     // THEMED AMBIENT MICRO-AURA & STARDUST PARTICLE ENGINE (64 instanced motes)
     // =========================================================================
-    const AMBIENT_MOTE_COUNT = 64;
+    const AMBIENT_MOTE_COUNT = isMobileDevice ? 24 : 64;
     const ambientMoteGeo = new THREE.DodecahedronGeometry(0.014, 0);
     const ambientMoteMat = new THREE.MeshBasicMaterial({
       color: 0xfde047,
@@ -12447,12 +12451,22 @@ export function initWizardChess() {
       manualStepMode = Boolean(v);
     };
 
-    function animate() {
+    let lastRenderTime = 0;
+    const TARGET_FPS = 60;
+    const targetIntervalMs = (1000 / TARGET_FPS) - 1.2; // ~15.4ms: locks cleanly to 60 FPS on 120Hz/144Hz displays
+
+    function animate(timestamp) {
       if (!navigator.webdriver && !manualStepMode) {
         requestAnimationFrame(animate);
       }
-      if (manualStepMode) return;
-      const now = performance.now();
+      if (manualStepMode || document.hidden) return;
+
+      const now = timestamp || performance.now();
+      if (targetIntervalMs > 0 && now - lastRenderTime < targetIntervalMs) {
+        return;
+      }
+      lastRenderTime = now;
+
       frameCount++;
       if (now - lastFpsTime >= 500) {
         currentFPS = Math.round((frameCount * 1000) / (now - lastFpsTime));
@@ -12462,6 +12476,14 @@ export function initWizardChess() {
       const dt = Math.min(clock.getDelta(), 0.1);
       stepScene(dt || 0.016, true);
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        lastRenderTime = performance.now();
+        lastFpsTime = performance.now();
+        frameCount = 0;
+      }
+    });
 
     window.addEventListener('resize', () => {
       applyPerformanceSettings(performancePreset);
