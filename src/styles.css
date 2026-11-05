@@ -4879,3 +4879,575 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   box-shadow: 0 0 14px rgba(245, 158, 11, 0.6);
   transform: translateY(-1px);
 }
+
+/* ============================================================================
+   3D Tactical Tile Ping Controls & Command Bar
+   ============================================================================ */
+.hud-btn.tactical-ping-top-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #e0f2fe;
+}
+
+.hud-btn.tactical-ping-top-btn.active {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.95), rgba(15, 23, 42, 0.96));
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+}
+
+.ping-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.tactical-ping-bar {
+  position: fixed;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 48;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  max-width: min(940px, 95vw);
+  padding: 6px 12px;
+  background: rgba(10, 14, 24, 0.94);
+  border: 1px solid rgba(245, 215, 110, 0.42);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+  pointer-events: auto;
+}
+
+.tactical-ping-bar.ping-mode-active {
+  border-color: rgba(56, 189, 248, 0.78);
+}
+
+.tactical-ping-intents {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.tactical-ping-bar-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #f5d76e;
+  margin-right: 4px;
+}
+
+.ping-intent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.92);
+  color: #cbd5e1;
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.ping-intent-btn:hover {
+  border-color: rgba(245, 215, 110, 0.7);
+  color: #ffffff;
+}
+
+.ping-intent-btn.active {
+  background: rgba(30, 41, 59, 0.98);
+  font-weight: 800;
+}
+
+.tactical-ping-active-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.active-ping-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(245, 215, 110, 0.55);
+  background: rgba(15, 23, 42, 0.95);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.active-ping-chip:hover {
+  background: rgba(30, 41, 59, 0.98);
+}
+
+.ping-chip-label {
+  opacity: 0.92;
+}
+
+.ping-chip-timer {
+  font-size: 0.66rem;
+  color: #94a3b8;
+}
+
+.ping-chip-remove {
+  font-size: 0.68rem;
+  color: #f87171;
+  margin-left: 2px;
+}
+
+.ping-clear-all-btn {
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  background: rgba(69, 10, 10, 0.85);
+  color: #fca5a5;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ping-clear-all-btn:hover {
+  background: rgba(127, 29, 29, 0.95);
+  color: #ffffff;
+}
+
+.tactical-ping-hint {
+  width: 100%;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  padding-top: 4px;
+}
+
+.ping-mode-exit-inline {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+/* ============================================================================
+   HANDS-ON INTERACTIVE POINTER & SPOTLIGHT OVERLAY ("CẦM TAY CHỈ VIỆC")
+   ============================================================================ */
+
+.tutorial-top-btn {
+  border-color: rgba(52, 211, 153, 0.55) !important;
+  background: linear-gradient(180deg, rgba(6, 78, 59, 0.85), rgba(4, 47, 46, 0.92)) !important;
+  color: #a7f3d0 !important;
+  font-weight: 800 !important;
+}
+
+.tutorial-top-btn:hover,
+.tutorial-top-btn.active {
+  border-color: #34d399 !important;
+  background: linear-gradient(180deg, rgba(5, 150, 105, 0.92), rgba(6, 95, 70, 0.96)) !important;
+  color: #ffffff !important;
+}
+
+.grind-reward-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(245, 215, 110, 0.45);
+  color: #e2e8f0;
+  font-size: 0.75rem;
+}
+
+.grind-reward-pill strong {
+  color: #fde047;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.hands-on-overlay-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 68;
+  pointer-events: none;
+}
+
+/* Spotlight cutout frame around the exact DOM button to click */
+.hands-on-dom-spotlight {
+  position: fixed;
+  border-radius: 10px;
+  border: 2.5px solid #fde047;
+  box-shadow:
+    0 0 0 9999px rgba(3, 6, 14, 0.52),
+    0 0 22px rgba(250, 204, 21, 0.95),
+    inset 0 0 12px rgba(52, 211, 153, 0.65);
+  pointer-events: none;
+  transition: left 0.14s ease, top 0.14s ease, width 0.14s ease, height 0.14s ease;
+}
+
+.bot-elo-tier-tag {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(9, 13, 22, 0.85);
+  border: 1px solid rgba(245, 215, 110, 0.35);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* 3D Board Target Reticle directly over the 3D chess piece or 3D destination square (pointer-events: none so direct 3D board clicks always pass through!) */
+.hands-on-3d-reticle {
+  position: fixed;
+  width: 68px;
+  height: 68px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(52, 211, 153, 0.24) 0%, rgba(52, 211, 153, 0.02) 70%);
+  border: 2.5px solid #34d399;
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.92);
+  pointer-events: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: reticleScaleBreath 1.1s ease-in-out infinite alternate;
+}
+
+.hands-on-3d-reticle.capture-reticle {
+  border-color: #f87171;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.28) 0%, rgba(239, 68, 68, 0.04) 70%);
+  box-shadow: 0 0 26px rgba(239, 68, 68, 0.95);
+}
+
+.reticle-ring-outer {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 1.5px dashed #fde047;
+}
+
+.reticle-ring-inner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fde047;
+  box-shadow: 0 0 10px #fde047;
+}
+
+@keyframes reticleScaleBreath {
+  0% {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+/* Floating Callout Bubble + Bouncing Hand Pointer */
+.hands-on-pointer-bubble {
+  position: fixed;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 70;
+  user-select: none;
+}
+
+.hop-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #0f172a 0%, #090d16 100%);
+  border: 2px solid #fde047;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.88), 0 0 18px rgba(250, 204, 21, 0.45);
+  white-space: nowrap;
+}
+
+.hands-on-pointer-bubble.capture-bubble .hop-content {
+  border-color: #f87171;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.88), 0 0 18px rgba(239, 68, 68, 0.55);
+}
+
+.hop-step-pill {
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #fde047;
+  color: #090d16;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.hop-text-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hop-action-label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.hop-sub-hint {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+
+.hop-skip-x {
+  margin-left: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.9);
+  color: #cbd5e1;
+  font-size: 0.68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.hop-skip-x:hover {
+  border-color: #f87171;
+  color: #ffffff;
+}
+
+.hop-bouncing-hand {
+  font-size: 1.95rem;
+  line-height: 1;
+  margin-top: 2px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.9));
+  animation: handPointBounce 0.55s ease-in-out infinite alternate;
+}
+
+@keyframes handPointBounce {
+  0% {
+    transform: translateY(-4px) scale(1);
+  }
+  100% {
+    transform: translateY(6px) scale(1.08);
+  }
+}
+
+@media (max-width: 768px) {
+  .hop-content {
+    white-space: normal;
+    max-width: 88vw;
+    padding: 6px 10px;
+  }
+
+  .hop-action-label {
+    font-size: 0.75rem;
+  }
+}
+
+/* ============================================================================
+   3D VISUAL PATHING & TRAJECTORY INDICATOR BAR
+   ============================================================================ */
+.hud-btn.pathing-top-btn {
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #bae6fd;
+}
+
+.hud-btn.pathing-top-btn.active {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.52), rgba(15, 23, 42, 0.94));
+  border-color: #38bdf8;
+  color: #f0f9ff;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+}
+
+.unit-pathing-telemetry-bar {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 36;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 12px;
+  max-width: min(94vw, 960px);
+  border-radius: 8px;
+  background: rgba(9, 13, 24, 0.93);
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.72);
+  color: #f1f5f9;
+  font-size: 0.76rem;
+  pointer-events: auto;
+}
+
+.upb-unit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(30, 41, 59, 0.92);
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  font-weight: 800;
+  color: #fde047;
+}
+
+.upb-unit-icon {
+  font-size: 0.95rem;
+}
+
+.upb-unit-coord {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.95);
+  color: #38bdf8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+}
+
+.upb-section {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.upb-label {
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+.upb-breadcrumbs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.upb-crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.upb-crumb {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(30, 41, 59, 0.88);
+  border: 1px solid rgba(251, 191, 36, 0.36);
+  color: #fde68a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.71rem;
+  font-weight: 700;
+}
+
+.upb-crumb.kind-capture {
+  border-color: rgba(249, 115, 22, 0.65);
+  color: #fed7aa;
+  background: rgba(124, 45, 18, 0.55);
+}
+
+.upb-crumb.kind-clash_repel {
+  border-color: rgba(236, 72, 153, 0.65);
+  color: #fbcfe8;
+  background: rgba(131, 24, 67, 0.52);
+}
+
+.upb-crumb.current {
+  border-color: #38bdf8;
+  color: #e0f2fe;
+  background: rgba(14, 116, 144, 0.45);
+}
+
+.upb-crumb-arrow {
+  color: #64748b;
+  font-size: 0.68rem;
+}
+
+.upb-muted-note {
+  color: #64748b;
+  font-style: italic;
+  font-size: 0.7rem;
+}
+
+.upb-traj-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 0.73rem;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  background: rgba(14, 116, 144, 0.36);
+  color: #e0f2fe;
+}
+
+.upb-traj-badge.capture {
+  border-color: rgba(239, 68, 68, 0.68);
+  background: rgba(127, 29, 29, 0.55);
+  color: #fecaca;
+}
+
+.upb-traj-badge.castle {
+  border-color: rgba(251, 191, 36, 0.68);
+  background: rgba(120, 53, 15, 0.55);
+  color: #fef08a;
+}
+
+.upb-waypoints-note {
+  color: #7dd3fc;
+  font-size: 0.7rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.upb-mode-Controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.upb-mode-btn {
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.9);
+  color: #cbd5e1;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upb-mode-btn.active {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.52);
+  color: #ffffff;
+}

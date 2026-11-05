@@ -29,6 +29,7 @@ import {
   getEloRankInfo,
   loadCommercialProfile,
   saveCommercialProfile,
+  TACTICAL_PING_INTENTS,
   soundFX
 } from './pokerChessCore.js';
 
@@ -1910,6 +1911,8 @@ export function initWizardChess() {
     scene.add(boardGroup);
     const squareHighlightsGroup = new THREE.Group();
     scene.add(squareHighlightsGroup);
+    const tacticalPingsGroup = new THREE.Group();
+    scene.add(tacticalPingsGroup);
     const boardSquareMeshes = [];
     const boardSquareGrid = Array.from({ length: 8 }, () => Array(8).fill(null));
 
@@ -2968,6 +2971,9 @@ export function initWizardChess() {
     let pendingComboEval = null;
     let lastEmpoweredSquare = null;
     let ultimateTargetSquares = []; // [{ r, c }] up to 8 enemy units for Tứ Quý (Thiên Phạt)
+    let tacticalPingMode = false;
+    let selectedPingIntent = 'AUTO';
+    const activeTacticalPings = []; // Active 3D tactical tile ping markers [{ id, r, c, algebraic, intent, label, icon, colorHex, threeHex, group, life, maxLife, createdAt }]
     let combatLogFeed = []; // Recent tactical events
     const floatingTexts3D = []; // 3D rising combat numbers & callouts
     const lightningBeams3D = []; // 3D Ultimate divine judgment beams
@@ -2990,6 +2996,8 @@ export function initWizardChess() {
     }
 
     function awardKillGoldBounty(killedPieceType, killerColor, worldPos) {
+      // Only award Gold when the human player kills an enemy unit
+      if (killerColor !== playerColor) return 0;
       const goldTable = {
         pawn: 25,
         knight: 40,
@@ -2998,13 +3006,9 @@ export function initWizardChess() {
         queen: 75,
         king: 150
       };
-      const baseGold = goldTable[killedPieceType] || 30;
-      const isPlayerKill = killerColor === playerColor || autoMoveEnabled;
-      const earnedGold = isPlayerKill ? baseGold : Math.round(baseGold * 0.5);
+      const earnedGold = goldTable[killedPieceType] || 30;
       commercialProfile.gold = Math.max(0, (commercialProfile.gold || 0) + earnedGold);
-      if (isPlayerKill) {
-        commercialProfile.totalKills = (commercialProfile.totalKills || 0) + 1;
-      }
+      commercialProfile.totalKills = (commercialProfile.totalKills || 0) + 1;
       saveCommercialProfile(commercialProfile);
       if (worldPos) {
         spawnFloatingCombatText(
@@ -3018,8 +3022,8 @@ export function initWizardChess() {
     }
 
     function recordRankedMatchOutcome(winnerSide) {
-      const isPlayerWin = winnerSide === playerColor || autoMoveEnabled;
-      const prevElo = commercialProfile.elo || 1050;
+      const isPlayerWin = winnerSide === playerColor;
+      const prevElo = commercialProfile.elo || 1000;
       const rankBefore = getEloRankInfo(prevElo);
       let eloDelta = 0;
       let goldReward = 0;
@@ -3034,7 +3038,7 @@ export function initWizardChess() {
         commercialProfile.losses = (commercialProfile.losses || 0) + 1;
         commercialProfile.winStreak = 0;
         eloDelta = -16;
-        goldReward = 65; // Participation & fair-play match completion gold
+        goldReward = 40; // Participation match completion gold
       }
 
       const nextElo = Math.max(800, prevElo + eloDelta);
@@ -3136,38 +3140,12 @@ export function initWizardChess() {
       return { ok: true, previewSkinId: skin.id, skin };
     }
 
-    function claimRankedBountyOrSimulateMatch(mode = 'ranked_win') {
-      if (mode === 'daily_gold') {
-        const bonus = 400;
-        commercialProfile.gold = (commercialProfile.gold || 0) + bonus;
-        saveCommercialProfile(commercialProfile);
-        soundFX.playLevelUp();
-        spawnFloatingCombatText(
-          new THREE.Vector3(0, BOARD_SURFACE_Y + 0.35, 0),
-          `+${bonus} 🪙 THƯỞNG KHO BẠC!`,
-          '#fde047',
-          0.95
-        );
-        addCombatLog(`🪙 Nhận +${bonus} Vàng từ Kho Bạc Thánh Đường!`, 'gold');
-        emitPokerChessSync();
-        return { ok: true, goldAdded: bonus };
-      }
-
-      // Simulate / Claim a Ranked Arena Victory to test climbing Elo & unlocking prestige skins
-      const rec = recordRankedMatchOutcome(playerColor);
-      soundFX.playVictoryFanfare();
-      spawnFloatingCombatText(
-        new THREE.Vector3(0, BOARD_SURFACE_Y + 0.4, 0),
-        `🏆 THẮNG XẾP HẠNG: +${rec.eloDelta} ELO • +${rec.goldReward} 🪙`,
-        '#4ade80',
-        0.95
-      );
-      addCombatLog(
-        `🏆 Thắng Trận Xếp Hạng: +${rec.eloDelta} Elo (Đạt ${rec.eloAfter} Elo - ${rec.tierNameVi}) & +${rec.goldReward} Vàng!`,
-        'gold'
-      );
-      emitPokerChessSync();
-      return { ok: true, matchRecord: rec };
+    function claimRankedBountyOrSimulateMatch() {
+      // Production Fair-Play Lock: Free Elo & Gold simulation buttons are disabled so players grind through real matches
+      return {
+        ok: false,
+        message: 'Hệ thống cộng nhanh đã đóng để đảm bảo công bằng — Hãy trực tiếp thi đấu để tích lũy Elo và Vàng!'
+      };
     }
 
     // Mode & Player Configuration
@@ -4068,7 +4046,9 @@ export function initWizardChess() {
       const scale = BOARD_SQ_SIZE;
       root.scale.set(scale, scale, scale);
       root.rotation.y = color === 'w' ? Math.PI : 0;
+      root.userData.isChessPieceRoot = true;
       scene.add(root);
+      allInstantiatedPieceMeshes.add(root);
 
       const pieceObj = {
         type,
@@ -4079,7 +4059,16 @@ export function initWizardChess() {
         mixer,
         actions,
         currentAction: null,
-        hasMoved: false
+        hasMoved: false,
+        pathHistory: [
+          {
+            r,
+            c,
+            algebraic: `${String.fromCharCode(97 + c)}${8 - r}`,
+            turn: 0,
+            kind: 'SPAWN'
+          }
+        ]
       };
 
       attachRPGStatsToPiece(pieceObj, initialLevel);
@@ -4094,6 +4083,37 @@ export function initWizardChess() {
 
       playPieceClip(pieceObj, 'Idle', true, 0);
       return pieceObj;
+    }
+
+    const allInstantiatedPieceMeshes = new Set();
+    const pendingBoardTimers = new Set();
+
+    function scheduleBoardTimeout(fn, delayMs) {
+      const tid = setTimeout(() => {
+        pendingBoardTimers.delete(tid);
+        fn();
+      }, delayMs);
+      pendingBoardTimers.add(tid);
+      return tid;
+    }
+
+    function removePieceMeshSafely(pieceOrMesh) {
+      if (!pieceOrMesh) return;
+      const mesh = pieceOrMesh.isObject3D ? pieceOrMesh : pieceOrMesh.mesh;
+      if (pieceOrMesh.mixer) {
+        try {
+          pieceOrMesh.mixer.stopAllAction();
+        } catch (e) {}
+        const mixIdx = activeMixers.indexOf(pieceOrMesh.mixer);
+        if (mixIdx !== -1) activeMixers.splice(mixIdx, 1);
+      }
+      if (mesh) {
+        if (mesh.parent) {
+          mesh.parent.remove(mesh);
+        }
+        scene.remove(mesh);
+        allInstantiatedPieceMeshes.delete(mesh);
+      }
     }
 
     const ATTACK_SYNC_PROFILES = {
@@ -4141,14 +4161,71 @@ export function initWizardChess() {
     }
 
     function clearAllPieces() {
+      // 1. Cancel any pending delayed ultimate/combat timers so they cannot touch the new board
+      for (const tid of pendingBoardTimers) {
+        clearTimeout(tid);
+      }
+      pendingBoardTimers.clear();
+
+      // 2. Remove all pieces referenced in boardState
       for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
-          if (boardState[r][c] && boardState[r][c].mesh) {
-            scene.remove(boardState[r][c].mesh);
+          if (boardState[r][c]) {
+            removePieceMeshSafely(boardState[r][c]);
           }
           boardState[r][c] = null;
         }
       }
+
+      // 3. Remove any toppled/fallen King piece or orphaned piece meshes tracked in allInstantiatedPieceMeshes
+      if (checkmateState && checkmateState.fallenKingPiece) {
+        removePieceMeshSafely(checkmateState.fallenKingPiece);
+        checkmateState.fallenKingPiece = null;
+      }
+      for (const mesh of Array.from(allInstantiatedPieceMeshes)) {
+        removePieceMeshSafely(mesh);
+      }
+      allInstantiatedPieceMeshes.clear();
+
+      // 4. Sweep scene.children for any residual chess piece roots or transient combat FX
+      for (let i = scene.children.length - 1; i >= 0; i--) {
+        const child = scene.children[i];
+        if (child && child.userData && child.userData.isChessPieceRoot) {
+          scene.remove(child);
+        }
+      }
+
+      // 5. Clear transient 3D combat effects & shatter debris
+      for (const d of shatterDebris) {
+        if (d.mesh) scene.remove(d.mesh);
+      }
+      shatterDebris.length = 0;
+      for (const ft of floatingTexts3D) {
+        if (ft.sprite) scene.remove(ft.sprite);
+      }
+      floatingTexts3D.length = 0;
+      for (const lb of lightningBeams3D) {
+        if (lb.mesh) scene.remove(lb.mesh);
+      }
+      lightningBeams3D.length = 0;
+      for (const sw of combatShockwaves3D) {
+        if (sw.mesh) scene.remove(sw.mesh);
+      }
+      combatShockwaves3D.length = 0;
+      for (const sa of slashArcs3D) {
+        if (sa.mesh) scene.remove(sa.mesh);
+      }
+      slashArcs3D.length = 0;
+      for (const sp of combatSparks3D) {
+        if (sp.mesh) scene.remove(sp.mesh);
+      }
+      combatSparks3D.length = 0;
+      for (const sh of defendShields3D) {
+        if (sh.domeMesh) scene.remove(sh.domeMesh);
+        if (sh.ringMesh) scene.remove(sh.ringMesh);
+      }
+      defendShields3D.length = 0;
+      activeUnitCombatAnims3D.length = 0;
       activeMixers.length = 0;
     }
 
@@ -4165,10 +4242,15 @@ export function initWizardChess() {
       defeatedColor: null,
       winnerColor: null,
       kingFallAngleDeg: 0,
-      phase: 'none'
+      phase: 'none',
+      fallenKingPiece: null
     };
 
     function clearCheckmateSequence() {
+      if (checkmateState.fallenKingPiece) {
+        removePieceMeshSafely(checkmateState.fallenKingPiece);
+        checkmateState.fallenKingPiece = null;
+      }
       checkmateState.active = false;
       checkmateState.bannerVisible = false;
       checkmateState.defeatedColor = null;
@@ -4209,7 +4291,10 @@ export function initWizardChess() {
                   maxHp: p.maxHp,
                   baseAtk: p.baseAtk,
                   armor: p.armor,
-                  activeCombo: p.activeCombo ? { ...p.activeCombo } : null
+                  activeCombo: p.activeCombo ? { ...p.activeCombo } : null,
+                  pathHistory: Array.isArray(p.pathHistory)
+                    ? p.pathHistory.map((st) => ({ ...st }))
+                    : []
                 }
               : null
           )
@@ -4275,6 +4360,9 @@ export function initWizardChess() {
             if (typeof cell.armor === 'number') inst.armor = cell.armor;
             if (typeof cell.xp === 'number') inst.xp = cell.xp;
             inst.activeCombo = cell.activeCombo ? { ...cell.activeCombo } : null;
+            if (Array.isArray(cell.pathHistory) && cell.pathHistory.length > 0) {
+              inst.pathHistory = cell.pathHistory.map((st) => ({ ...st }));
+            }
             updateUnit3DBadge(inst);
             boardState[r][c] = inst;
           }
@@ -4285,6 +4373,119 @@ export function initWizardChess() {
       updateTurnUI();
       if (typeof updateScriptBarUI === 'function') updateScriptBarUI();
       return true;
+    }
+
+    // =========================================================================
+    // Progressive Bot Difficulty Scaling by Player Elo Rating
+    // =========================================================================
+    function getBotDifficultyProfile(eloRating = commercialProfile?.elo || 1000) {
+      const elo = Number(eloRating) || 1000;
+      if (elo < 1150) {
+        return {
+          level: 1,
+          tierId: 'bronze_bot',
+          nameVi: 'Bot Tân Binh Đồng',
+          badgeVi: '🤖 Bot Lv.1 • Dễ',
+          descVi: 'Đánh ngẫu nhiên, ít dùng bài mạnh, không cộng chỉ số',
+          colorHex: '#cd7f32',
+          noise: 42,
+          comboSmartPct: 0.65,
+          mulliganDraws: 0,
+          lookaheadRiskWeight: 0,
+          bonusHp: 0,
+          bonusAtk: 0,
+          bonusArmor: 0,
+          thinkDelayMs: 620
+        };
+      }
+      if (elo < 1300) {
+        return {
+          level: 2,
+          tierId: 'silver_bot',
+          nameVi: 'Bot Hiệp Sĩ Bạc',
+          badgeVi: '🤖 Bot Lv.2 • Vừa',
+          descVi: 'Biết ghép bộ 5 lá tối ưu, ưu tiên đổi máu lời (+2❤ HP)',
+          colorHex: '#cbd5e1',
+          noise: 18,
+          comboSmartPct: 0.92,
+          mulliganDraws: 0,
+          lookaheadRiskWeight: 0.35,
+          bonusHp: 2,
+          bonusAtk: 0,
+          bonusArmor: 0,
+          thinkDelayMs: 560
+        };
+      }
+      if (elo < 1500) {
+        return {
+          level: 3,
+          tierId: 'gold_bot',
+          nameVi: 'Bot Chiến Tướng Vàng',
+          badgeVi: '🤖 Bot Lv.3 • Khá',
+          descVi: 'Chiếm Ô Thánh Tích, đổi 1 lá bài xấu, tính sát thương chuẩn (+4❤ +1⚔)',
+          colorHex: '#f5d76e',
+          noise: 8,
+          comboSmartPct: 1.0,
+          mulliganDraws: 1,
+          lookaheadRiskWeight: 0.65,
+          bonusHp: 4,
+          bonusAtk: 1,
+          bonusArmor: 0,
+          thinkDelayMs: 500
+        };
+      }
+      if (elo < 1750) {
+        return {
+          level: 4,
+          tierId: 'platinum_bot',
+          nameVi: 'Bot Quý Tộc Bạch Kim',
+          badgeVi: '🤖 Bot Lv.4 • Khó',
+          descVi: 'Tính trước phản đòn, bảo vệ Vua/Hậu, săn quân yếu (+6❤ +1⚔ +1🛡)',
+          colorHex: '#38bdf8',
+          noise: 3,
+          comboSmartPct: 1.0,
+          mulliganDraws: 1,
+          lookaheadRiskWeight: 0.95,
+          bonusHp: 6,
+          bonusAtk: 1,
+          bonusArmor: 1,
+          thinkDelayMs: 460
+        };
+      }
+      if (elo < 2050) {
+        return {
+          level: 5,
+          tierId: 'diamond_bot',
+          nameVi: 'Bot Thánh Kỵ Sĩ Kim Cương',
+          badgeVi: '🤖 Bot Lv.5 • Ác Mộng',
+          descVi: 'Chiến thuật cao cấp, lọc 2 lá bài phép, dồn sát thương kết liễu (+9❤ +2⚔ +1🛡)',
+          colorHex: '#a855f7',
+          noise: 1,
+          comboSmartPct: 1.0,
+          mulliganDraws: 2,
+          lookaheadRiskWeight: 1.25,
+          bonusHp: 9,
+          bonusAtk: 2,
+          bonusArmor: 1,
+          thinkDelayMs: 420
+        };
+      }
+      return {
+        level: 6,
+        tierId: 'grandmaster_bot',
+        nameVi: 'Bot Đại Kiện Tướng',
+        badgeVi: '🤖 Bot Lv.6 • Thần Thoại',
+        descVi: 'Trí tuệ tối thượng, lọc 3 lá bài phép, không mắc sai lầm (+12❤ +2⚔ +2🛡)',
+        colorHex: '#ef4444',
+        noise: 0.2,
+        comboSmartPct: 1.0,
+        mulliganDraws: 3,
+        lookaheadRiskWeight: 1.5,
+        bonusHp: 12,
+        bonusAtk: 2,
+        bonusArmor: 2,
+        thinkDelayMs: 380
+      };
     }
 
     function resetChessBoard(orientCamera = true, preserveScript = false) {
@@ -4303,6 +4504,8 @@ export function initWizardChess() {
       orbitControls.enabled = true;
       clearAllPieces();
       clearSquareHighlights();
+      clearAllTacticalPings(false);
+      tacticalPingMode = false;
       selectedSquare = null;
       hoveredSquare = null;
       validMoves = [];
@@ -4322,10 +4525,11 @@ export function initWizardChess() {
         w: createPlayerPokerState(),
         b: createPlayerPokerState()
       };
+      const botProf = getBotDifficultyProfile();
       combatLogFeed = [
         {
           id: 'init_log',
-          text: '🃏 Lượt 1 bắt đầu! Quy tắc Hearthstone: ① Bốc Bài ➔ ② Kích Hoạt Phép (Mana) ➔ ③ Gắn Buff Quân Cờ ➔ ④ Đi Quân & Combat!',
+          text: `🃏 Lượt 1 bắt đầu! Đối thủ: ${botProf.nameVi} (${botProf.badgeVi}) — ${botProf.descVi}.`,
           type: 'gold',
           turn: 1
         }
@@ -4346,6 +4550,27 @@ export function initWizardChess() {
         boardState[6][c] = instantiatePiece('pawn', 'w', 6, c, 1);
         boardState[1][c] = instantiatePiece('pawn', 'b', 1, c, 1);
         boardState[0][c] = instantiatePiece(backRow[c], 'b', 0, c, 1);
+      }
+
+      // Apply Elo-scaled Bot Difficulty bonuses to AI pieces in single-player mode
+      if (gameMode === 'single' && (botProf.bonusHp > 0 || botProf.bonusAtk > 0 || botProf.bonusArmor > 0)) {
+        const aiSide = playerColor === 'w' ? 'b' : 'w';
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const p = boardState[r][c];
+            if (p && p.color === aiSide) {
+              const hpScale = p.type === 'king' ? 1.5 : p.type === 'pawn' ? 0.65 : 1.0;
+              const extraHp = Math.round(botProf.bonusHp * hpScale);
+              p.maxHp = (p.maxHp || 15) + extraHp;
+              p.hp = p.maxHp;
+              p.displayHp = p.hp;
+              p.trailHp = p.hp;
+              p.baseAtk = (p.baseAtk || 4) + (p.type === 'pawn' ? Math.floor(botProf.bonusAtk * 0.6) : botProf.bonusAtk);
+              p.armor = Math.min(getUnitArmorCap(p), (p.armor || 0) + (p.type === 'pawn' ? 0 : botProf.bonusArmor));
+              updateUnit3DBadge(p);
+            }
+          }
+        }
       }
 
       const currentSkinToRender = commercialProfile.equippedSkinId || activeRenderedSkinId || 'classic_sanctum';
@@ -4639,6 +4864,636 @@ export function initWizardChess() {
       // Floor tiles share 2 static PBR materials for high FPS; glow is rendered via sharedTileGlowGeo overlays
     }
 
+    // =========================================================================
+    // 3D VISUAL PATHING INDICATOR SYSTEM (Move History Breadcrumb Trail + Intended Trajectory)
+    // =========================================================================
+    const unitPathingGroup = new THREE.Group();
+    unitPathingGroup.name = 'UnitPathingIndicators3D';
+    scene.add(unitPathingGroup);
+
+    // Modes: 'ALL' (History + Trajectory), 'TRAJECTORY' (Intended Trajectory only), 'HISTORY' (Move History only), 'OFF'
+    let pathingDisplayMode = 'ALL';
+    const activeTrajectoryChevrons = [];
+    const activeHistoryNodes = [];
+    const activeTrajectoryWaypoints = [];
+    let activeTargetLockRing = null;
+
+    const sharedWaypointDiamondGeo = new THREE.OctahedronGeometry(0.036, 0);
+    const sharedHistoryRingGeo = new THREE.RingGeometry(0.055, 0.088, 16);
+    sharedHistoryRingGeo.rotateX(-Math.PI / 2);
+    const sharedOriginCompassGeo = new THREE.RingGeometry(0.095, 0.132, 6);
+    sharedOriginCompassGeo.rotateX(-Math.PI / 2);
+    const sharedTrajChevronGeo = new THREE.ConeGeometry(0.034, 0.078, 4);
+    sharedTrajChevronGeo.rotateX(Math.PI / 2);
+    const sharedTargetLockRingGeo = new THREE.RingGeometry(0.118, 0.152, 24);
+    sharedTargetLockRingGeo.rotateX(-Math.PI / 2);
+
+    function clearUnitPathing3D() {
+      activeTrajectoryChevrons.length = 0;
+      activeHistoryNodes.length = 0;
+      activeTrajectoryWaypoints.length = 0;
+      activeTargetLockRing = null;
+      while (unitPathingGroup.children.length > 0) {
+        const child = unitPathingGroup.children[0];
+        child.traverse((node) => {
+          if (node.userData?.ownGeo && node.geometry) {
+            node.geometry.dispose();
+          }
+          if (node.material) {
+            if (node.material.map) node.material.map.dispose();
+            node.material.dispose();
+          }
+        });
+        unitPathingGroup.remove(child);
+      }
+    }
+
+    function computeMoveTrajectoryWaypoints(piece, fromR, fromC, toR, toC, moveInfo = null) {
+      const dr = toR - fromR;
+      const dc = toC - fromC;
+      const waypoints = [];
+      const isCapture = Boolean(
+        moveInfo?.capture || (boardState[toR]?.[toC] && boardState[toR][toC].color !== piece?.color)
+      );
+      const isCastle = Boolean(moveInfo?.castle);
+      const isKnightJump = piece?.type === 'knight' || Math.abs(dr) * Math.abs(dc) === 2;
+
+      if (isKnightJump && (dr !== 0 || dc !== 0)) {
+        // L-shape ground stepping stones (2 squares along primary axis, then 1 square perpendicular)
+        if (Math.abs(dr) === 2) {
+          const stepR = dr > 0 ? 1 : -1;
+          waypoints.push({
+            r: fromR + stepR,
+            c: fromC,
+            algebraic: toAlgebraic(fromR + stepR, fromC),
+            isIntermediate: true,
+            isCorner: false
+          });
+          waypoints.push({
+            r: fromR + stepR * 2,
+            c: fromC,
+            algebraic: toAlgebraic(fromR + stepR * 2, fromC),
+            isIntermediate: true,
+            isCorner: true
+          });
+        } else if (Math.abs(dc) === 2) {
+          const stepC = dc > 0 ? 1 : -1;
+          waypoints.push({
+            r: fromR,
+            c: fromC + stepC,
+            algebraic: toAlgebraic(fromR, fromC + stepC),
+            isIntermediate: true,
+            isCorner: false
+          });
+          waypoints.push({
+            r: fromR,
+            c: fromC + stepC * 2,
+            algebraic: toAlgebraic(fromR, fromC + stepC * 2),
+            isIntermediate: true,
+            isCorner: true
+          });
+        }
+      } else {
+        const steps = Math.max(Math.abs(dr), Math.abs(dc));
+        if (steps > 1) {
+          const stepR = dr === 0 ? 0 : dr / steps;
+          const stepC = dc === 0 ? 0 : dc / steps;
+          if (Number.isInteger(stepR) && Number.isInteger(stepC)) {
+            for (let s = 1; s < steps; s++) {
+              const wr = fromR + stepR * s;
+              const wc = fromC + stepC * s;
+              waypoints.push({
+                r: wr,
+                c: wc,
+                algebraic: toAlgebraic(wr, wc),
+                isIntermediate: true,
+                isCorner: false
+              });
+            }
+          }
+        }
+      }
+
+      waypoints.push({
+        r: toR,
+        c: toC,
+        algebraic: toAlgebraic(toR, toC),
+        isIntermediate: false,
+        isDestination: true
+      });
+
+      const chebyshevDist = Math.max(Math.abs(dr), Math.abs(dc));
+      const manhattanDist = Math.abs(dr) + Math.abs(dc);
+      return {
+        fromR,
+        fromC,
+        fromAlgebraic: toAlgebraic(fromR, fromC),
+        toR,
+        toC,
+        toAlgebraic: toAlgebraic(toR, toC),
+        isCapture,
+        isCastle,
+        castleSide: moveInfo?.castle || null,
+        isKnightJump,
+        distance: isKnightJump ? 3 : chebyshevDist,
+        manhattanDist,
+        waypoints
+      };
+    }
+
+    function createPathingLabelSprite(text, borderHex = '#38bdf8', subText = '') {
+      const canvas = document.createElement('canvas');
+      canvas.width = 384;
+      canvas.height = 96;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = 'rgba(7, 11, 22, 0.92)';
+      ctx.beginPath();
+      ctx.roundRect(8, 10, 368, 76, 18);
+      ctx.fill();
+
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = borderHex;
+      ctx.stroke();
+
+      ctx.font = 'bold 25px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(text, 192, subText ? 36 : 48);
+
+      if (subText) {
+        ctx.font = '600 18px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = borderHex;
+        ctx.fillText(subText, 192, 65);
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.46, 0.115, 1);
+      sprite.renderOrder = 26;
+      return sprite;
+    }
+
+    function getActivePathingSubjectUnit() {
+      if (selectedSquare && boardState[selectedSquare.r]?.[selectedSquare.c]) {
+        return boardState[selectedSquare.r][selectedSquare.c];
+      }
+      if (hoveredSquare && boardState[hoveredSquare.r]?.[hoveredSquare.c]) {
+        return boardState[hoveredSquare.r][hoveredSquare.c];
+      }
+      if (moveHistory.length > 0) {
+        const lastMv = moveHistory[moveHistory.length - 1];
+        if (lastMv && boardState[lastMv.toR]?.[lastMv.toC]) {
+          return boardState[lastMv.toR][lastMv.toC];
+        }
+      }
+      return null;
+    }
+
+    function getActiveIntendedTrajectoryInfo(subjectUnit) {
+      if (!subjectUnit) return null;
+
+      // Case 1: A unit is selected and has legal moves
+      if (
+        selectedSquare &&
+        selectedSquare.r === subjectUnit.r &&
+        selectedSquare.c === subjectUnit.c &&
+        Array.isArray(validMoves) &&
+        validMoves.length > 0
+      ) {
+        let targetMove = null;
+        if (hoveredSquare) {
+          targetMove =
+            validMoves.find((m) => m.r === hoveredSquare.r && m.c === hoveredSquare.c) || null;
+        }
+        // If not hovering a specific legal destination, highlight the top tactical move (prioritizing captures, castling, or forward central advance)
+        if (!targetMove) {
+          const sorted = [...validMoves].sort((a, b) => {
+            const scoreMove = (m) => {
+              let sc = 0;
+              if (m.capture) sc += 100;
+              if (m.castle) sc += 60;
+              const centerBias = 3.5 - (Math.abs(3.5 - m.r) + Math.abs(3.5 - m.c)) * 0.5;
+              sc += centerBias * 4;
+              sc += subjectUnit.color === 'w' ? (7 - m.r) * 2 : m.r * 2;
+              return sc;
+            };
+            return scoreMove(b) - scoreMove(a);
+          });
+          targetMove = sorted[0] || null;
+        }
+
+        if (targetMove) {
+          const traj = computeMoveTrajectoryWaypoints(
+            subjectUnit,
+            subjectUnit.r,
+            subjectUnit.c,
+            targetMove.r,
+            targetMove.c,
+            targetMove
+          );
+          traj.isHoveredTarget = Boolean(
+            hoveredSquare && hoveredSquare.r === targetMove.r && hoveredSquare.c === targetMove.c
+          );
+          return traj;
+        }
+      }
+
+      // Case 2: Hovering any unit on the board (when no unit is selected) -> preview its primary legal trajectory
+      if (
+        !selectedSquare &&
+        hoveredSquare &&
+        hoveredSquare.r === subjectUnit.r &&
+        hoveredSquare.c === subjectUnit.c
+      ) {
+        const hoverMoves = getLegalMovesForPiece(subjectUnit.r, subjectUnit.c);
+        if (hoverMoves.length > 0) {
+          const bestHoverMove =
+            hoverMoves.find((m) => m.capture) ||
+            hoverMoves.find((m) => m.castle) ||
+            hoverMoves[0];
+          const traj = computeMoveTrajectoryWaypoints(
+            subjectUnit,
+            subjectUnit.r,
+            subjectUnit.c,
+            bestHoverMove.r,
+            bestHoverMove.c,
+            bestHoverMove
+          );
+          traj.isHoveredTarget = false;
+          traj.candidateMoves = hoverMoves;
+          return traj;
+        }
+      }
+
+      return null;
+    }
+
+    function createFloorBeamBetween(p1, p2, yOffset, width, colorHex, opacity) {
+      const dx = p2.x - p1.x;
+      const dz = p2.z - p1.z;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.01) return null;
+      const geo = new THREE.PlaneGeometry(width, len);
+      geo.rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData.ownGeo = true;
+      mesh.position.set((p1.x + p2.x) * 0.5, BOARD_SURFACE_Y + yOffset, (p1.z + p2.z) * 0.5);
+      mesh.rotation.y = Math.atan2(dx, dz);
+      mesh.renderOrder = 8;
+      return mesh;
+    }
+
+    function rebuildUnitPathing3D() {
+      clearUnitPathing3D();
+      if (pathingDisplayMode === 'OFF' || gameOver) return;
+
+      const subjectUnit = getActivePathingSubjectUnit();
+      if (!subjectUnit) return;
+
+      const showHistory = pathingDisplayMode === 'ALL' || pathingDisplayMode === 'HISTORY';
+      const showTrajectory = pathingDisplayMode === 'ALL' || pathingDisplayMode === 'TRAJECTORY';
+
+      // =======================================================================
+      // 1. RENDER 3D MOVE HISTORY TRAIL (Breadcrumb Nodes + Ribbon + Footsteps)
+      // =======================================================================
+      const hist = Array.isArray(subjectUnit.pathHistory) ? subjectUnit.pathHistory : [];
+      if (showHistory && hist.length >= 1) {
+        const originStep = hist[0];
+        const originWorld = boardToWorld(originStep.r, originStep.c);
+
+        // Origin Spawn Seal Ring (Amber Gold)
+        if (hist.length > 1 || selectedSquare) {
+          const originMat = new THREE.MeshBasicMaterial({
+            color: 0xf59e0b,
+            transparent: true,
+            opacity: 0.72,
+            depthWrite: false,
+            side: THREE.DoubleSide
+          });
+          const originRing = new THREE.Mesh(sharedOriginCompassGeo, originMat);
+          originRing.position.set(originWorld.x, BOARD_SURFACE_Y + 0.006, originWorld.z);
+          originRing.renderOrder = 7;
+          unitPathingGroup.add(originRing);
+          activeHistoryNodes.push({
+            mesh: originRing,
+            rotSpeed: 0.65,
+            baseY: BOARD_SURFACE_Y + 0.006,
+            bobAmp: 0
+          });
+        }
+
+        // Connect consecutive historical steps with glowing amber/gold floor ribbons & directional footprints
+        for (let i = 0; i < hist.length - 1; i++) {
+          const a = hist[i];
+          const b = hist[i + 1];
+          const progress = (i + 1) / Math.max(1, hist.length - 1);
+          const legColor = b.kind === 'CAPTURE' ? 0xf97316 : b.kind === 'CLASH_REPEL' ? 0xec4899 : 0xfbbf24;
+          const legOpacity = 0.32 + progress * 0.45;
+
+          const worldA = boardToWorld(a.r, a.c);
+          const targetR = b.kind === 'CLASH_REPEL' && b.targetR !== undefined ? b.targetR : b.r;
+          const targetC = b.kind === 'CLASH_REPEL' && b.targetC !== undefined ? b.targetC : b.c;
+          const worldB = boardToWorld(targetR, targetC);
+
+          const beam = createFloorBeamBetween(worldA, worldB, 0.0065, 0.036, legColor, legOpacity);
+          if (beam) unitPathingGroup.add(beam);
+
+          // Historical directional chevron at the midpoint of each leg
+          const dx = worldB.x - worldA.x;
+          const dz = worldB.z - worldA.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist > 0.05) {
+            const chevMat = new THREE.MeshBasicMaterial({
+              color: legColor,
+              transparent: true,
+              opacity: Math.min(0.92, legOpacity + 0.18),
+              depthWrite: false
+            });
+            const chevMesh = new THREE.Mesh(sharedTrajChevronGeo, chevMat);
+            chevMesh.position.set(
+              worldA.x + dx * 0.55,
+              BOARD_SURFACE_Y + 0.022,
+              worldA.z + dz * 0.55
+            );
+            chevMesh.rotation.y = Math.atan2(dx, dz);
+            chevMesh.scale.set(0.75, 0.45, 0.75);
+            chevMesh.renderOrder = 9;
+            unitPathingGroup.add(chevMesh);
+          }
+
+          // Breadcrumb node on historical square a (and clash target if CLASH_REPEL)
+          const nodeRingMat = new THREE.MeshBasicMaterial({
+            color: legColor,
+            transparent: true,
+            opacity: legOpacity,
+            depthWrite: false,
+            side: THREE.DoubleSide
+          });
+          const nodeRing = new THREE.Mesh(sharedHistoryRingGeo, nodeRingMat);
+          nodeRing.position.set(worldA.x, BOARD_SURFACE_Y + 0.007, worldA.z);
+          nodeRing.renderOrder = 8;
+          unitPathingGroup.add(nodeRing);
+
+          const gemMat = new THREE.MeshBasicMaterial({
+            color: 0xfde047,
+            transparent: true,
+            opacity: legOpacity + 0.15
+          });
+          const gemMesh = new THREE.Mesh(sharedWaypointDiamondGeo, gemMat);
+          gemMesh.position.set(worldA.x, BOARD_SURFACE_Y + 0.042, worldA.z);
+          gemMesh.scale.setScalar(0.65 + progress * 0.25);
+          gemMesh.renderOrder = 10;
+          unitPathingGroup.add(gemMesh);
+          activeHistoryNodes.push({
+            mesh: gemMesh,
+            rotSpeed: 1.8,
+            baseY: BOARD_SURFACE_Y + 0.042,
+            bobAmp: 0.008,
+            phase: i * 1.1
+          });
+        }
+      }
+
+      // =======================================================================
+      // 2. RENDER 3D INTENDED TRAJECTORY (Spokes + Parabolic Arc + Marching Chevrons + Stepping Stones)
+      // =======================================================================
+      if (showTrajectory) {
+        const traj = getActiveIntendedTrajectoryInfo(subjectUnit);
+        const allMoves =
+          selectedSquare &&
+          selectedSquare.r === subjectUnit.r &&
+          selectedSquare.c === subjectUnit.c
+            ? validMoves
+            : traj?.candidateMoves || [];
+
+        const startWorld = boardToWorld(subjectUnit.r, subjectUnit.c);
+
+        // Render subtle tactical trajectory spokes to all other valid moves
+        if (Array.isArray(allMoves) && allMoves.length > 0) {
+          for (const mv of allMoves) {
+            if (traj && mv.r === traj.toR && mv.c === traj.toC) continue;
+            const mvWorld = boardToWorld(mv.r, mv.c);
+            const spokeColor = mv.capture ? 0xef4444 : mv.castle ? 0xfbbf24 : 0x38bdf8;
+            const spokeBeam = createFloorBeamBetween(
+              startWorld,
+              mvWorld,
+              0.0055,
+              0.014,
+              spokeColor,
+              0.24
+            );
+            if (spokeBeam) unitPathingGroup.add(spokeBeam);
+          }
+        }
+
+        // Render primary Intended Trajectory with 3D Parabolic Energy Arc, Waypoints & Marching Chevrons
+        if (traj) {
+          const endWorld = boardToWorld(traj.toR, traj.toC);
+          const primaryHex = traj.isCapture
+            ? 0xef4444
+            : traj.isCastle
+              ? 0xfbbf24
+              : 0x38bdf8;
+          const primaryCss = traj.isCapture
+            ? '#ef4444'
+            : traj.isCastle
+              ? '#fbbf24'
+              : '#38bdf8';
+
+          // Ground path segments through waypoints (shows exact L-path for Knights or ray for sliding units)
+          let prevPt = startWorld;
+          for (let wIdx = 0; wIdx < traj.waypoints.length; wIdx++) {
+            const wp = traj.waypoints[wIdx];
+            const wpWorld = boardToWorld(wp.r, wp.c);
+            const segBeam = createFloorBeamBetween(
+              prevPt,
+              wpWorld,
+              0.008,
+              traj.isHoveredTarget ? 0.044 : 0.032,
+              primaryHex,
+              traj.isHoveredTarget ? 0.78 : 0.55
+            );
+            if (segBeam) unitPathingGroup.add(segBeam);
+            prevPt = wpWorld;
+
+            // Stepping stone diamond on intermediate squares
+            if (wp.isIntermediate) {
+              const stepRingMat = new THREE.MeshBasicMaterial({
+                color: primaryHex,
+                transparent: true,
+                opacity: 0.75,
+                depthWrite: false,
+                side: THREE.DoubleSide
+              });
+              const stepRing = new THREE.Mesh(sharedHistoryRingGeo, stepRingMat);
+              stepRing.position.set(wpWorld.x, BOARD_SURFACE_Y + 0.0085, wpWorld.z);
+              stepRing.renderOrder = 9;
+              unitPathingGroup.add(stepRing);
+
+              const wpGemMat = new THREE.MeshBasicMaterial({
+                color: 0xe0f2fe,
+                transparent: true,
+                opacity: 0.9
+              });
+              const wpGem = new THREE.Mesh(sharedWaypointDiamondGeo, wpGemMat);
+              wpGem.position.set(wpWorld.x, BOARD_SURFACE_Y + 0.038, wpWorld.z);
+              wpGem.scale.setScalar(wp.isCorner ? 0.95 : 0.78);
+              wpGem.renderOrder = 11;
+              unitPathingGroup.add(wpGem);
+              activeTrajectoryWaypoints.push({
+                mesh: wpGem,
+                baseY: BOARD_SURFACE_Y + 0.038,
+                phase: wIdx * 0.9
+              });
+            }
+          }
+
+          // Parabolic 3D Energy Arc from unit pedestal to target square
+          const dx = endWorld.x - startWorld.x;
+          const dz = endWorld.z - startWorld.z;
+          const worldDist = Math.hypot(dx, dz);
+          const arcPeakY =
+            BOARD_SURFACE_Y +
+            (traj.isKnightJump
+              ? 0.34
+              : traj.isCapture
+                ? Math.min(0.32, 0.14 + worldDist * 0.12)
+                : Math.min(0.24, 0.09 + worldDist * 0.08));
+
+          const curve = new THREE.QuadraticBezierCurve3(
+            new THREE.Vector3(startWorld.x, BOARD_SURFACE_Y + 0.05, startWorld.z),
+            new THREE.Vector3(
+              (startWorld.x + endWorld.x) * 0.5,
+              arcPeakY,
+              (startWorld.z + endWorld.z) * 0.5
+            ),
+            new THREE.Vector3(endWorld.x, BOARD_SURFACE_Y + 0.04, endWorld.z)
+          );
+
+          const tubeRadius = traj.isHoveredTarget ? 0.013 : 0.0095;
+          const tubeGeo = new THREE.TubeGeometry(curve, 28, tubeRadius, 8, false);
+          const tubeMat = new THREE.MeshBasicMaterial({
+            color: primaryHex,
+            transparent: true,
+            opacity: traj.isHoveredTarget ? 0.88 : 0.64,
+            depthWrite: false
+          });
+          const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+          tubeMesh.userData.ownGeo = true;
+          tubeMesh.renderOrder = 12;
+          unitPathingGroup.add(tubeMesh);
+
+          // Animated Marching Chevrons along the trajectory curve
+          const chevronCount = Math.max(3, Math.min(6, Math.round(worldDist / 0.24) + 2));
+          for (let cIdx = 0; cIdx < chevronCount; cIdx++) {
+            const chevMat = new THREE.MeshBasicMaterial({
+              color: 0xffffff,
+              transparent: true,
+              opacity: 0.92,
+              depthWrite: false
+            });
+            chevMat.color.lerp(new THREE.Color(primaryHex), 0.35);
+            const chevMesh = new THREE.Mesh(sharedTrajChevronGeo, chevMat);
+            chevMesh.scale.set(0.85, 0.85, 0.85);
+            chevMesh.renderOrder = 14;
+            unitPathingGroup.add(chevMesh);
+            activeTrajectoryChevrons.push({
+              mesh: chevMesh,
+              curve,
+              offset: cIdx / chevronCount
+            });
+          }
+
+          // Target Lock Ring at destination square
+          const lockMat = new THREE.MeshBasicMaterial({
+            color: primaryHex,
+            transparent: true,
+            opacity: 0.92,
+            depthWrite: false,
+            side: THREE.DoubleSide
+          });
+          const lockRing = new THREE.Mesh(sharedTargetLockRingGeo, lockMat);
+          lockRing.position.set(endWorld.x, BOARD_SURFACE_Y + 0.009, endWorld.z);
+          lockRing.renderOrder = 12;
+          unitPathingGroup.add(lockRing);
+          activeTargetLockRing = lockRing;
+
+          // Secondary Castling Rook Trajectory Arc (when King castles Kingside or Queenside)
+          if (traj.isCastle) {
+            const rookFromC = traj.castleSide === 'kingside' ? 7 : 0;
+            const rookToC = traj.castleSide === 'kingside' ? 5 : 3;
+            const rStart = boardToWorld(traj.fromR, rookFromC);
+            const rEnd = boardToWorld(traj.fromR, rookToC);
+            const rookCurve = new THREE.QuadraticBezierCurve3(
+              new THREE.Vector3(rStart.x, BOARD_SURFACE_Y + 0.05, rStart.z),
+              new THREE.Vector3((rStart.x + rEnd.x) * 0.5, BOARD_SURFACE_Y + 0.22, (rStart.z + rEnd.z) * 0.5),
+              new THREE.Vector3(rEnd.x, BOARD_SURFACE_Y + 0.04, rEnd.z)
+            );
+            const rookTubeGeo = new THREE.TubeGeometry(rookCurve, 20, 0.008, 6, false);
+            const rookTubeMat = new THREE.MeshBasicMaterial({
+              color: 0xfbbf24,
+              transparent: true,
+              opacity: 0.72,
+              depthWrite: false
+            });
+            const rookTube = new THREE.Mesh(rookTubeGeo, rookTubeMat);
+            rookTube.userData.ownGeo = true;
+            rookTube.renderOrder = 12;
+            unitPathingGroup.add(rookTube);
+          }
+
+          // Floating 3D Trajectory Callout Label above the destination square
+          const moveTitle = `${traj.fromAlgebraic.toUpperCase()} ➔ ${traj.toAlgebraic.toUpperCase()}`;
+          const moveSub = traj.isCapture
+            ? `⚔ TẤN CÔNG • ${traj.distance} Ô`
+            : traj.isCastle
+              ? `🏰 NHẬP THÀNH`
+              : traj.isKnightJump
+                ? `🐴 NHẢY MÃ CHỮ L • ${traj.distance} Ô`
+                : `🧭 DI CHUYỂN • ${traj.distance} Ô`;
+          const labelSprite = createPathingLabelSprite(moveTitle, primaryCss, moveSub);
+          labelSprite.position.set(endWorld.x, BOARD_SURFACE_Y + 0.28, endWorld.z);
+          unitPathingGroup.add(labelSprite);
+        }
+      }
+    }
+
+    function setPathingDisplayMode(mode) {
+      const allowed = ['ALL', 'TRAJECTORY', 'HISTORY', 'OFF'];
+      if (allowed.includes(mode)) {
+        pathingDisplayMode = mode;
+      }
+      rebuildUnitPathing3D();
+      emitPokerChessSync();
+      return pathingDisplayMode;
+    }
+
+    function cyclePathingDisplayMode() {
+      const order = ['ALL', 'TRAJECTORY', 'HISTORY', 'OFF'];
+      const idx = order.indexOf(pathingDisplayMode);
+      pathingDisplayMode = order[(idx + 1) % order.length];
+      soundFX?.playUIClick?.();
+      rebuildUnitPathing3D();
+      emitPokerChessSync();
+      return pathingDisplayMode;
+    }
+
     function clearSquareHighlights() {
       while (squareHighlightsGroup.children.length > 0) {
         const child = squareHighlightsGroup.children[0];
@@ -4649,6 +5504,7 @@ export function initWizardChess() {
         });
         squareHighlightsGroup.remove(child);
       }
+      rebuildUnitPathing3D();
     }
 
     function createFloorTileHighlightMesh(r, c, mode, customTintHex = null) {
@@ -4775,6 +5631,399 @@ export function initWizardChess() {
         const moveTileMesh = createFloorTileHighlightMesh(m.r, m.c, mode);
         squareHighlightsGroup.add(moveTileMesh);
       }
+      rebuildUnitPathing3D();
+    }
+
+    // =========================================================================
+    // 3D TACTICAL TILE PING SYSTEM (Visual Beacon Marker + AI Intent Coordinator)
+    // =========================================================================
+    const TACTICAL_PING_DURATION = 16.0;
+    const sharedPingOctRingGeo = new THREE.RingGeometry(0.112, 0.146, 8);
+    sharedPingOctRingGeo.rotateX(-Math.PI / 2);
+    const sharedPingInnerCompassGeo = new THREE.RingGeometry(0.056, 0.076, 16);
+    sharedPingInnerCompassGeo.rotateX(-Math.PI / 2);
+    const sharedPingSonarGeo = new THREE.RingGeometry(0.048, 0.072, 32);
+    sharedPingSonarGeo.rotateX(-Math.PI / 2);
+    const sharedPingPillarGeo = new THREE.CylinderGeometry(0.036, 0.088, 0.42, 16, 1, true);
+    const sharedPingCrystalGeo = new THREE.OctahedronGeometry(0.038, 0);
+    const sharedPingGyroGeo = new THREE.TorusGeometry(0.062, 0.006, 8, 24);
+    const sharedPingBracketArmGeo = new THREE.BoxGeometry(0.048, 0.008, 0.012);
+
+    function createTacticalPingLabelSprite(icon, labelText, algebraic, colorHex) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 384;
+      canvas.height = 96;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(10, 14, 24, 0.88)';
+        ctx.strokeStyle = colorHex || '#f5d76e';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.roundRect(10, 12, canvas.width - 20, canvas.height - 24, 18);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = '800 28px "Cinzel", "Inter", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = colorHex || '#f5d76e';
+        ctx.fillText(`${icon} ${labelText.toUpperCase()} [${algebraic.toUpperCase()}]`, canvas.width / 2, canvas.height / 2 + 1);
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.38, 0.095, 1);
+      sprite.renderOrder = 26;
+      return { sprite, tex, mat };
+    }
+
+    function disposePingEntry3D(entry) {
+      if (!entry || !entry.group) return;
+      tacticalPingsGroup.remove(entry.group);
+      entry.group.traverse((node) => {
+        if (node.material) {
+          if (node.material.map) node.material.map.dispose();
+          node.material.dispose();
+        }
+      });
+    }
+
+    function clearAllTacticalPings(emitSync = true) {
+      while (activeTacticalPings.length > 0) {
+        const entry = activeTacticalPings.pop();
+        disposePingEntry3D(entry);
+      }
+      if (emitSync) {
+        emitPokerChessSync();
+      }
+    }
+
+    function removeTacticalPingAt(r, c, emitSync = true) {
+      const idx = activeTacticalPings.findIndex((p) => p.r === r && p.c === c);
+      if (idx === -1) return false;
+      const [removed] = activeTacticalPings.splice(idx, 1);
+      disposePingEntry3D(removed);
+      if (emitSync) {
+        emitPokerChessSync();
+      }
+      return true;
+    }
+
+    function resolveSmartPingIntent(r, c, requestedIntent = 'AUTO') {
+      if (requestedIntent && requestedIntent !== 'AUTO' && TACTICAL_PING_INTENTS[requestedIntent]) {
+        return requestedIntent;
+      }
+      const pieceOnSq = boardState[r]?.[c];
+      if (pieceOnSq) {
+        if (pieceOnSq.color !== playerColor) {
+          return 'ATTACK';
+        }
+        if (turnPhase === 'EMPOWER_UNIT' || turnPhase === 'SELECT_CARDS' || turnPhase === 'DRAW_PHASE') {
+          return 'BUFF';
+        }
+        return 'DEFEND';
+      }
+      return 'MOVE';
+    }
+
+    function createTacticalPingMarker3D(r, c, intentKey) {
+      const def = TACTICAL_PING_INTENTS[intentKey] || TACTICAL_PING_INTENTS.MOVE;
+      const worldPos = boardToWorld(r, c);
+      const alg = toAlgebraic(r, c);
+      const group = new THREE.Group();
+      group.position.set(worldPos.x, BOARD_SURFACE_Y, worldPos.z);
+
+      // 1. Base Octagonal Tactical Reticle Ring (with polygonOffset to prevent coplanar Z-fighting)
+      const octRingMat = new THREE.MeshBasicMaterial({
+        color: def.threeHex,
+        transparent: true,
+        opacity: 0.94,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2
+      });
+      const octRingMesh = new THREE.Mesh(sharedPingOctRingGeo, octRingMat);
+      octRingMesh.position.y = 0.008;
+      octRingMesh.renderOrder = 14;
+      group.add(octRingMesh);
+
+      // 2. Inner Rotating Compass Ring
+      const compassMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.86,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -3,
+        polygonOffsetUnits: -3
+      });
+      const compassMesh = new THREE.Mesh(sharedPingInnerCompassGeo, compassMat);
+      compassMesh.position.y = 0.010;
+      compassMesh.renderOrder = 15;
+      group.add(compassMesh);
+
+      // 3. Expanding Sonar Pulse Wave Ring
+      const sonarMat = new THREE.MeshBasicMaterial({
+        color: def.threeHex,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const sonarMesh = new THREE.Mesh(sharedPingSonarGeo, sonarMat);
+      sonarMesh.position.y = 0.011;
+      sonarMesh.renderOrder = 15;
+      group.add(sonarMesh);
+
+      // 4. Four Tactical Corner Chevron Brackets framing the tile
+      const bracketsGroup = new THREE.Group();
+      bracketsGroup.position.y = 0.012;
+      const bracketMat = new THREE.MeshStandardMaterial({
+        color: def.threeHex,
+        emissive: def.threeHex,
+        emissiveIntensity: 0.95,
+        roughness: 0.2,
+        metalness: 0.75,
+        transparent: true,
+        opacity: 0.95
+      });
+      const cornerSigns = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1]
+      ];
+      const cornerNodes = [];
+      for (const [sx, sz] of cornerSigns) {
+        const cornerPivot = new THREE.Group();
+        const baseCornerDist = 0.128;
+        cornerPivot.position.set(sx * baseCornerDist, 0, sz * baseCornerDist);
+        cornerPivot.userData = { sx, sz, baseDist: baseCornerDist };
+
+        const armX = new THREE.Mesh(sharedPingBracketArmGeo, bracketMat);
+        armX.position.set(-sx * 0.018, 0, 0);
+        cornerPivot.add(armX);
+
+        const armZ = new THREE.Mesh(sharedPingBracketArmGeo, bracketMat);
+        armZ.rotation.y = Math.PI / 2;
+        armZ.position.set(0, 0, -sz * 0.018);
+        cornerPivot.add(armZ);
+
+        bracketsGroup.add(cornerPivot);
+        cornerNodes.push(cornerPivot);
+      }
+      group.add(bracketsGroup);
+
+      // 5. Vertical Holographic Beacon Light Column
+      const pillarMat = new THREE.MeshBasicMaterial({
+        color: def.threeHex,
+        transparent: true,
+        opacity: 0.24,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+      });
+      const pillarMesh = new THREE.Mesh(sharedPingPillarGeo, pillarMat);
+      pillarMesh.position.y = 0.21;
+      pillarMesh.renderOrder = 16;
+      group.add(pillarMesh);
+
+      // 6. Floating 3D Tactical Crystal Finial + Gyro Ring
+      const finialAnchor = new THREE.Group();
+      const pieceOnSq = boardState[r]?.[c];
+      const baseHoverY = pieceOnSq ? (PIECE_HEIGHTS[pieceOnSq.type] || 0.48) + 0.26 : 0.34;
+      finialAnchor.position.y = baseHoverY;
+
+      const crystalMat = new THREE.MeshStandardMaterial({
+        color: def.threeHex,
+        emissive: def.threeHex,
+        emissiveIntensity: 1.15,
+        roughness: 0.12,
+        metalness: 0.82,
+        transparent: true,
+        opacity: 0.96
+      });
+      const crystalMesh = new THREE.Mesh(sharedPingCrystalGeo, crystalMat);
+      finialAnchor.add(crystalMesh);
+
+      const gyroMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false
+      });
+      const gyroMesh = new THREE.Mesh(sharedPingGyroGeo, gyroMat);
+      gyroMesh.rotation.x = Math.PI / 3;
+      finialAnchor.add(gyroMesh);
+
+      // 7. Floating Tactical Label Sprite above the crystal
+      const { sprite: labelSprite } = createTacticalPingLabelSprite(
+        def.icon,
+        def.label,
+        alg,
+        def.colorHex
+      );
+      labelSprite.position.set(0, 0.105, 0);
+      finialAnchor.add(labelSprite);
+
+      group.add(finialAnchor);
+      tacticalPingsGroup.add(group);
+
+      return {
+        group,
+        octRingMesh,
+        octRingMat,
+        compassMesh,
+        compassMat,
+        sonarMesh,
+        sonarMat,
+        pillarMesh,
+        pillarMat,
+        bracketMat,
+        cornerNodes,
+        finialAnchor,
+        crystalMesh,
+        crystalMat,
+        gyroMesh,
+        gyroMat,
+        labelSprite,
+        baseHoverY
+      };
+    }
+
+    function pingBoardSquare(r, c, requestedIntent = selectedPingIntent) {
+      if (r < 0 || r > 7 || c < 0 || c > 7 || gameOver) return null;
+
+      const existing = activeTacticalPings.find((p) => p.r === r && p.c === c);
+      let resolvedIntent = resolveSmartPingIntent(r, c, requestedIntent);
+
+      // If clicking an already-pinged square in AUTO mode, cycle its intent or clear if cycled through
+      if (existing) {
+        if (requestedIntent === 'AUTO') {
+          const cycleOrder = ['ATTACK', 'DEFEND', 'MOVE', 'BUFF'];
+          const curIdx = cycleOrder.indexOf(existing.intent);
+          if (existing.cycledOnce) {
+            removeTacticalPingAt(r, c, true);
+            soundFX.playUIClick();
+            return null;
+          }
+          resolvedIntent = cycleOrder[(curIdx + 1) % cycleOrder.length];
+          removeTacticalPingAt(r, c, false);
+        } else if (existing.intent === resolvedIntent) {
+          removeTacticalPingAt(r, c, true);
+          soundFX.playUIClick();
+          return null;
+        } else {
+          removeTacticalPingAt(r, c, false);
+        }
+      }
+
+      // Cap maximum simultaneous tactical pings at 4 (remove oldest if exceeded)
+      while (activeTacticalPings.length >= 4) {
+        const oldest = activeTacticalPings.shift();
+        disposePingEntry3D(oldest);
+      }
+
+      const def = TACTICAL_PING_INTENTS[resolvedIntent] || TACTICAL_PING_INTENTS.MOVE;
+      const visual = createTacticalPingMarker3D(r, c, resolvedIntent);
+      const alg = toAlgebraic(r, c);
+      const pieceOnSq = boardState[r]?.[c];
+      const unitDesc = pieceOnSq
+        ? `${PIECE_NAMES_VI[pieceOnSq.type] || pieceOnSq.type} ${pieceOnSq.color === 'w' ? 'Trắng' : 'Đen'}`
+        : `Ô trống ${alg.toUpperCase()}`;
+
+      const entry = {
+        id: `ping_${Date.now()}_${r}_${c}`,
+        r,
+        c,
+        algebraic: alg,
+        intent: resolvedIntent,
+        label: def.label,
+        shortLabel: def.shortLabel,
+        icon: def.icon,
+        colorHex: def.colorHex,
+        threeHex: def.threeHex,
+        unitDesc,
+        cycledOnce: Boolean(existing),
+        life: TACTICAL_PING_DURATION,
+        maxLife: TACTICAL_PING_DURATION,
+        createdAt: performance.now(),
+        ...visual
+      };
+
+      activeTacticalPings.push(entry);
+      soundFX.playTacticalPing?.(resolvedIntent);
+
+      const wPos = boardToWorld(r, c);
+      spawnCombatShockwave3D(wPos, def.threeHex, false, false);
+      spawnFloatingCombatText(
+        wPos,
+        `${def.icon} PING ${def.label.toUpperCase()}: ${alg.toUpperCase()}`,
+        def.colorHex,
+        0.92
+      );
+
+      addCombatLog(
+        `${def.icon} [Ping Chiến Thuật • ${alg.toUpperCase()}]: Chỉ điểm [${def.label}] tại ${unitDesc} — AI sẽ ưu tiên phối hợp!`,
+        'combo'
+      );
+
+      emitPokerChessSync();
+      return entry;
+    }
+
+    function consumeFulfilledTacticalPings(fromR, fromC, toR, toC) {
+      if (activeTacticalPings.length === 0) return;
+      let changed = false;
+      for (let i = activeTacticalPings.length - 1; i >= 0; i--) {
+        const p = activeTacticalPings[i];
+        const isDestMatch = p.r === toR && p.c === toC;
+        const isOriginBuffOrMove =
+          p.r === fromR && p.c === fromC && (p.intent === 'MOVE' || p.intent === 'BUFF');
+        if (isDestMatch || isOriginBuffOrMove) {
+          const wPos = boardToWorld(toR, toC);
+          spawnCombatSparks3D(wPos, p.threeHex || 0xf5d76e, 18, 0.9);
+          spawnFloatingCombatText(
+            wPos,
+            `✓ ĐÃ PHỐI HỢP PING [${p.label.toUpperCase()}]!`,
+            p.colorHex || '#10b981',
+            0.88
+          );
+          disposePingEntry3D(p);
+          activeTacticalPings.splice(i, 1);
+          changed = true;
+        }
+      }
+      if (changed) {
+        emitPokerChessSync();
+      }
+    }
+
+    function toggleTacticalPingMode(forceState = null) {
+      tacticalPingMode = typeof forceState === 'boolean' ? forceState : !tacticalPingMode;
+      soundFX.playUIClick();
+      emitPokerChessSync();
+      return tacticalPingMode;
+    }
+
+    function setTacticalPingIntent(intentId) {
+      if (TACTICAL_PING_INTENTS[intentId]) {
+        selectedPingIntent = intentId;
+        tacticalPingMode = true;
+        soundFX.playUIClick();
+        emitPokerChessSync();
+      }
+      return selectedPingIntent;
     }
 
     // =========================================================================
@@ -4822,14 +6071,12 @@ export function initWizardChess() {
       );
 
       targets.forEach((targetPiece, idx) => {
-        setTimeout(() => {
-          if (!targetPiece || !boardState[targetPiece.r]?.[targetPiece.c]) return;
+        scheduleBoardTimeout(() => {
+          if (!targetPiece || boardState[targetPiece.r]?.[targetPiece.c] !== targetPiece) return;
           const pos = boardToWorld(targetPiece.r, targetPiece.c);
           spawnDivineLightningBeam(pos, 0xf5d76e, 0.11);
           spawnStoneShatter(pos, targetPiece.color);
-          if (targetPiece.mesh) {
-            scene.remove(targetPiece.mesh);
-          }
+          removePieceMeshSafely(targetPiece);
           boardState[targetPiece.r][targetPiece.c] = null;
           if (currentTurn === 'w') capturedByWhite += 1;
           else capturedByBlack += 1;
@@ -4845,7 +6092,7 @@ export function initWizardChess() {
 
       turnPhase = 'MOVE_OR_COMBAT';
       pendingComboEval = null;
-      setTimeout(() => {
+      scheduleBoardTimeout(() => {
         updateAllUnitBadges();
         updateTurnUI();
       }, targets.length * 95 + 120);
@@ -4871,7 +6118,7 @@ export function initWizardChess() {
 
       const origFogColor = scene.fog.color.getHex();
       scene.fog.color.setHex(0x581414);
-      setTimeout(() => {
+      scheduleBoardTimeout(() => {
         scene.fog.color.setHex(origFogColor);
       }, 2200);
 
@@ -4889,11 +6136,12 @@ export function initWizardChess() {
       }
 
       enemyUnits.forEach((p, idx) => {
-        setTimeout(() => {
+        scheduleBoardTimeout(() => {
+          if (boardState[p.r]?.[p.c] !== p) return;
           const pos = boardToWorld(p.r, p.c);
           spawnDivineLightningBeam(pos, 0xef4444, 0.12);
           spawnStoneShatter(pos, p.color);
-          if (p.mesh) scene.remove(p.mesh);
+          removePieceMeshSafely(p);
           boardState[p.r][p.c] = null;
           if (winnerColor === 'w') capturedByWhite += 1;
           else capturedByBlack += 1;
@@ -5133,10 +6381,21 @@ export function initWizardChess() {
 
     function empowerFriendlyUnitAt(r, c) {
       const piece = boardState[r]?.[c];
-      if (!piece || piece.color !== currentTurn || !pendingComboEval) return false;
-      const appliedCombo = pendingComboEval;
+      if (!piece || piece.color !== currentTurn) return false;
+      const appliedCombo =
+        pendingComboEval ||
+        pokerDecks[currentTurn]?.committedComboThisTurn || {
+          id: 'HIGH_CARD',
+          name: 'Mậu Thầu',
+          rank: 1,
+          atkBonus: 2,
+          armorBonus: 0,
+          healInstant: 0,
+          colorHex: '#f5d76e',
+          ringColor: 0xf5d76e
+        };
       const res = applyComboEmpowermentToUnit(piece, appliedCombo, boardState, turnNumber);
-      soundFX.playComboEmpower(appliedCombo.rank);
+      soundFX.playComboEmpower(appliedCombo.rank || 1);
       const wPos = boardToWorld(r, c);
       spawnDivineLightningBeam(wPos, appliedCombo.ringColor || 0xf5d76e, 0.075);
       spawnFloatingCombatText(
@@ -5152,11 +6411,29 @@ export function initWizardChess() {
       lastEmpoweredSquare = { r, c };
       pendingComboEval = null;
       turnPhase = 'MOVE_OR_COMBAT';
+      const buffPingIdx = activeTacticalPings.findIndex(
+        (p) => p.r === r && p.c === c && p.intent === 'BUFF'
+      );
+      if (buffPingIdx !== -1) {
+        const [fulfilledBuffPing] = activeTacticalPings.splice(buffPingIdx, 1);
+        disposePingEntry3D(fulfilledBuffPing);
+      }
       updateAllUnitBadges();
-      // Immediately select the empowered unit so the player sees its legal moves right away!
-      selectedSquare = { r, c };
-      validMoves = getLegalMovesForPiece(r, c);
-      showSquareHighlights(r, c, validMoves);
+      // Immediately select the empowered unit (or a frontline movable unit if the empowered unit is blocked) so legal moves glow right away!
+      let selR = r;
+      let selC = c;
+      let moves = getLegalMovesForPiece(selR, selC);
+      if (!moves || moves.length === 0) {
+        const fallback = findBestMovableFriendlyUnit(currentTurn);
+        if (fallback) {
+          selR = fallback.r;
+          selC = fallback.c;
+          moves = fallback.moves;
+        }
+      }
+      selectedSquare = { r: selR, c: selC };
+      validMoves = moves || [];
+      showSquareHighlights(selR, selC, validMoves);
       updateTurnUI();
       return true;
     }
@@ -5268,6 +6545,7 @@ export function initWizardChess() {
       soundFX.stopLowTimeTickingLoop(true);
       activeCamTransition = null;
       clearSquareHighlights();
+      consumeFulfilledTacticalPings(fromR, fromC, toR, toC);
       selectedSquare = null;
       validMoves = [];
       updateTurnUI();
@@ -5689,12 +6967,47 @@ export function initWizardChess() {
             }
           }
 
+          if (!Array.isArray(piece.pathHistory)) {
+            piece.pathHistory = [
+              { r: fromR, c: fromC, algebraic: toAlgebraic(fromR, fromC), turn: 0, kind: 'SPAWN' }
+            ];
+          }
+          piece.pathHistory.push({
+            r: toR,
+            c: toC,
+            fromR,
+            fromC,
+            algebraic: toAlgebraic(toR, toC),
+            turn: turnNumber,
+            kind: isCastling ? 'CASTLE' : 'MOVE'
+          });
+
           if (isCastling && castleRook) {
             boardState[fromR][castleRookFromC] = null;
             boardState[fromR][castleRookToC] = castleRook;
             castleRook.r = fromR;
             castleRook.c = castleRookToC;
             castleRook.hasMoved = true;
+            if (!Array.isArray(castleRook.pathHistory)) {
+              castleRook.pathHistory = [
+                {
+                  r: fromR,
+                  c: castleRookFromC,
+                  algebraic: toAlgebraic(fromR, castleRookFromC),
+                  turn: 0,
+                  kind: 'SPAWN'
+                }
+              ];
+            }
+            castleRook.pathHistory.push({
+              r: fromR,
+              c: castleRookToC,
+              fromR,
+              fromC: castleRookFromC,
+              algebraic: toAlgebraic(fromR, castleRookToC),
+              turn: turnNumber,
+              kind: 'CASTLE'
+            });
             if (castleRook.mesh) {
               castleRook.mesh.position.copy(castleRookEndPos);
               castleRook.mesh.rotation.y = castleRook.color === 'w' ? Math.PI : 0;
@@ -5707,12 +7020,18 @@ export function initWizardChess() {
             const inheritedLvl = piece.level || 1;
             const inheritedCombo = piece.activeCombo ? { ...piece.activeCombo } : null;
             const inheritedArmor = piece.armor || 0;
+            const inheritedHistory = Array.isArray(piece.pathHistory)
+              ? piece.pathHistory.map((st) => ({ ...st }))
+              : [];
             scene.remove(piece.mesh);
             const promoted = instantiatePiece('queen', piece.color, toR, toC, inheritedLvl);
             promoted.hasMoved = true;
             promoted.activeCombo = inheritedCombo;
             promoted.armor = inheritedArmor;
             promoted.hp = Math.min(promoted.maxHp, piece.hp + 10);
+            if (inheritedHistory.length > 0) {
+              promoted.pathHistory = inheritedHistory;
+            }
             updateUnit3DBadge(promoted);
             boardState[toR][toC] = promoted;
             soundFX.playLevelUp();
@@ -5810,11 +7129,33 @@ export function initWizardChess() {
 
           if (combatSim.outcome === 'BREAKTHROUGH') {
             // Defender died, Attacker survived -> Attacker occupies (toR, toC)
+            // Guarantee dead Defender's 3D model is removed (or tracked as fallenKingPiece if King)
+            if (captured) {
+              if (captured.type === 'king') {
+                checkmateState.fallenKingPiece = captured;
+              } else {
+                removePieceMeshSafely(captured);
+              }
+            }
             boardState[fromR][fromC] = null;
             boardState[toR][toC] = piece;
             piece.r = toR;
             piece.c = toC;
             piece.hasMoved = true;
+            if (!Array.isArray(piece.pathHistory)) {
+              piece.pathHistory = [
+                { r: fromR, c: fromC, algebraic: toAlgebraic(fromR, fromC), turn: 0, kind: 'SPAWN' }
+              ];
+            }
+            piece.pathHistory.push({
+              r: toR,
+              c: toC,
+              fromR,
+              fromC,
+              algebraic: toAlgebraic(toR, toC),
+              turn: turnNumber,
+              kind: 'CAPTURE'
+            });
 
             if (piece.color === 'w') capturedByWhite += 1;
             else capturedByBlack += 1;
@@ -5853,10 +7194,16 @@ export function initWizardChess() {
             // Pawn Promotion after breakthrough onto back rank
             if (piece.type === 'pawn' && (toR === 0 || toR === 7)) {
               const inheritedLvl = piece.level || 1;
-              scene.remove(piece.mesh);
+              const inheritedHistory = Array.isArray(piece.pathHistory)
+                ? piece.pathHistory.map((st) => ({ ...st }))
+                : [];
+              removePieceMeshSafely(piece);
               const promoted = instantiatePiece('queen', piece.color, toR, toC, inheritedLvl);
               promoted.hasMoved = true;
               promoted.hp = Math.min(promoted.maxHp, piece.hp + 10);
+              if (inheritedHistory.length > 0) {
+                promoted.pathHistory = inheritedHistory;
+              }
               updateUnit3DBadge(promoted);
               boardState[toR][toC] = promoted;
             } else {
@@ -5868,7 +7215,7 @@ export function initWizardChess() {
 
             const bonusGold = awardKillGoldBounty(captured.type, piece.color, endPos);
             addCombatLog(
-              `⚔ ĐỘT PHÁ: ${atkName} hạ gục ${defName} (-${combatSim.totalHpLossDef} HP) sau khi nhận đòn đánh trả (-${combatSim.totalHpLossAtk} HP), nhận +${xpEarned} XP & +${bonusGold} 🪙 Vàng!`,
+              `⚔ ĐỘT PHÁ: ${atkName} hạ gục ${defName} (-${combatSim.totalHpLossDef} HP) sau khi nhận đòn đánh trả (-${combatSim.totalHpLossAtk} HP), nhận +${xpEarned} XP${bonusGold > 0 ? ` & +${bonusGold} 🪙 Vàng` : ''}!`,
               'kill'
             );
             lastAggressorInfo = {
@@ -5881,6 +7228,23 @@ export function initWizardChess() {
           } else if (combatSim.outcome === 'CLASH_REPEL') {
             // Both survived! Attacker returns to (fromR, fromC), Defender stays at (toR, toC)
             piece.hasMoved = true;
+            if (!Array.isArray(piece.pathHistory)) {
+              piece.pathHistory = [
+                { r: fromR, c: fromC, algebraic: toAlgebraic(fromR, fromC), turn: 0, kind: 'SPAWN' }
+              ];
+            }
+            piece.pathHistory.push({
+              r: fromR,
+              c: fromC,
+              fromR,
+              fromC,
+              targetR: toR,
+              targetC: toC,
+              targetAlgebraic: toAlgebraic(toR, toC),
+              algebraic: toAlgebraic(fromR, fromC),
+              turn: turnNumber,
+              kind: 'CLASH_REPEL'
+            });
             piece.mesh.position.copy(startPos);
             piece.mesh.rotation.y = piece.color === 'w' ? Math.PI : 0;
             playPieceClip(piece, 'Idle', true, 0.18);
@@ -5909,7 +7273,11 @@ export function initWizardChess() {
           } else if (combatSim.outcome === 'COUNTER_KILL') {
             // Attacker died to simultaneous counter-attack; Defender survived and holds (toR, toC)
             boardState[fromR][fromC] = null;
-            if (piece.mesh) scene.remove(piece.mesh);
+            if (piece.type === 'king') {
+              checkmateState.fallenKingPiece = piece;
+            } else {
+              removePieceMeshSafely(piece);
+            }
             if (captured.color === 'w') capturedByWhite += 1;
             else capturedByBlack += 1;
 
@@ -5924,7 +7292,7 @@ export function initWizardChess() {
 
             const bonusGold = awardKillGoldBounty(piece.type, captured.color, endPos);
             addCombatLog(
-              `💀 ĐÁNH TRẢ HẠ GỤC: ${defName} tự động đánh trả kết liễu ${atkName} (-${combatSim.totalHpLossAtk} HP), thưởng +${bonusGold} 🪙 Vàng!`,
+              `💀 ĐÁNH TRẢ HẠ GỤC: ${defName} tự động đánh trả kết liễu ${atkName} (-${combatSim.totalHpLossAtk} HP)${bonusGold > 0 ? `, thưởng +${bonusGold} 🪙 Vàng` : ''}!`,
               'danger'
             );
             lastAggressorInfo = null;
@@ -5932,8 +7300,10 @@ export function initWizardChess() {
             // Both Attacker and Defender died simultaneously! Both squares become empty.
             boardState[fromR][fromC] = null;
             boardState[toR][toC] = null;
-            if (piece.mesh) scene.remove(piece.mesh);
-            if (captured.mesh) scene.remove(captured.mesh);
+            if (piece.type === 'king') checkmateState.fallenKingPiece = piece;
+            else removePieceMeshSafely(piece);
+            if (captured.type === 'king') checkmateState.fallenKingPiece = captured;
+            else removePieceMeshSafely(captured);
             capturedByWhite += 1;
             capturedByBlack += 1;
 
@@ -6549,19 +7919,54 @@ export function initWizardChess() {
     const activeMoveTweens = [];
 
     // =========================================================================
-    // Single-Player Tactical AI (Poker Combo Evaluation + RPG Combat Scoring)
+    // Single-Player Tactical AI (Elo-Scaled Poker Combo + RPG Combat Scoring)
     // =========================================================================
-    function chooseSmartAIMove(color) {
+    function chooseSmartAIMove(color, candidateCombo = null) {
       const legalMoves = getAllLegalMoves(color);
       if (legalMoves.length === 0) return null;
+
+      const botProf = getBotDifficultyProfile();
+      const oppColor = color === 'w' ? 'b' : 'w';
+
+      // Precompute enemy pseudo-attack map for higher-Elo danger avoidance
+      let enemyDangerMap = null;
+      if (botProf.lookaheadRiskWeight > 0) {
+        enemyDangerMap = Array.from({ length: 8 }, () => Array(8).fill(0));
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const ep = boardState[r][c];
+            if (ep && ep.color === oppColor) {
+              const eMoves = getPseudoMovesForPiece(r, c, boardState);
+              const eAtk = Math.max(1, (ep.baseAtk || 4) + (ep.activeCombo?.atkBonus || 0));
+              for (const em of eMoves) {
+                enemyDangerMap[em.r][em.c] = Math.max(enemyDangerMap[em.r][em.c], eAtk);
+              }
+            }
+          }
+        }
+      }
 
       let bestScore = -Infinity;
       let bestCandidates = [];
 
       for (const m of legalMoves) {
         const piece = boardState[m.fromR][m.fromC];
+        if (!piece) continue;
         const target = boardState[m.toR][m.toC];
         let score = 0;
+
+        // Optionally simulate with pending Poker buff attached to this moving unit (for Lv.2+ Bots)
+        const savedCombo = piece.activeCombo;
+        const savedArmor = piece.armor;
+        const savedHp = piece.hp;
+        if (candidateCombo && !piece.activeCombo && botProf.level >= 2) {
+          piece.activeCombo = {
+            ...candidateCombo,
+            atkBonus: candidateCombo.atkBonus || 2
+          };
+          piece.armor = Math.min(getUnitArmorCap(piece), (piece.armor || 0) + (candidateCombo.armorBonus || 0));
+          piece.hp = Math.min(piece.maxHp || 20, (piece.hp || 10) + (candidateCombo.healInstant || 0));
+        }
 
         if (target) {
           // Evaluate actual Simultaneous RPG Combat outcome!
@@ -6570,19 +7975,23 @@ export function initWizardChess() {
             if (target.type === 'king' && sim.defHpAfter <= 0) {
               score += 50000; // Winning blow on enemy King!
             } else if (sim.outcome === 'BREAKTHROUGH') {
-              score += (PIECE_VALUES[target.type] || 150) * 1.35 + sim.totalHpLossDef * 12 - sim.totalHpLossAtk * 5;
+              score += (PIECE_VALUES[target.type] || 150) * 1.4 + sim.totalHpLossDef * 14 - sim.totalHpLossAtk * 5;
+              if (botProf.level >= 3 && target.hp < target.maxHp * 0.5) {
+                score += 140; // Ruthlessly finish off wounded player units at Gold+ Elo
+              }
             } else if (sim.outcome === 'CLASH_REPEL') {
               // Favor positive damage trades, especially chipping down the Enemy King or Queen
-              const tradeDelta = sim.totalHpLossDef * (target.type === 'king' ? 28 : 14) - sim.totalHpLossAtk * 11;
+              const tradeDelta =
+                sim.totalHpLossDef * (target.type === 'king' ? 32 : target.type === 'queen' ? 20 : 14) -
+                sim.totalHpLossAtk * (piece.type === 'king' ? 24 : 11);
               score += tradeDelta + 25;
             } else if (sim.outcome === 'MUTUAL_DESTRUCTION') {
-              score += ((PIECE_VALUES[target.type] || 100) - (PIECE_VALUES[piece.type] || 100)) * 1.1;
+              score += ((PIECE_VALUES[target.type] || 100) - (PIECE_VALUES[piece.type] || 100)) * 1.2;
             } else if (sim.outcome === 'COUNTER_KILL') {
-              score -= (PIECE_VALUES[piece.type] || 150) * 1.5;
+              score -= (PIECE_VALUES[piece.type] || 150) * (botProf.level >= 2 ? 2.2 : 1.1);
             }
 
             // Automatic Retaliation Priority (Phản Kích Tự Động):
-            // If an enemy piece just attacked us on the previous turn, strongly favor counter-attacking it!
             if (
               lastAggressorInfo &&
               lastAggressorInfo.attackerColor !== color &&
@@ -6600,16 +8009,83 @@ export function initWizardChess() {
           const centerDist = Math.abs(3.5 - m.toR) + Math.abs(3.5 - m.toC);
           score += (7 - centerDist) * 7;
           if (piece.type === 'pawn') {
-            const advance = color === 'w' ? (6 - m.toR) : (m.toR - 1);
+            const advance = color === 'w' ? 6 - m.toR : m.toR - 1;
             score += advance * 11;
           }
           if (piece.activeCombo) {
-            // Empowered pieces want to advance into striking range
-            score += 18;
+            score += 24;
+          }
+          // Gold+ Elo Bots evaluate Sanctum Tile Modifiers (Consecrated +1⚔/+1🛡 vs Corrupted -1⚔/-1🛡)
+          if (botProf.level >= 3) {
+            const destTileMod = getBoardTileModifier(m.toR, m.toC);
+            if (destTileMod?.id === 'CONSECRATED') score += 55;
+            else if (destTileMod?.id === 'CORRUPTED') score -= 45;
           }
         }
 
-        score += (Math.random() - 0.5) * 14;
+        // Restore temporary simulation state
+        piece.activeCombo = savedCombo;
+        piece.armor = savedArmor;
+        piece.hp = savedHp;
+
+        // Higher-Elo Lookahead: avoid walking valuable units (King/Queen/Rook) into lethal enemy fire on empty squares
+        if (enemyDangerMap && !target) {
+          const incomingThreat = enemyDangerMap[m.toR][m.toC] || 0;
+          if (incomingThreat > 0) {
+            const unitValWeight = piece.type === 'king' ? 6.5 : piece.type === 'queen' ? 4.2 : piece.type === 'rook' ? 2.5 : 1.0;
+            const currentThreat = enemyDangerMap[m.fromR][m.fromC] || 0;
+            if (incomingThreat > currentThreat) {
+              score -= incomingThreat * unitValWeight * 4.5 * botProf.lookaheadRiskWeight;
+            }
+          } else if (enemyDangerMap[m.fromR][m.fromC] > 0 && (piece.type === 'king' || piece.type === 'queen')) {
+            // Bonus for evacuating a threatened King/Queen to safety!
+            score += enemyDangerMap[m.fromR][m.fromC] * 18 * botProf.lookaheadRiskWeight;
+          }
+        }
+
+        score += (Math.random() - 0.5) * botProf.noise;
+
+        // =====================================================================
+        // Tactical Tile Ping AI Coordination Weighting
+        // =====================================================================
+        if (activeTacticalPings.length > 0) {
+          for (const ping of activeTacticalPings) {
+            const distBefore = Math.abs(ping.r - m.fromR) + Math.abs(ping.c - m.fromC);
+            const distAfter = Math.abs(ping.r - m.toR) + Math.abs(ping.c - m.toC);
+
+            if (ping.intent === 'ATTACK') {
+              if (m.toR === ping.r && m.toC === ping.c) {
+                score += 1150;
+              } else if (distAfter < distBefore) {
+                score += (distBefore - distAfter) * 85;
+              }
+            } else if (ping.intent === 'MOVE') {
+              if (m.toR === ping.r && m.toC === ping.c) {
+                score += 980;
+              } else if (distAfter < distBefore) {
+                score += (distBefore - distAfter) * 70;
+              }
+            } else if (ping.intent === 'DEFEND') {
+              const pingedUnit = boardState[ping.r]?.[ping.c];
+              if (pingedUnit && pingedUnit.color === color) {
+                if (m.fromR === ping.r && m.fromC === ping.c && !target) {
+                  score -= 320;
+                }
+                if (target && Math.abs(m.toR - ping.r) <= 2 && Math.abs(m.toC - ping.c) <= 2) {
+                  score += 640;
+                }
+              } else if (m.toR === ping.r && m.toC === ping.c) {
+                score += 820;
+              } else if (Math.abs(m.toR - ping.r) <= 1 && Math.abs(m.toC - ping.c) <= 1) {
+                score += 240;
+              }
+            } else if (ping.intent === 'BUFF') {
+              if (m.fromR === ping.r && m.fromC === ping.c) {
+                score += 520;
+              }
+            }
+          }
+        }
 
         if (score > bestScore + 1) {
           bestScore = score;
@@ -6625,28 +8101,53 @@ export function initWizardChess() {
     function triggerAIMoveNow() {
       if (isAnimatingMove || gameOver) return false;
 
-      // Clear any pending script pre-highlight so Auto Move can act immediately
       if (preMoveHighlightTask) {
         preMoveHighlightTask = null;
       }
+
+      const botProf = getBotDifficultyProfile();
 
       // 1. AI executes Step 1 (Bốc Bài) -> Step 2 (Kích Hoạt Phép) -> Step 3 (Gắn Buff) -> Step 4 (Đi Quân & Combat)
       const aiDeck = pokerDecks[currentTurn];
       if (aiDeck && turnPhase === 'DRAW_PHASE') {
         drawUpToSevenCards(aiDeck, true);
+        // Higher Elo Bots (Lv.3+) can mulligan 1-3 weakest singleton cards to craft stronger Poker combos!
+        if (botProf.mulliganDraws > 0 && aiDeck.drawPile && aiDeck.drawPile.length >= botProf.mulliganDraws) {
+          const rankCounts = {};
+          for (const c of aiDeck.hand) {
+            if (c) rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1;
+          }
+          const singletons = aiDeck.hand
+            .map((c, idx) => ({ c, idx, count: c ? rankCounts[c.rank] || 1 : 99 }))
+            .filter((item) => item.c && item.count === 1)
+            .sort((a, b) => (a.c.rank || 2) - (b.c.rank || 2));
+          const swaps = Math.min(botProf.mulliganDraws, singletons.length);
+          for (let s = 0; s < swaps; s++) {
+            const replaceIdx = singletons[s].idx;
+            const replacement = aiDeck.drawPile.pop();
+            if (replacement) {
+              aiDeck.discardPile.push(aiDeck.hand[replaceIdx]);
+              aiDeck.hand[replaceIdx] = replacement;
+            }
+          }
+        }
         turnPhase = 'SELECT_CARDS';
       }
       if (aiDeck && turnPhase === 'SELECT_CARDS') {
-        const best = findBest5Of7(aiDeck.hand);
-        aiDeck.selectedIndices = best.indices;
+        if (Math.random() <= botProf.comboSmartPct) {
+          const best = findBest5Of7(aiDeck.hand);
+          aiDeck.selectedIndices = best.indices;
+        } else {
+          // Bronze Bot occasionally picks the first 5 cards casually
+          aiDeck.selectedIndices = [0, 1, 2, 3, 4].filter((i) => i < aiDeck.hand.length);
+        }
         commitSelected5CardCombo();
         if (gameOver) return true;
       }
       if (turnPhase === 'ULTIMATE_TARGETING') {
         confirmFourKingsUltimate();
         if (gameOver) return true;
-        // Wait briefly for the 8 lightning strikes to clear before executing the move
-        setTimeout(() => {
+        scheduleBoardTimeout(() => {
           if (!gameOver && !isAnimatingMove) {
             const postUltMove = chooseSmartAIMove(currentTurn);
             if (postUltMove) {
@@ -6662,16 +8163,37 @@ export function initWizardChess() {
         return true;
       }
 
-      // 2. Pick best RPG move and attach the Hearthstone Buff to the attacking/moving unit
-      const chosen = chooseSmartAIMove(currentTurn);
+      // 2. Pick best RPG move (evaluating the pending Poker Buff on candidate units) and attach the Buff visually
+      const chosen = chooseSmartAIMove(currentTurn, pendingComboEval);
       if (!chosen) {
         return handleTurnTimeout();
       }
-      if (turnPhase === 'EMPOWER_UNIT' && pendingComboEval) {
-        const unitToBuff = boardState[chosen.fromR]?.[chosen.fromC];
-        if (unitToBuff) {
-          applyComboEmpowermentToUnit(unitToBuff, pendingComboEval, boardState, turnNumber);
-          lastEmpoweredSquare = { r: chosen.fromR, c: chosen.fromC };
+      if (turnPhase === 'EMPOWER_UNIT') {
+        let buffCoords = { r: chosen.fromR, c: chosen.fromC };
+        const buffPing = activeTacticalPings.find(
+          (p) =>
+            (p.intent === 'BUFF' || p.intent === 'DEFEND') &&
+            boardState[p.r]?.[p.c]?.color === currentTurn
+        );
+        if (buffPing) {
+          buffCoords = { r: buffPing.r, c: buffPing.c };
+          if (buffPing.intent === 'BUFF') {
+            removeTacticalPingAt(buffPing.r, buffPing.c, false);
+          }
+        }
+        const unitToBuff = boardState[buffCoords.r]?.[buffCoords.c];
+        if (unitToBuff && pendingComboEval) {
+          const appliedCombo = pendingComboEval;
+          const res = applyComboEmpowermentToUnit(unitToBuff, appliedCombo, boardState, turnNumber);
+          const wPos = boardToWorld(buffCoords.r, buffCoords.c);
+          spawnDivineLightningBeam(wPos, appliedCombo.ringColor || 0xf5d76e, 0.065);
+          spawnFloatingCombatText(
+            wPos,
+            `🤖 ${appliedCombo.name.toUpperCase()}: +${res.atkBonus}⚔${res.armorBonus > 0 ? ` +${res.armorBonus}🛡` : ''}`,
+            appliedCombo.colorHex || '#f5d76e',
+            0.88
+          );
+          lastEmpoweredSquare = { r: buffCoords.r, c: buffCoords.c };
           pendingComboEval = null;
           turnPhase = 'MOVE_OR_COMBAT';
           updateUnit3DBadge(unitToBuff);
@@ -6685,7 +8207,6 @@ export function initWizardChess() {
         skipAutoPoker: true
       });
       if (!moved) {
-        // Fallback: If chosen move failed execution, try any remaining legal moves on board
         const allLegal = getAllLegalMoves(currentTurn);
         for (const fb of allLegal) {
           if (fb.fromR === chosen.fromR && fb.fromC === chosen.fromC && fb.toR === chosen.toR && fb.toC === chosen.toC) continue;
@@ -6700,7 +8221,6 @@ export function initWizardChess() {
         }
       }
       if (!moved) {
-        // Failsafe: if all legal moves failed or none exist, safely end turn rather than hang
         return handleTurnTimeout();
       }
       return moved;
@@ -6712,59 +8232,32 @@ export function initWizardChess() {
         aiTimer = null;
       }
       if (gameOver || isAnimatingMove) return;
-      if (!autoMoveEnabled && (scriptedGameActive || preMoveHighlightTask)) return;
-      if (!autoMoveEnabled && (gameMode !== 'single' || !aiAutoPlay)) return;
+      if (scriptedGameActive || preMoveHighlightTask) return;
+      if (gameMode !== 'single' || !aiAutoPlay) return;
 
       const aiColor = playerColor === 'w' ? 'b' : 'w';
-      const shouldAutoAct = autoMoveEnabled || currentTurn === aiColor;
-      if (shouldAutoAct) {
+      if (currentTurn === aiColor) {
+        const botProf = getBotDifficultyProfile();
         aiTimer = setTimeout(() => {
           aiTimer = null;
           if (
-            (autoMoveEnabled || (!scriptedGameActive && gameMode === 'single' && currentTurn === aiColor)) &&
+            !scriptedGameActive &&
+            gameMode === 'single' &&
+            currentTurn === aiColor &&
             !isAnimatingMove &&
             !gameOver
           ) {
             triggerAIMoveNow();
           }
-        }, autoMoveEnabled ? 420 : 540);
+        }, botProf.thinkDelayMs || 520);
       }
     }
 
-    function toggleAutoMove(forceState) {
-      if (typeof forceState === 'boolean') {
-        autoMoveEnabled = forceState;
-      } else {
-        autoMoveEnabled = !autoMoveEnabled;
-      }
-      soundFX.playUIClick();
-
-      const aiMoveBtn = document.getElementById('btn-ai-move');
-      if (aiMoveBtn) {
-        aiMoveBtn.textContent = autoMoveEnabled ? '⚡ Auto Move: BẬT' : '🤖 Auto Move: TẮT';
-        aiMoveBtn.classList.toggle('active', autoMoveEnabled);
-      }
-
-      if (autoMoveEnabled) {
-        scriptedGameActive = false;
-        preMoveHighlightTask = null;
-        addCombatLog('⚡ Đã BẬT chế độ Auto Move — Tự động bốc bài, gắn Buff & giao tranh liên tục!', 'gold');
-        emitPokerChessSync();
-        if (!isAnimatingMove && !gameOver) {
-          triggerAIMoveNow();
-        } else {
-          maybeScheduleAIMove();
-        }
-      } else {
-        if (aiTimer) {
-          clearTimeout(aiTimer);
-          aiTimer = null;
-        }
-        addCombatLog('✋ Đã TẮT chế độ Auto Move — Bạn trực tiếp điều khiển lượt của mình.', 'info');
-        emitPokerChessSync();
-        maybeScheduleAIMove();
-      }
-      return autoMoveEnabled;
+    function toggleAutoMove() {
+      // Production Fair-Play Lock: Player Auto-Move is disabled so players play their own turn to earn Elo & Gold
+      autoMoveEnabled = false;
+      emitPokerChessSync();
+      return false;
     }
 
     // =========================================================================
@@ -7269,6 +8762,22 @@ export function initWizardChess() {
       if (e.code === 'KeyH' || e.code === 'KeyU') {
         e.preventDefault();
         toggleUI();
+        return;
+      }
+
+      if (e.code === 'KeyG' || e.code === 'KeyV') {
+        e.preventDefault();
+        if (hoveredSquare) {
+          pingBoardSquare(hoveredSquare.r, hoveredSquare.c, selectedPingIntent);
+        } else {
+          toggleTacticalPingMode();
+        }
+        return;
+      }
+
+      if (e.code === 'Escape' && tacticalPingMode) {
+        e.preventDefault();
+        toggleTacticalPingMode(false);
       }
     });
 
@@ -7564,21 +9073,24 @@ export function initWizardChess() {
       soundFX.stopLowTimeTickingLoop(true);
       const actualWinner = winnerColor || (defeatedColor === 'w' ? 'b' : 'w');
 
-      // Find the defeated King on the board
-      let kingPiece = null;
-      let kingR = -1;
-      let kingC = -1;
-      for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-          const p = boardState[r][c];
-          if (p && p.type === 'king' && p.color === defeatedColor) {
-            kingPiece = p;
-            kingR = r;
-            kingC = c;
-            break;
+      // Find the defeated King on the board (or use checkmateState.fallenKingPiece if overwritten by attacker)
+      let kingPiece = checkmateState.fallenKingPiece || null;
+      let kingR = kingPiece ? kingPiece.r : -1;
+      let kingC = kingPiece ? kingPiece.c : -1;
+      if (!kingPiece) {
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const p = boardState[r][c];
+            if (p && p.type === 'king' && p.color === defeatedColor) {
+              kingPiece = p;
+              kingR = r;
+              kingC = c;
+              break;
+            }
           }
         }
       }
+      checkmateState.fallenKingPiece = kingPiece;
 
       checkmateState.active = true;
       checkmateState.defeatedColor = defeatedColor;
@@ -7912,7 +9424,10 @@ export function initWizardChess() {
             : p.hp / Math.max(1, p.maxHp) <= 0.5
               ? 'BATTLE_WORN'
               : 'PRISTINE',
-        shieldShattered: Boolean(p.hp > 0 && p.hp / Math.max(1, p.maxHp) < 0.2)
+        shieldShattered: Boolean(p.hp > 0 && p.hp / Math.max(1, p.maxHp) < 0.2),
+        pathHistory: Array.isArray(p.pathHistory)
+          ? p.pathHistory.map((st) => ({ ...st }))
+          : [{ r, c, algebraic: toAlgebraic(r, c), turn: 0, kind: 'SPAWN' }]
       };
     }
 
@@ -8135,6 +9650,53 @@ export function initWizardChess() {
         inspectedUnit,
         hoveredTileModifier,
         combatForecast,
+        unitPathing: (() => {
+          const subject = getActivePathingSubjectUnit();
+          if (!subject) {
+            return {
+              displayMode: pathingDisplayMode,
+              subjectUnit: null,
+              originSquare: null,
+              pathHistory: [],
+              intendedTrajectory: null
+            };
+          }
+          const hist = Array.isArray(subject.pathHistory)
+            ? subject.pathHistory.map((st) => ({ ...st }))
+            : [
+                {
+                  r: subject.r,
+                  c: subject.c,
+                  algebraic: toAlgebraic(subject.r, subject.c),
+                  turn: 0,
+                  kind: 'SPAWN'
+                }
+              ];
+          const traj = getActiveIntendedTrajectoryInfo(subject);
+          return {
+            displayMode: pathingDisplayMode,
+            subjectUnit: serializeUnitForUI(subject, subject.r, subject.c),
+            originSquare: hist[0] || null,
+            pathHistory: hist,
+            intendedTrajectory: traj
+              ? {
+                  fromR: traj.fromR,
+                  fromC: traj.fromC,
+                  fromAlgebraic: traj.fromAlgebraic,
+                  toR: traj.toR,
+                  toC: traj.toC,
+                  toAlgebraic: traj.toAlgebraic,
+                  isCapture: traj.isCapture,
+                  isCastle: traj.isCastle,
+                  castleSide: traj.castleSide,
+                  isKnightJump: traj.isKnightJump,
+                  isHoveredTarget: Boolean(traj.isHoveredTarget),
+                  distance: traj.distance,
+                  waypoints: traj.waypoints
+                }
+              : null
+          };
+        })(),
         combatLogs: (combatLogFeed || [])
           .slice(0, 8)
           .map((item) => (typeof item === 'string' ? item : item.text)),
@@ -8145,10 +9707,26 @@ export function initWizardChess() {
         sfxMuted: soundFX.isMuted(),
         autoMoveEnabled,
         activeCombatBanner,
+        tacticalPingMode,
+        selectedPingIntent,
+        activeTacticalPings: activeTacticalPings.map((p) => ({
+          id: p.id,
+          r: p.r,
+          c: p.c,
+          algebraic: p.algebraic,
+          intent: p.intent,
+          label: p.label,
+          shortLabel: p.shortLabel,
+          icon: p.icon,
+          colorHex: p.colorHex,
+          unitDesc: p.unitDesc,
+          remainingSec: Math.max(1, Math.ceil(p.life))
+        })),
         commercial: {
-          elo: commercialProfile.elo || 1050,
-          peakElo: Math.max(commercialProfile.elo || 1050, commercialProfile.peakElo || 1050),
-          gold: commercialProfile.gold ?? 650,
+          publishMode: true,
+          elo: commercialProfile.elo || 1000,
+          peakElo: Math.max(commercialProfile.elo || 1000, commercialProfile.peakElo || 1000),
+          gold: commercialProfile.gold ?? 0,
           wins: commercialProfile.wins || 0,
           losses: commercialProfile.losses || 0,
           winStreak: commercialProfile.winStreak || 0,
@@ -8158,10 +9736,11 @@ export function initWizardChess() {
           previewSkinId: commercialProfile.previewSkinId || null,
           lastMatchDelta: commercialProfile.lastMatchDelta || null,
           matchHistory: commercialProfile.matchHistory || [],
-          rankInfo: getEloRankInfo(commercialProfile.elo || 1050),
+          rankInfo: getEloRankInfo(commercialProfile.elo || 1000),
           peakRankInfo: getEloRankInfo(
-            Math.max(commercialProfile.elo || 1050, commercialProfile.peakElo || 1050)
+            Math.max(commercialProfile.elo || 1000, commercialProfile.peakElo || 1000)
           ),
+          botDifficulty: getBotDifficultyProfile(commercialProfile.elo || 1000),
           skinsCatalog: CHESS_SKIN_CATALOG,
           rankTiers: ELO_RANK_TIERS
         },
@@ -8285,17 +9864,46 @@ export function initWizardChess() {
       return executeFourKingsDivineJudgment([...ultimateTargetSquares]);
     }
 
+    function findBestMovableFriendlyUnit(sideColor = currentTurn) {
+      // Prefer empowered unit if it has legal moves
+      if (lastEmpoweredSquare) {
+        const empP = boardState[lastEmpoweredSquare.r]?.[lastEmpoweredSquare.c];
+        if (empP && empP.color === sideColor) {
+          const empMoves = getLegalMovesForPiece(lastEmpoweredSquare.r, lastEmpoweredSquare.c);
+          if (empMoves && empMoves.length > 0) {
+            return { r: lastEmpoweredSquare.r, c: lastEmpoweredSquare.c, piece: empP, moves: empMoves };
+          }
+        }
+      }
+      // Prefer units that have captures first, then Knights / Center Pawns / Queen with legal moves
+      const candidates = [];
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const p = boardState[r][c];
+          if (!p || p.color !== sideColor) continue;
+          const moves = getLegalMovesForPiece(r, c);
+          if (!moves || moves.length === 0) continue;
+          const hasCap = moves.some((m) => m.capture);
+          const isCenterPawn = p.type === 'pawn' && (c === 4 || c === 3);
+          const isKnight = p.type === 'knight';
+          const score =
+            (hasCap ? 1000 : 0) +
+            (isCenterPawn ? 320 : 0) +
+            (isKnight ? 300 : 0) +
+            (PIECE_VALUES[p.type] || 100) * 0.25;
+          candidates.push({ r, c, piece: p, moves, score });
+        }
+      }
+      candidates.sort((a, b) => b.score - a.score);
+      return candidates[0] || null;
+    }
+
     function skipEmpowerPhase() {
       if (gameOver || isAnimatingMove) return false;
-      // In Hearthstone mode, if player clicks quick-buff on Empower Banner, auto-buff highest value friendly unit (or King)
       if (turnPhase === 'EMPOWER_UNIT' && pendingComboEval) {
-        for (let r = 0; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            const p = boardState[r][c];
-            if (p && p.color === currentTurn && p.type === 'queen') {
-              return empowerFriendlyUnitAt(r, c);
-            }
-          }
+        const bestMovable = findBestMovableFriendlyUnit(currentTurn);
+        if (bestMovable) {
+          return empowerFriendlyUnitAt(bestMovable.r, bestMovable.c);
         }
         for (let r = 0; r < 8; r++) {
           for (let c = 0; c < 8; c++) {
@@ -8313,18 +9921,9 @@ export function initWizardChess() {
       return true;
     }
 
-    function triggerPresetHand(presetKey) {
-      if (gameOver || isAnimatingMove) return false;
-      const targetColor = gameMode === 'single' ? playerColor : currentTurn;
-      injectPresetHand(pokerDecks[targetColor], presetKey);
-      if (currentTurn === targetColor) {
-        turnPhase = 'SELECT_CARDS';
-        pendingComboEval = null;
-        clearSquareHighlights();
-      }
-      soundFX.playCardDraw();
-      updateTurnUI();
-      return true;
+    function triggerPresetHand() {
+      // Production Publish Lock: Preset Poker Hands (+ Bài mẫu) are disabled in Publish Mode
+      return false;
     }
 
     function updateTurnUI() {
@@ -8401,7 +10000,7 @@ export function initWizardChess() {
         modeBadge.textContent = `Playing as ${playerColor === 'w' ? 'White' : 'Black'}`;
       }
       if (btnAiMove) {
-        btnAiMove.style.display = 'inline-flex';
+        btnAiMove.style.display = 'none';
       }
       if (btnSideToggle) {
         btnSideToggle.style.display = 'inline-flex';
@@ -8441,18 +10040,18 @@ export function initWizardChess() {
 
       raycaster.setFromCamera(pointer, camera);
 
-      // 1. Fast analytical cylinder intersection against standing chess pieces (avoids expensive SkinnedMesh triangle raycasting)
+      // 1. Fast analytical cylinder intersection against standing chess pieces (generous radius so clicking piece body/head is effortless)
       let bestDist = Infinity;
       let bestSquare = null;
-      const pieceRadiusSq = 0.145 * 0.145;
+      const pieceRadiusSq = 0.172 * 0.172;
 
       for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
           const p = boardState[r][c];
           if (!p || !p.mesh) continue;
           const pos = p.mesh.position;
-          const h = PIECE_HEIGHTS[p.type] || 0.48;
-          raySegStart.set(pos.x, BOARD_SURFACE_Y + 0.04, pos.z);
+          const h = (PIECE_HEIGHTS[p.type] || 0.48) + 0.06;
+          raySegStart.set(pos.x, BOARD_SURFACE_Y + 0.02, pos.z);
           raySegEnd.set(pos.x, BOARD_SURFACE_Y + h, pos.z);
           const distSq = raycaster.ray.distanceSqToSegment(
             raySegStart,
@@ -8461,7 +10060,10 @@ export function initWizardChess() {
             null
           );
           if (distSq <= pieceRadiusSq) {
-            const camDist = rayClosestPt.distanceTo(raycaster.ray.origin);
+            // During EMPOWER_UNIT, prioritize friendly pieces if ray passes through multiple pieces
+            const camDist =
+              rayClosestPt.distanceTo(raycaster.ray.origin) -
+              (turnPhase === 'EMPOWER_UNIT' && p.color === currentTurn ? 0.18 : 0);
             if (camDist < bestDist) {
               bestDist = camDist;
               bestSquare = { r, c };
@@ -8471,11 +10073,57 @@ export function initWizardChess() {
       }
 
       // 2. Intersect the 64 low-poly board tile boxes (12 triangles each)
+      // CRITICAL: Never let an empty background floor tile behind a 3D piece overwrite a direct piece hit!
       const tileHits = raycaster.intersectObjects(boardSquareMeshes, false);
       if (tileHits.length > 0) {
         const hit = tileHits[0];
-        if (hit.distance < bestDist + 0.06 && hit.object?.userData?.isSquare) {
-          bestSquare = { r: hit.object.userData.r, c: hit.object.userData.c };
+        if (hit.object?.userData?.isSquare) {
+          const tileR = hit.object.userData.r;
+          const tileC = hit.object.userData.c;
+          const tilePiece = boardState[tileR]?.[tileC];
+          if (!bestSquare) {
+            bestSquare = { r: tileR, c: tileC };
+          } else if (turnPhase === 'EMPOWER_UNIT') {
+            const curBestPiece = boardState[bestSquare.r]?.[bestSquare.c];
+            if (
+              (!curBestPiece || curBestPiece.color !== currentTurn) &&
+              tilePiece &&
+              tilePiece.color === currentTurn
+            ) {
+              bestSquare = { r: tileR, c: tileC };
+            }
+          } else if (hit.distance < bestDist - 0.14 && tilePiece) {
+            bestSquare = { r: tileR, c: tileC };
+          }
+        }
+      }
+
+      // 3. In EMPOWER_UNIT, if the click landed slightly off a piece onto an empty/enemy square, snap to the nearest friendly piece within 48px on screen
+      if (turnPhase === 'EMPOWER_UNIT') {
+        const pickedPiece = bestSquare ? boardState[bestSquare.r]?.[bestSquare.c] : null;
+        if (!pickedPiece || pickedPiece.color !== currentTurn) {
+          let closestScreenDist = 48;
+          let snapSquare = null;
+          const projVec = new THREE.Vector3();
+          for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+              const p = boardState[r][c];
+              if (!p || p.color !== currentTurn) continue;
+              projVec.copy(boardToWorld(r, c));
+              projVec.y += (PIECE_HEIGHTS[p.type] || 0.45) * 0.5;
+              projVec.project(camera);
+              const sx = rect.left + (projVec.x * 0.5 + 0.5) * rect.width;
+              const sy = rect.top + (-projVec.y * 0.5 + 0.5) * rect.height;
+              const dPx = Math.hypot(clientX - sx, clientY - sy);
+              if (dPx < closestScreenDist) {
+                closestScreenDist = dPx;
+                snapSquare = { r, c };
+              }
+            }
+          }
+          if (snapSquare) {
+            bestSquare = snapSquare;
+          }
         }
       }
 
@@ -8505,6 +10153,7 @@ export function initWizardChess() {
             soundFX.playSquareTarget(Boolean(hoveredLegal.capture));
           }
         }
+        rebuildUnitPathing3D();
         if (prevPiece || nextPiece || selectedSquare) {
           emitPokerChessSync();
         }
@@ -8543,6 +10192,12 @@ export function initWizardChess() {
       }
 
       const { r: clickedR, c: clickedC } = sq;
+
+      // 0. Tactical Tile Ping Trigger: Alt+Click, Shift+Click, Middle-Click, or when Ping Mode is active
+      if (e.altKey || e.shiftKey || e.button === 1 || tacticalPingMode) {
+        pingBoardSquare(clickedR, clickedC, selectedPingIntent);
+        return;
+      }
 
       // Cancel any pending scripted pre-move highlight timer when the user manually interacts with the board
       if (preMoveHighlightTask) {
@@ -9431,6 +11086,23 @@ export function initWizardChess() {
         if (!move) return false;
         return executeChessMove(selectedSquare.r, selectedSquare.c, move.r, move.c);
       },
+      pingSquare: (r, c, intent = selectedPingIntent) => pingBoardSquare(r, c, intent),
+      removeTacticalPingAt: (r, c) => removeTacticalPingAt(r, c, true),
+      clearTacticalPings: () => clearAllTacticalPings(true),
+      toggleTacticalPingMode: (forceState = null) => toggleTacticalPingMode(forceState),
+      setTacticalPingIntent: (intentId) => setTacticalPingIntent(intentId),
+      getTacticalPings: () =>
+        activeTacticalPings.map((p) => ({
+          id: p.id,
+          r: p.r,
+          c: p.c,
+          algebraic: p.algebraic,
+          intent: p.intent,
+          label: p.label,
+          icon: p.icon,
+          colorHex: p.colorHex,
+          remainingSec: Math.max(0, Number(p.life.toFixed(1)))
+        })),
       setTurnTimeRemaining: (sec) => {
         turnTimeRemaining = Math.max(0, Math.min(TURN_TIME_LIMIT, Number(sec) || 0));
         lastSyncedTurnSecond = Math.ceil(turnTimeRemaining);
@@ -9447,6 +11119,131 @@ export function initWizardChess() {
         return turnTimeRemaining;
       },
       getPokerChessUIState,
+      getTutorial3DTargetScreenPos: () => {
+        if (gameOver || isAnimatingMove || !renderer?.domElement || !camera) return null;
+        const projectSq = (r, c, yLift = 0.28) => {
+          const wPos = boardToWorld(r, c).clone();
+          wPos.y += yLift;
+          wPos.project(camera);
+          const rect = renderer.domElement.getBoundingClientRect();
+          const x = Math.round(rect.left + (wPos.x * 0.5 + 0.5) * rect.width);
+          const y = Math.round(rect.top + (-wPos.y * 0.5 + 0.5) * rect.height);
+          return { x, y };
+        };
+
+        const bestUnit = findBestMovableFriendlyUnit(currentTurn);
+        if (turnPhase === 'EMPOWER_UNIT' && bestUnit) {
+          const pt = projectSq(bestUnit.r, bestUnit.c, 0.36);
+          return {
+            stepType: 'EMPOWER_3D_UNIT',
+            x: pt.x,
+            y: pt.y,
+            r: bestUnit.r,
+            c: bestUnit.c,
+            algebraic: toAlgebraic(bestUnit.r, bestUnit.c),
+            unitNameVi: PIECE_NAMES_VI[bestUnit.piece.type] || bestUnit.piece.type,
+            unitIcon: UNIT_BASE_STATS[bestUnit.piece.type]?.icon || '♟'
+          };
+        }
+
+        if (turnPhase === 'MOVE_OR_COMBAT') {
+          if (!selectedSquare || !validMoves || validMoves.length === 0) {
+            if (!bestUnit) return null;
+            const pt = projectSq(bestUnit.r, bestUnit.c, 0.36);
+            return {
+              stepType: 'SELECT_3D_UNIT',
+              x: pt.x,
+              y: pt.y,
+              r: bestUnit.r,
+              c: bestUnit.c,
+              algebraic: toAlgebraic(bestUnit.r, bestUnit.c),
+              unitNameVi: PIECE_NAMES_VI[bestUnit.piece.type] || bestUnit.piece.type,
+              unitIcon: UNIT_BASE_STATS[bestUnit.piece.type]?.icon || '♟'
+            };
+          }
+
+          // A friendly unit is already selected and has validMoves: pick the best destination square!
+          const sortedMoves = [...validMoves].sort((a, b) => {
+            const capDiff = (b.capture ? 100 : 0) - (a.capture ? 100 : 0);
+            if (capDiff !== 0) return capDiff;
+            const aCenter = a.r >= 2 && a.r <= 5 && a.c >= 2 && a.c <= 5 ? 25 : 0;
+            const bCenter = b.r >= 2 && b.r <= 5 && b.c >= 2 && b.c <= 5 ? 25 : 0;
+            const aAdv = currentTurn === 'w' ? 7 - a.r : a.r;
+            const bAdv = currentTurn === 'w' ? 7 - b.r : b.r;
+            return bCenter + bAdv * 4 - (aCenter + aAdv * 4);
+          });
+          const bestMove = sortedMoves[0];
+          if (!bestMove) return null;
+          const pt = projectSq(bestMove.r, bestMove.c, bestMove.capture ? 0.3 : 0.08);
+          const selP = boardState[selectedSquare.r]?.[selectedSquare.c];
+          return {
+            stepType: 'CLICK_3D_DEST',
+            x: pt.x,
+            y: pt.y,
+            r: bestMove.r,
+            c: bestMove.c,
+            fromR: selectedSquare.r,
+            fromC: selectedSquare.c,
+            algebraic: toAlgebraic(bestMove.r, bestMove.c),
+            fromAlgebraic: toAlgebraic(selectedSquare.r, selectedSquare.c),
+            unitNameVi: selP ? PIECE_NAMES_VI[selP.type] || selP.type : 'Quân cờ',
+            unitIcon: selP ? UNIT_BASE_STATS[selP.type]?.icon || '♟' : '♟',
+            isCapture: Boolean(bestMove.capture)
+          };
+        }
+
+        return null;
+      },
+      triggerTutorialStepAction: () => {
+        if (gameOver || isAnimatingMove || currentTurn !== playerColor) return false;
+        if (turnPhase === 'DRAW_PHASE') {
+          return drawTurnCards();
+        }
+        if (turnPhase === 'SELECT_CARDS') {
+          const pState = pokerDecks[currentTurn];
+          if (!pState || (pState.selectedIndices || []).length < 5) {
+            autoSelectBest5Cards();
+            return true;
+          }
+          return Boolean(commitSelected5CardCombo());
+        }
+        if (turnPhase === 'EMPOWER_UNIT') {
+          const bestUnit = findBestMovableFriendlyUnit(currentTurn);
+          if (bestUnit) {
+            return empowerFriendlyUnitAt(bestUnit.r, bestUnit.c);
+          }
+          return skipEmpowerPhase();
+        }
+        if (turnPhase === 'ULTIMATE_TARGETING') {
+          return confirmFourKingsUltimate();
+        }
+        if (turnPhase === 'MOVE_OR_COMBAT') {
+          if (!selectedSquare || !validMoves || validMoves.length === 0) {
+            const bestUnit = findBestMovableFriendlyUnit(currentTurn);
+            if (!bestUnit) return false;
+            selectedSquare = { r: bestUnit.r, c: bestUnit.c };
+            validMoves = bestUnit.moves;
+            showSquareHighlights(bestUnit.r, bestUnit.c, validMoves);
+            soundFX.playPieceSelect(bestUnit.piece.type);
+            emitPokerChessSync();
+            return true;
+          }
+          const sortedMoves = [...validMoves].sort((a, b) => {
+            const capDiff = (b.capture ? 100 : 0) - (a.capture ? 100 : 0);
+            if (capDiff !== 0) return capDiff;
+            const aCenter = a.r >= 2 && a.r <= 5 && a.c >= 2 && a.c <= 5 ? 25 : 0;
+            const bCenter = b.r >= 2 && b.r <= 5 && b.c >= 2 && b.c <= 5 ? 25 : 0;
+            const aAdv = currentTurn === 'w' ? 7 - a.r : a.r;
+            const bAdv = currentTurn === 'w' ? 7 - b.r : b.r;
+            return bCenter + bAdv * 4 - (aCenter + aAdv * 4);
+          });
+          const bestMove = sortedMoves[0];
+          if (bestMove) {
+            return executeChessMove(selectedSquare.r, selectedSquare.c, bestMove.r, bestMove.c);
+          }
+        }
+        return false;
+      },
       testColumnCollisionSlide: (startArr, endArr, steps = 20) => {
         activeCamTransition = null;
         camera.position.set(startArr[0], startArr[1], startArr[2]);
@@ -9784,8 +11581,14 @@ export function initWizardChess() {
         if (turnTimeRemaining <= 0) {
           handleTurnTimeout();
         }
-        // Self-healing Auto Move watchdog: if Auto Move is active and no animation or timer is pending, schedule next move
-        if (autoMoveEnabled && !aiTimer && activeMoveTweens.length === 0) {
+        // Self-healing Single-Player Bot & Auto Move watchdog: guarantee Bot plays its turn whenever idle
+        const aiSideColor = playerColor === 'w' ? 'b' : 'w';
+        const isBotTurnWaiting =
+          !scriptedGameActive &&
+          gameMode === 'single' &&
+          aiAutoPlay &&
+          currentTurn === aiSideColor;
+        if ((autoMoveEnabled || isBotTurnWaiting) && !aiTimer && activeMoveTweens.length === 0) {
           maybeScheduleAIMove();
         }
       } else if (soundFX.isLowTimeTickingActive()) {
@@ -10133,6 +11936,130 @@ export function initWizardChess() {
         }
       }
 
+      // Animate 3D Tactical Tile Ping Beacon Markers (Sonar Ripple, Rotating Compass, Corner Chevrons & Floating Crystal)
+      if (activeTacticalPings.length > 0) {
+        let pingExpired = false;
+        for (let i = activeTacticalPings.length - 1; i >= 0; i--) {
+          const tp = activeTacticalPings[i];
+          tp.life -= dt;
+          if (tp.life <= 0) {
+            disposePingEntry3D(tp);
+            activeTacticalPings.splice(i, 1);
+            pingExpired = true;
+            continue;
+          }
+          const age = tp.maxLife - tp.life;
+          const fadeOut = tp.life < 1.5 ? Math.max(0.05, tp.life / 1.5) : 1.0;
+
+          // Sonar pulse cycle (every 1.25s expands from 0.55x to 2.05x and fades)
+          const sonarPhase = (age * 0.85) % 1.0;
+          if (tp.sonarMesh && tp.sonarMat) {
+            const sonarScale = 0.55 + sonarPhase * 1.55;
+            tp.sonarMesh.scale.set(sonarScale, sonarScale, 1);
+            tp.sonarMat.opacity = (1.0 - sonarPhase) * 0.82 * fadeOut;
+          }
+
+          // Rotate octagonal reticle & inner compass ring in opposite directions
+          if (tp.octRingMesh && tp.octRingMat) {
+            tp.octRingMesh.rotation.z += dt * 0.55;
+            tp.octRingMat.opacity = (0.78 + Math.sin(elapsedTotal * 4.5) * 0.16) * fadeOut;
+          }
+          if (tp.compassMesh && tp.compassMat) {
+            tp.compassMesh.rotation.z -= dt * 1.45;
+            tp.compassMat.opacity = 0.86 * fadeOut;
+          }
+
+          // Pulse corner chevron brackets inward/outward
+          if (tp.cornerNodes) {
+            const bracketOffset = Math.sin(elapsedTotal * 5.2 + i) * 0.012;
+            for (const cn of tp.cornerNodes) {
+              const d = (cn.userData.baseDist || 0.128) + bracketOffset;
+              cn.position.x = cn.userData.sx * d;
+              cn.position.z = cn.userData.sz * d;
+            }
+          }
+          if (tp.bracketMat) {
+            tp.bracketMat.opacity = 0.94 * fadeOut;
+          }
+
+          // Holographic light pillar pulse
+          if (tp.pillarMesh && tp.pillarMat) {
+            tp.pillarMat.opacity = (0.18 + Math.sin(elapsedTotal * 3.8 + i) * 0.07) * fadeOut;
+            const pScale = 0.92 + Math.sin(elapsedTotal * 4.2 + i) * 0.08;
+            tp.pillarMesh.scale.set(pScale, 1, pScale);
+          }
+
+          // Dynamic elevation so the floating crystal & callout badge always stay above any piece on that tile
+          const pieceOnTile = boardState[tp.r]?.[tp.c];
+          const targetHoverY = pieceOnTile
+            ? (PIECE_HEIGHTS[pieceOnTile.type] || 0.48) + 0.26
+            : 0.34;
+          tp.baseHoverY += (targetHoverY - tp.baseHoverY) * Math.min(1, dt * 8);
+
+          if (tp.finialAnchor) {
+            tp.finialAnchor.position.y = tp.baseHoverY + Math.sin(elapsedTotal * 3.6 + i) * 0.028;
+          }
+          if (tp.crystalMesh && tp.crystalMat) {
+            tp.crystalMesh.rotation.y += dt * 2.2;
+            tp.crystalMat.opacity = 0.96 * fadeOut;
+          }
+          if (tp.gyroMesh && tp.gyroMat) {
+            tp.gyroMesh.rotation.z += dt * 2.8;
+            tp.gyroMesh.rotation.y -= dt * 1.6;
+            tp.gyroMat.opacity = 0.85 * fadeOut;
+          }
+          if (tp.labelSprite && tp.labelSprite.material) {
+            tp.labelSprite.material.opacity = fadeOut;
+          }
+        }
+        if (pingExpired) {
+          emitPokerChessSync();
+        }
+      }
+
+      // Animate 3D Visual Pathing Indicators (Marching Trajectory Chevrons, Historical Breadcrumb Crystals & Target Lock Ring)
+      if (activeTrajectoryChevrons.length > 0) {
+        for (let i = 0; i < activeTrajectoryChevrons.length; i++) {
+          const item = activeTrajectoryChevrons[i];
+          if (!item.mesh || !item.curve) continue;
+          const u = (item.offset + elapsedTotal * 0.72) % 1.0;
+          const pt = item.curve.getPoint(u);
+          const tan = item.curve.getTangent(u);
+          item.mesh.position.copy(pt);
+          item.mesh.lookAt(pt.x + tan.x, pt.y + tan.y, pt.z + tan.z);
+          if (item.mesh.material) {
+            const edgeFade = u < 0.14 ? u / 0.14 : u > 0.86 ? (1 - u) / 0.14 : 1.0;
+            item.mesh.material.opacity = Math.max(0.08, 0.92 * edgeFade);
+          }
+        }
+      }
+      if (activeHistoryNodes.length > 0) {
+        for (let i = 0; i < activeHistoryNodes.length; i++) {
+          const hn = activeHistoryNodes[i];
+          if (!hn.mesh) continue;
+          if (hn.bobAmp > 0) {
+            hn.mesh.rotation.y += dt * (hn.rotSpeed || 1.5);
+            hn.mesh.position.y =
+              hn.baseY + Math.sin(elapsedTotal * 3.4 + (hn.phase || 0)) * hn.bobAmp;
+          } else {
+            hn.mesh.rotation.z += dt * (hn.rotSpeed || 0.6);
+          }
+        }
+      }
+      if (activeTrajectoryWaypoints.length > 0) {
+        for (let i = 0; i < activeTrajectoryWaypoints.length; i++) {
+          const wp = activeTrajectoryWaypoints[i];
+          if (!wp.mesh) continue;
+          wp.mesh.rotation.y += dt * 2.4;
+          wp.mesh.position.y = wp.baseY + Math.sin(elapsedTotal * 4.2 + (wp.phase || 0)) * 0.009;
+        }
+      }
+      if (activeTargetLockRing) {
+        activeTargetLockRing.rotation.z -= dt * 1.65;
+        const lockScale = 0.94 + Math.sin(elapsedTotal * 5.0) * 0.07;
+        activeTargetLockRing.scale.set(lockScale, lockScale, 1);
+      }
+
       // Feature 4: Video-game style WASD + R/F camera translation AND Arrow-key camera rotation
       // with separate UI-configurable Move Speed & Rot Speed (both default 10%) and smooth ease-in / ease-out velocity damping
       if (!isAnimatingMove) {
@@ -10323,6 +12250,9 @@ export function initWizardChess() {
     window.wizardChess.cyclePerformancePreset = cyclePerformancePreset;
     window.wizardChess.setPerformancePreset = applyPerformanceSettings;
     window.wizardChess.getPerformancePreset = () => performancePreset;
+    window.wizardChess.cyclePathingDisplayMode = cyclePathingDisplayMode;
+    window.wizardChess.setPathingDisplayMode = setPathingDisplayMode;
+    window.wizardChess.getPathingDisplayMode = () => pathingDisplayMode;
     window.wizardChess.getFPS = () => currentFPS;
     window.wizardChess.setManualStepMode = (v) => {
       manualStepMode = Boolean(v);

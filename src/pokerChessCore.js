@@ -2357,7 +2357,91 @@ class SanctumSoundEngine {
       osc.stop(now + 0.9);
     }
   }
+
+  playTacticalPing(intent = 'MOVE') {
+    const ctx = this.ensureCtx();
+    if (!ctx || this.muted) return;
+    const now = ctx.currentTime;
+
+    const noteSets = {
+      ATTACK: [587.33, 880.0, 1174.66], // D5 -> A5 -> D6 urgent tactical target lock
+      DEFEND: [523.25, 659.25, 783.99], // C5 -> E5 -> G5 warm Aegis guard chord
+      BUFF: [659.25, 987.77, 1318.51],  // E5 -> B5 -> E6 arcane empowerment chime
+      MOVE: [698.46, 1046.5, 1396.91]   // F5 -> C6 -> F6 crisp sonar beacon ping
+    };
+    const freqs = noteSets[intent] || noteSets.MOVE;
+
+    freqs.forEach((f, idx) => {
+      const t0 = now + idx * 0.055;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = intent === 'ATTACK' ? 'sawtooth' : idx === 2 ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(f, t0);
+      osc.frequency.exponentialRampToValueAtTime(f * 1.008, t0 + 0.24);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(intent === 'ATTACK' ? 3400 : 4200, t0);
+
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime((idx === 0 ? 0.14 : 0.18) * this.sfxVolume, t0 + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.36);
+
+      osc.connect(filter).connect(gain);
+      this._connectToSanctumSpace(gain, 0.86, 0.42, (idx - 1) * 0.12);
+      osc.start(t0);
+      osc.stop(t0 + 0.38);
+    });
+  }
 }
+
+export const TACTICAL_PING_INTENTS = {
+  AUTO: {
+    id: 'AUTO',
+    label: 'Tự Động',
+    shortLabel: 'Tự Động',
+    icon: '📍',
+    colorHex: '#f5d76e',
+    threeHex: 0xf5d76e,
+    desc: 'Tự nhận diện: Ô có địch = Tập Kích, Ô đồng minh = Hộ Vệ/Buff, Ô trống = Chiếm Giữ'
+  },
+  ATTACK: {
+    id: 'ATTACK',
+    label: 'Tập Kích',
+    shortLabel: 'Công',
+    icon: '⚔️',
+    colorHex: '#f97316',
+    threeHex: 0xff5522,
+    desc: 'Chỉ điểm mục tiêu ưu tiên tấn công hoặc đột kích cho AI'
+  },
+  DEFEND: {
+    id: 'DEFEND',
+    label: 'Phòng Thủ',
+    shortLabel: 'Thủ',
+    icon: '🛡️',
+    colorHex: '#38bdf8',
+    threeHex: 0x38bdf8,
+    desc: 'Yêu cầu AI bảo vệ quân đồng minh hoặc trấn giữ ô cờ này'
+  },
+  MOVE: {
+    id: 'MOVE',
+    label: 'Chiếm Ô',
+    shortLabel: 'Tiến',
+    icon: '🎯',
+    colorHex: '#10b981',
+    threeHex: 0x10b981,
+    desc: 'Điều hướng AI ưu tiên tiến quân chiếm giữ ô cờ này'
+  },
+  BUFF: {
+    id: 'BUFF',
+    label: 'Ưu Tiên Buff',
+    shortLabel: 'Buff',
+    icon: '✨',
+    colorHex: '#c084fc',
+    threeHex: 0xc084fc,
+    desc: 'Chỉ định quân đồng minh nhận Phép Bài Poker ở Bước 3'
+  }
+};
 
 export function triggerMeleeHapticVibration(options = {}) {
   const {
@@ -2824,10 +2908,11 @@ export const CHESS_SKIN_CATALOG = [
   }
 ];
 
-const COMMERCIAL_PROFILE_STORAGE_KEY = 'sanctum_commercial_profile_v1';
+const COMMERCIAL_PROFILE_STORAGE_KEY = 'sanctum_commercial_profile_publish_v2';
+export const IS_PUBLISH_PRODUCTION_MODE = true;
 
-export function getEloRankInfo(elo = 1050) {
-  const numElo = Math.max(0, Math.round(Number(elo) || 1050));
+export function getEloRankInfo(elo = 1000) {
+  const numElo = Math.max(0, Math.round(Number(elo) || 1000));
   let currentTier = ELO_RANK_TIERS[0];
   let nextTier = null;
   for (let i = 0; i < ELO_RANK_TIERS.length; i++) {
@@ -2865,9 +2950,9 @@ export function getEloRankInfo(elo = 1050) {
 
 export function loadCommercialProfile() {
   const defaultProfile = {
-    elo: 1050,
-    peakElo: 1050,
-    gold: 650,
+    elo: 1000,
+    peakElo: 1000,
+    gold: 0,
     wins: 0,
     losses: 0,
     winStreak: 0,
@@ -2889,12 +2974,12 @@ export function loadCommercialProfile() {
     const equipped = CHESS_SKIN_CATALOG.some((s) => s.id === parsed.equippedSkinId)
       ? parsed.equippedSkinId
       : 'classic_sanctum';
-    const elo = Math.max(800, Number(parsed.elo) || 1050);
+    const elo = Math.max(800, Number(parsed.elo) || 1000);
     const peakElo = Math.max(elo, Number(parsed.peakElo) || elo);
     return {
       elo,
       peakElo,
-      gold: Math.max(0, Math.round(Number(parsed.gold) ?? 650)),
+      gold: Math.max(0, Math.round(Number(parsed.gold) ?? 0)),
       wins: Math.max(0, Number(parsed.wins) || 0),
       losses: Math.max(0, Number(parsed.losses) || 0),
       winStreak: Math.max(0, Number(parsed.winStreak) || 0),

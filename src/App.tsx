@@ -6,6 +6,7 @@ import {
   UNIT_SKILLS,
   CHESS_SKIN_CATALOG,
   ELO_RANK_TIERS,
+  TACTICAL_PING_INTENTS,
   getEloRankInfo
 } from './pokerChessCore.js';
 
@@ -80,6 +81,18 @@ interface UnitUI {
   portraitState?: 'PRISTINE' | 'BATTLE_WORN' | 'SHIELD_SHATTER';
   shieldShattered?: boolean;
   alive?: boolean;
+  pathHistory?: {
+    r: number;
+    c: number;
+    fromR?: number;
+    fromC?: number;
+    targetR?: number;
+    targetC?: number;
+    targetAlgebraic?: string;
+    algebraic: string;
+    turn: number;
+    kind: 'SPAWN' | 'MOVE' | 'CAPTURE' | 'CASTLE' | 'CLASH_REPEL';
+  }[];
 }
 
 interface CombatForecastUI {
@@ -421,6 +434,51 @@ interface PokerChessSyncState {
   inspectedUnit: UnitUI | null;
   hoveredTileModifier?: TileModifierUI | null;
   combatForecast: CombatForecastUI | null;
+  unitPathing?: {
+    displayMode: 'ALL' | 'TRAJECTORY' | 'HISTORY' | 'OFF';
+    subjectUnit: UnitUI | null;
+    originSquare: {
+      r: number;
+      c: number;
+      algebraic: string;
+      turn: number;
+      kind: string;
+    } | null;
+    pathHistory: {
+      r: number;
+      c: number;
+      fromR?: number;
+      fromC?: number;
+      targetR?: number;
+      targetC?: number;
+      targetAlgebraic?: string;
+      algebraic: string;
+      turn: number;
+      kind: 'SPAWN' | 'MOVE' | 'CAPTURE' | 'CASTLE' | 'CLASH_REPEL';
+    }[];
+    intendedTrajectory: {
+      fromR: number;
+      fromC: number;
+      fromAlgebraic: string;
+      toR: number;
+      toC: number;
+      toAlgebraic: string;
+      isCapture: boolean;
+      isCastle: boolean;
+      castleSide?: string | null;
+      isKnightJump: boolean;
+      isHoveredTarget: boolean;
+      distance: number;
+      waypoints: {
+        r: number;
+        c: number;
+        algebraic: string;
+        isIntermediate?: boolean;
+        isCorner?: boolean;
+        isDestination?: boolean;
+      }[];
+    } | null;
+  };
   combatLogs: string[];
   capturedByWhite: number;
   capturedByBlack: number;
@@ -428,6 +486,21 @@ interface PokerChessSyncState {
   sfxMuted?: boolean;
   autoMoveEnabled?: boolean;
   activeCombatBanner?: ActiveCombatBannerUI | null;
+  tacticalPingMode?: boolean;
+  selectedPingIntent?: string;
+  activeTacticalPings?: {
+    id: string;
+    r: number;
+    c: number;
+    algebraic: string;
+    intent: string;
+    label: string;
+    shortLabel?: string;
+    icon: string;
+    colorHex: string;
+    unitDesc?: string;
+    remainingSec: number;
+  }[];
   commercial?: {
     elo: number;
     peakElo: number;
@@ -465,6 +538,17 @@ interface PokerChessSyncState {
     }[];
     rankInfo?: ReturnType<typeof getEloRankInfo>;
     peakRankInfo?: ReturnType<typeof getEloRankInfo>;
+    botDifficulty?: {
+      level: number;
+      tierId: string;
+      nameVi: string;
+      badgeVi: string;
+      descVi: string;
+      colorHex: string;
+      bonusHp: number;
+      bonusAtk: number;
+      bonusArmor: number;
+    };
   };
   hapticTriggerCount?: number;
   lastHapticVibration?: {
@@ -534,13 +618,49 @@ type WizardChessWindow = {
     triggerEpicCombatShowcase?: () => boolean;
     selectSquareForMovePreview?: (r: number, c: number) => unknown;
     executeSelectedMoveTo?: (toR: number, toC: number) => boolean;
+    pingSquare?: (r: number, c: number, intent?: string) => unknown;
+    removeTacticalPingAt?: (r: number, c: number) => boolean;
+    clearTacticalPings?: () => void;
+    toggleTacticalPingMode?: (forceState?: boolean | null) => boolean;
+    setTacticalPingIntent?: (intentId: string) => string;
+    getTacticalPings?: () => unknown[];
     setTurnTimeRemaining?: (sec: number) => number;
     getPokerChessUIState?: () => PokerChessSyncState;
+    getTutorial3DTargetScreenPos?: () => {
+      stepType: 'EMPOWER_3D_UNIT' | 'SELECT_3D_UNIT' | 'CLICK_3D_DEST';
+      x: number;
+      y: number;
+      r: number;
+      c: number;
+      fromR?: number;
+      fromC?: number;
+      algebraic: string;
+      fromAlgebraic?: string;
+      unitNameVi?: string;
+      unitIcon?: string;
+      isCapture?: boolean;
+    } | null;
+    triggerTutorialStepAction?: () => boolean;
     cyclePerformancePreset?: () => string;
     setPerformancePreset?: (preset: 'performance' | 'balanced' | 'ultra') => void;
     getPerformancePreset?: () => string;
+    cyclePathingDisplayMode?: () => 'ALL' | 'TRAJECTORY' | 'HISTORY' | 'OFF';
+    setPathingDisplayMode?: (
+      mode: 'ALL' | 'TRAJECTORY' | 'HISTORY' | 'OFF'
+    ) => 'ALL' | 'TRAJECTORY' | 'HISTORY' | 'OFF';
+    getPathingDisplayMode?: () => 'ALL' | 'TRAJECTORY' | 'HISTORY' | 'OFF';
     getFPS?: () => number;
   };
+};
+
+type HandsOnTargetSpot = {
+  kind: 'dom' | 'board3d';
+  stepBadge: string;
+  actionText: string;
+  subHint?: string;
+  rect?: { left: number; top: number; width: number; height: number };
+  point?: { x: number; y: number };
+  isCapture?: boolean;
 };
 
 type PhaseAnnouncementUI = {
@@ -564,9 +684,16 @@ export default function App() {
 
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [pokerDockMinimized, setPokerDockMinimized] = useState(false);
-  const [sandboxOpen, setSandboxOpen] = useState(false);
   const [peekDockDuringMove, setPeekDockDuringMove] = useState(false);
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
+  const [handsOnActive, setHandsOnActive] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pokerchess_hands_on_publish_v2') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [handsOnSpot, setHandsOnSpot] = useState<HandsOnTargetSpot | null>(null);
   const [skinStoreOpen, setSkinStoreOpen] = useState(false);
   const [storeTab, setStoreTab] = useState<'skins' | 'elo'>('skins');
   const [skinFilter, setSkinFilter] = useState<'all' | 'gold' | 'elo' | 'owned'>('all');
@@ -577,6 +704,16 @@ export default function App() {
   const [gameState, setGameState] = useState<PokerChessSyncState | null>(null);
   const [timeoutToast, setTimeoutToast] = useState<TurnTimeoutNoticeUI | null>(null);
   const [phaseAnnouncement, setPhaseAnnouncement] = useState<PhaseAnnouncementUI | null>(null);
+
+  const finishHandsOnTutorial = () => {
+    try {
+      localStorage.setItem('pokerchess_hands_on_publish_v2', 'true');
+    } catch {
+      // ignore storage errors
+    }
+    setHandsOnActive(false);
+    setHandsOnSpot(null);
+  };
 
   useEffect(() => {
     const triggerToast = (notice: TurnTimeoutNoticeUI) => {
@@ -692,13 +829,15 @@ export default function App() {
         ) || null
       : null;
 
-  // Automatically hide the card-drawing dock as soon as the 5-card hand is locked in (EMPOWER_UNIT / MOVE_UNIT / ULTIMATE_TARGETING),
-  // during active melee combat, or during the opponent's turn — and automatically show it again once combat finishes
-  // and the player's next turn starts (DRAW_PHASE / SELECT_CARDS).
+  // Keep the dock visible during DRAW_PHASE, SELECT_CARDS, EMPOWER_UNIT (compact unit-chip selector bar),
+  // and ULTIMATE_TARGETING, then tuck it away during Step 4 (MOVE_UNIT) & active combat so the 3D board is 100% clear.
   const isCardPhase =
     isPlayerTurn &&
     !gameState?.autoMoveEnabled &&
-    (turnPhase === 'DRAW_PHASE' || turnPhase === 'SELECT_CARDS') &&
+    (turnPhase === 'DRAW_PHASE' ||
+      turnPhase === 'SELECT_CARDS' ||
+      turnPhase === 'EMPOWER_UNIT' ||
+      turnPhase === 'ULTIMATE_TARGETING') &&
     !gameState?.activeCombatBanner &&
     !gameState?.isAnimatingMove;
 
@@ -772,7 +911,19 @@ export default function App() {
     }
     // 3. Turn switched between White and Black (without active combat banner change)
     else if (prev.turn !== currTurn) {
-      if (isPlayer) {
+      // If the player just finished their guided Hands-On turn, celebrate and auto-complete!
+      if (!isPlayer && handsOnActive) {
+        finishHandsOnTutorial();
+        showAnnouncement(
+          {
+            category: 'move',
+            badge: '🎉 HOÀN THÀNH CẦM TAY CHỈ VIỆC!',
+            title: 'BẠN ĐÃ NẮM VỮNG CÁCH CHƠI — ĐẾN LƯỢT AI!',
+            subtitle: 'Hạ quân địch thưởng +25~150🪙 Vàng • Đánh sập Vua địch thưởng +36 Elo!'
+          },
+          4200
+        );
+      } else if (isPlayer) {
         showAnnouncement({
           category: 'turn',
           badge: '👑 THÔNG BÁO LƯỢT MỚI',
@@ -832,7 +983,152 @@ export default function App() {
     }
 
     prevFlowRef.current = { turn: currTurn, phase: currPhase, hadCombat: currCombat };
-  }, [gameState]);
+  }, [gameState, handsOnActive]);
+
+  // Real-time Hands-On Spotlight & 3D Board Pointer tracker ("Cầm Tay Chỉ Việc")
+  useEffect(() => {
+    if (!handsOnActive || gameState?.gameOver || skinStoreOpen || rulesModalOpen) {
+      setHandsOnSpot(null);
+      return;
+    }
+
+    if (pokerDockMinimized && (turnPhase === 'DRAW_PHASE' || turnPhase === 'SELECT_CARDS')) {
+      setPokerDockMinimized(false);
+    }
+
+    const computeSpotlight = () => {
+      if (!isPlayerTurn || gameState?.isAnimatingMove) {
+        setHandsOnSpot(null);
+        return;
+      }
+
+      // STEP 1: Point directly at "🃏 Bốc 5 Lá Bài Mới" button
+      if (turnPhase === 'DRAW_PHASE') {
+        const el = document.getElementById('btn-tutorial-draw-cards');
+        if (el) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            setHandsOnSpot({
+              kind: 'dom',
+              stepBadge: 'BƯỚC 1 / 4',
+              actionText: 'Bấm vào đây để rút 5 lá bài!',
+              rect: { left: r.left, top: r.top, width: r.width, height: r.height }
+            });
+            return;
+          }
+        }
+      }
+
+      // STEP 2: Point at "Tự chọn 5 lá" first, then "🔥 Kích Hoạt Phép" once 5 cards are selected
+      if (turnPhase === 'SELECT_CARDS') {
+        if (!poker?.isFiveSelected) {
+          const el = document.getElementById('btn-tutorial-autoselect-5');
+          if (el) {
+            const r = el.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) {
+              setHandsOnSpot({
+                kind: 'dom',
+                stepBadge: 'BƯỚC 2 / 4',
+                actionText: 'Bấm đây tự ghép 5 lá bài mạnh nhất!',
+                rect: { left: r.left, top: r.top, width: r.width, height: r.height }
+              });
+              return;
+            }
+          }
+        } else {
+          const el = document.getElementById('btn-tutorial-commit-combo');
+          if (el) {
+            const r = el.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) {
+              setHandsOnSpot({
+                kind: 'dom',
+                stepBadge: 'BƯỚC 2 / 4',
+                actionText: `Bấm Kích Hoạt Phép (${poker.evaluatedCombo?.nameVi || 'Poker'})!`,
+                rect: { left: r.left, top: r.top, width: r.width, height: r.height }
+              });
+              return;
+            }
+          }
+        }
+      }
+
+      // STEP 3 (ULTIMATE): Point at "⚡ Giáng Thiên Phạt"
+      if (turnPhase === 'ULTIMATE_TARGETING') {
+        const el =
+          document.getElementById('btn-tutorial-ultimate-confirm') ||
+          document.querySelector('.director-action-btn.ultimate');
+        if (el) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            setHandsOnSpot({
+              kind: 'dom',
+              stepBadge: 'BƯỚC 3 / 4',
+              actionText: 'Bấm đây để Giáng Thiên Phạt!',
+              rect: { left: r.left, top: r.top, width: r.width, height: r.height }
+            });
+            return;
+          }
+        }
+      }
+
+      // STEP 3 & STEP 4: Point directly at the 3D chess piece or 3D destination square on the board!
+      const boardTarget = getEngine()?.getTutorial3DTargetScreenPos?.();
+      if (boardTarget) {
+        if (boardTarget.stepType === 'EMPOWER_3D_UNIT') {
+          setHandsOnSpot({
+            kind: 'board3d',
+            stepBadge: 'BƯỚC 3 / 4',
+            actionText: `Bấm vào ${boardTarget.unitIcon} ${boardTarget.unitNameVi} (${boardTarget.algebraic.toUpperCase()}) để gắn Buff!`,
+            subHint: '+Công ⚔ & +Giáp 🛡 cho quân này',
+            point: { x: boardTarget.x, y: boardTarget.y }
+          });
+          return;
+        }
+        if (boardTarget.stepType === 'SELECT_3D_UNIT') {
+          setHandsOnSpot({
+            kind: 'board3d',
+            stepBadge: 'BƯỚC 4 / 4',
+            actionText: `Bấm chọn ${boardTarget.unitIcon} ${boardTarget.unitNameVi} (${boardTarget.algebraic.toUpperCase()}) trên bàn 3D!`,
+            subHint: 'Để hiện các ô di chuyển & tấn công',
+            point: { x: boardTarget.x, y: boardTarget.y }
+          });
+          return;
+        }
+        if (boardTarget.stepType === 'CLICK_3D_DEST') {
+          setHandsOnSpot({
+            kind: 'board3d',
+            stepBadge: 'BƯỚC 4 / 4',
+            actionText: boardTarget.isCapture
+              ? `Bấm vào ô ĐỎ ${boardTarget.algebraic.toUpperCase()} để CHÉM ĐỊCH ⚔!`
+              : `Bấm vào ô XANH ${boardTarget.algebraic.toUpperCase()} để TIẾN QUÂN ♟!`,
+            subHint: `${boardTarget.unitIcon} ${boardTarget.unitNameVi} ${(boardTarget.fromAlgebraic || '').toUpperCase()} ➔ ${boardTarget.algebraic.toUpperCase()}`,
+            point: { x: boardTarget.x, y: boardTarget.y },
+            isCapture: boardTarget.isCapture
+          });
+          return;
+        }
+      }
+
+      setHandsOnSpot(null);
+    };
+
+    computeSpotlight();
+    const timer = setInterval(computeSpotlight, 90);
+    window.addEventListener('resize', computeSpotlight);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('resize', computeSpotlight);
+    };
+  }, [
+    handsOnActive,
+    gameState,
+    turnPhase,
+    isPlayerTurn,
+    poker,
+    pokerDockMinimized,
+    skinStoreOpen,
+    rulesModalOpen
+  ]);
 
   const outcomeMeta: Record<
     CombatForecastUI['outcome'],
@@ -1048,7 +1344,9 @@ export default function App() {
             id="btn-elo-rank-top"
             title={`Hạng hiện tại: ${
               gameState?.commercial?.rankInfo?.tierNameVi || 'Tân Binh Đồng'
-            } (${gameState?.commercial?.elo ?? 1050} Elo) — Nhấn để xem Bảng Xếp Hạng Elo & Mốc Mở Khóa Skin`}
+            } (${gameState?.commercial?.elo ?? 1000} Elo) | Độ khó AI: ${
+              gameState?.commercial?.botDifficulty?.nameVi || 'Bot Tân Binh Đồng'
+            } (${gameState?.commercial?.botDifficulty?.descVi || 'Tăng dần theo Elo'}) — Nhấn để xem Bảng Xếp Hạng Elo`}
             onMouseEnter={() => getEngine()?.playUIHover?.()}
             onClick={() => {
               getEngine()?.playUIClick?.();
@@ -1060,7 +1358,15 @@ export default function App() {
             <span className="elo-tier-icon">
               {gameState?.commercial?.rankInfo?.tierIcon || '🥉'}
             </span>
-            <span className="elo-score-text">{gameState?.commercial?.elo ?? 1050} Elo</span>
+            <span className="elo-score-text">{gameState?.commercial?.elo ?? 1000} Elo</span>
+            <span
+              className="bot-elo-tier-tag"
+              style={{
+                color: gameState?.commercial?.botDifficulty?.colorHex || '#f5d76e'
+              }}
+            >
+              {gameState?.commercial?.botDifficulty?.badgeVi || '🤖 Bot Lv.1'}
+            </span>
           </button>
 
           <button
@@ -1078,21 +1384,64 @@ export default function App() {
           >
             <span className="store-icon">🛒 Skin</span>
             <span className="gold-wallet-pill">
-              🪙 {(gameState?.commercial?.gold ?? 650).toLocaleString()}
+              🪙 {(gameState?.commercial?.gold ?? 0).toLocaleString()}
             </span>
           </button>
 
           <button
             type="button"
-            className={`hud-btn auto-move-btn ${gameState?.autoMoveEnabled ? 'active' : ''}`}
-            id="btn-auto-move"
-            title="Bật / Tắt Chế Độ Tự Động Đi Quân & Combat Liên Tục (Auto Move)"
+            className={`hud-btn tutorial-top-btn ${handsOnActive ? 'active' : ''}`}
+            id="btn-tutorial-open"
+            title="Bật / Tắt Chế Độ Cầm Tay Chỉ Việc (Bàn tay chỉ thẳng từng nút & từng ô cờ 3D trên màn hình)"
             onMouseEnter={() => getEngine()?.playUIHover?.()}
             onClick={() => {
-              getEngine()?.toggleAutoMove?.();
+              getEngine()?.playUIClick?.();
+              setHandsOnActive((prev) => !prev);
+              setMobileSheetOpen(false);
             }}
           >
-            {gameState?.autoMoveEnabled ? '⚡ Auto: BẬT' : '🤖 Auto Move'}
+            {handsOnActive ? '👆 Chỉ Việc: BẬT' : '👆 Chỉ Việc'}
+          </button>
+
+          <button
+            type="button"
+            className={`hud-btn tactical-ping-top-btn ${gameState?.tacticalPingMode ? 'active' : ''}`}
+            id="btn-tactical-ping"
+            title="Chế độ Ping Chiến Thuật trên bàn cờ 3D (Phím tắt: G hoặc Alt/Shift + Click vào ô cờ để chỉ điểm cho AI)"
+            onMouseEnter={() => getEngine()?.playUIHover?.()}
+            onClick={() => {
+              getEngine()?.toggleTacticalPingMode?.();
+            }}
+          >
+            <span>{gameState?.tacticalPingMode ? '📍 Ping: BẬT' : '📍 Ping Ô'}</span>
+            {(gameState?.activeTacticalPings?.length || 0) > 0 && (
+              <span className="ping-count-badge">
+                {gameState?.activeTacticalPings?.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className={`hud-btn pathing-top-btn ${
+              (gameState?.unitPathing?.displayMode || 'ALL') !== 'OFF' ? 'active' : ''
+            }`}
+            id="btn-pathing-mode"
+            title="Chuyển chế độ hiển thị Quỹ Đạo Dự Kiến & Lịch Sử Di Chuyển 3D của quân cờ đang chọn"
+            onMouseEnter={() => getEngine()?.playUIHover?.()}
+            onClick={() => {
+              getEngine()?.cyclePathingDisplayMode?.();
+            }}
+          >
+            <span>
+              {(() => {
+                const mode = gameState?.unitPathing?.displayMode || 'ALL';
+                if (mode === 'ALL') return '🧭 Quỹ Đạo: Đầy Đủ';
+                if (mode === 'TRAJECTORY') return '🎯 Chỉ Hướng Đi';
+                if (mode === 'HISTORY') return '📜 Chỉ Lịch Sử';
+                return '🧭 Quỹ Đạo: Tắt';
+              })()}
+            </span>
           </button>
 
           <button
@@ -1229,15 +1578,13 @@ export default function App() {
             Play as Black
           </button>
           <button
-            className={`hud-btn ${gameState?.autoMoveEnabled ? 'active' : ''}`}
+            className="hud-btn"
             id="btn-ai-move"
-            title="Bật / Tắt chế độ Auto Move tự động đánh liên tục"
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              setMobileSheetOpen(false);
-            }}
+            style={{ display: 'none' }}
+            aria-hidden="true"
+            tabIndex={-1}
           >
-            {gameState?.autoMoveEnabled ? '⚡ Auto Move: BẬT' : '🤖 Auto Move'}
+            Auto Move Locked
           </button>
           <button
             className="hud-btn"
@@ -1310,10 +1657,231 @@ export default function App() {
           </button>
 
           <div className="mobile-sheet-hint">
-            <strong>Mẹo:</strong> Kéo chuột trái xoay góc nhìn • Chuột phải di chuyển • Cuộn để thu phóng
+            <strong>Mẹo:</strong> Kéo chuột trái xoay góc nhìn • Chuột phải di chuyển • Giữ Alt/Shift + Click hoặc nhấn phím G để Ping ô cờ 3D
           </div>
         </div>
       </div>
+
+      {/* 3D TACTICAL TILE PING COMMAND BAR (SHOWN WHEN PING MODE IS ACTIVE OR ACTIVE PINGS EXIST ON BOARD) */}
+      {(gameState?.tacticalPingMode || (gameState?.activeTacticalPings?.length || 0) > 0) && (
+        <div
+          className={`tactical-ping-bar ${gameState?.tacticalPingMode ? 'ping-mode-active' : ''}`}
+          id="tactical-ping-bar"
+          role="region"
+          aria-label="Bảng Điều Khiển Ping Chiến Thuật 3D"
+        >
+          <div className="tactical-ping-intents">
+            <span className="tactical-ping-bar-title">
+              {gameState?.tacticalPingMode
+                ? '📍 CHỌN Ô CỜ 3D ĐỂ PING:'
+                : '📍 PING CHIẾN THUẬT AI:'}
+            </span>
+            {Object.values(TACTICAL_PING_INTENTS).map((intentDef) => {
+              const isSelected = (gameState?.selectedPingIntent || 'AUTO') === intentDef.id;
+              return (
+                <button
+                  key={intentDef.id}
+                  type="button"
+                  className={`ping-intent-btn ${isSelected ? 'active' : ''}`}
+                  style={
+                    isSelected
+                      ? {
+                          borderColor: intentDef.colorHex,
+                          color: intentDef.colorHex
+                        }
+                      : undefined
+                  }
+                  title={intentDef.desc}
+                  onClick={() => {
+                    getEngine()?.setTacticalPingIntent?.(intentDef.id);
+                  }}
+                >
+                  <span>{intentDef.icon}</span>
+                  <span>{intentDef.shortLabel}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {(gameState?.activeTacticalPings?.length || 0) > 0 && (
+            <div className="tactical-ping-active-list">
+              {gameState?.activeTacticalPings?.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="active-ping-chip"
+                  style={{ borderColor: p.colorHex, color: p.colorHex }}
+                  title={`${p.label} tại ${p.algebraic.toUpperCase()} (${p.unitDesc || ''}) — Bấm để xóa Ping này`}
+                  onClick={() => {
+                    getEngine()?.removeTacticalPingAt?.(p.r, p.c);
+                  }}
+                >
+                  <span>{p.icon}</span>
+                  <strong>{p.algebraic.toUpperCase()}</strong>
+                  <span className="ping-chip-label">{p.shortLabel || p.label}</span>
+                  <span className="ping-chip-timer">{p.remainingSec}s</span>
+                  <span className="ping-chip-remove">✕</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                className="ping-clear-all-btn"
+                title="Xóa toàn bộ Ping chiến thuật trên bàn cờ"
+                onClick={() => {
+                  getEngine()?.clearTacticalPings?.();
+                }}
+              >
+                ✕ Xóa Hết
+              </button>
+            </div>
+          )}
+
+          {gameState?.tacticalPingMode && (
+            <div className="tactical-ping-hint">
+              Click vào bất kỳ ô cờ 3D nào để đặt cọc tiêu ánh sáng chỉ điểm cho AI • Nhấn <strong>G</strong> hoặc{' '}
+              <button
+                type="button"
+                className="ping-mode-exit-inline"
+                onClick={() => getEngine()?.toggleTacticalPingMode?.(false)}
+              >
+                Thoát Ping
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3D VISUAL PATHING & TRAJECTORY INDICATOR BAR (SHOWN WHEN A UNIT IS SELECTED OR HAS MOVE HISTORY) */}
+      {gameState?.unitPathing &&
+        gameState.unitPathing.displayMode !== 'OFF' &&
+        gameState.unitPathing.subjectUnit &&
+        (Boolean(gameState.selectedSquare) ||
+          (gameState.unitPathing.pathHistory?.length || 0) > 1) && (
+          <div
+            className="unit-pathing-telemetry-bar"
+            id="unit-pathing-bar"
+            role="region"
+            aria-label="Chỉ Báo Lịch Sử Di Chuyển & Quỹ Đạo Quân Cờ 3D"
+          >
+            <div className="upb-unit-badge">
+              <span className="upb-unit-icon">{gameState.unitPathing.subjectUnit.icon}</span>
+              <span className="upb-unit-name">
+                {gameState.unitPathing.subjectUnit.nameVi} Lv.{gameState.unitPathing.subjectUnit.level}
+              </span>
+              <span className="upb-unit-coord">
+                {gameState.unitPathing.subjectUnit.algebraic.toUpperCase()}
+              </span>
+            </div>
+
+            {/* Move History Breadcrumb Trail */}
+            {(gameState.unitPathing.displayMode === 'ALL' ||
+              gameState.unitPathing.displayMode === 'HISTORY') && (
+              <div className="upb-section history-trail">
+                <span className="upb-label">📜 Lịch sử:</span>
+                <div className="upb-breadcrumbs">
+                  {(gameState.unitPathing.pathHistory || []).slice(-6).map((step, idx, arr) => (
+                    <span key={`${step.turn}_${step.algebraic}_${idx}`} className="upb-crumb-wrap">
+                      <span
+                        className={`upb-crumb kind-${step.kind.toLowerCase()} ${
+                          idx === arr.length - 1 ? 'current' : ''
+                        }`}
+                        title={
+                          step.kind === 'SPAWN'
+                            ? `Vị trí khởi điểm (${step.algebraic.toUpperCase()})`
+                            : step.kind === 'CLASH_REPEL'
+                              ? `Lượt ${step.turn}: Đụng độ tại ${(step.targetAlgebraic || '').toUpperCase()} và dội về ${step.algebraic.toUpperCase()}`
+                              : `Lượt ${step.turn}: ${step.algebraic.toUpperCase()} (${step.kind})`
+                        }
+                      >
+                        {step.kind === 'CLASH_REPEL' && step.targetAlgebraic
+                          ? `⚡${step.targetAlgebraic.toUpperCase()}↩${step.algebraic.toUpperCase()}`
+                          : step.algebraic.toUpperCase()}
+                      </span>
+                      {idx < arr.length - 1 && (
+                        <span className="upb-crumb-arrow" aria-hidden="true">
+                          ➔
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                  {(gameState.unitPathing.pathHistory?.length || 0) <= 1 && (
+                    <span className="upb-muted-note">(Chưa di chuyển)</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Intended Trajectory Indicator */}
+            {(gameState.unitPathing.displayMode === 'ALL' ||
+              gameState.unitPathing.displayMode === 'TRAJECTORY') &&
+              gameState.unitPathing.intendedTrajectory && (
+                <div className="upb-section intended-traj">
+                  <span className="upb-label">
+                    {gameState.unitPathing.intendedTrajectory.isHoveredTarget
+                      ? '🎯 Quỹ đạo chọn:'
+                      : '🧭 Quỹ đạo gợi ý:'}
+                  </span>
+                  <span
+                    className={`upb-traj-badge ${
+                      gameState.unitPathing.intendedTrajectory.isCapture
+                        ? 'capture'
+                        : gameState.unitPathing.intendedTrajectory.isCastle
+                          ? 'castle'
+                          : 'move'
+                    }`}
+                  >
+                    <strong>
+                      {gameState.unitPathing.intendedTrajectory.fromAlgebraic.toUpperCase()} ➔{' '}
+                      {gameState.unitPathing.intendedTrajectory.toAlgebraic.toUpperCase()}
+                    </strong>
+                    <span>
+                      {gameState.unitPathing.intendedTrajectory.isCapture
+                        ? '⚔ Tấn công'
+                        : gameState.unitPathing.intendedTrajectory.isCastle
+                          ? '🏰 Nhập thành'
+                          : gameState.unitPathing.intendedTrajectory.isKnightJump
+                            ? '🐴 Nhảy chữ L'
+                            : `${gameState.unitPathing.intendedTrajectory.distance} ô`}
+                    </span>
+                  </span>
+                  {(() => {
+                    const inter = gameState.unitPathing.intendedTrajectory.waypoints.filter(
+                      (w) => w.isIntermediate
+                    );
+                    if (inter.length === 0) return null;
+                    return (
+                      <span className="upb-waypoints-note">
+                        Qua: {inter.map((w) => w.algebraic.toUpperCase()).join(' › ')}
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
+
+            {/* Quick Mode Filter Buttons */}
+            <div className="upb-mode-Controls">
+              {(
+                [
+                  { id: 'ALL', label: 'Đầy Đủ' },
+                  { id: 'TRAJECTORY', label: 'Hướng Đi' },
+                  { id: 'HISTORY', label: 'Lịch Sử' },
+                  { id: 'OFF', label: 'Ẩn' }
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`upb-mode-btn ${
+                    gameState.unitPathing?.displayMode === m.id ? 'active' : ''
+                  }`}
+                  onClick={() => getEngine()?.setPathingDisplayMode?.(m.id)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
       {/* TEMPORARY 'TIME EXPIRED' TOAST NOTIFICATION WHEN TURN TIMER REACHES 0 */}
       {timeoutToast && (
@@ -1658,14 +2226,6 @@ export default function App() {
               <span>Cỗ bài: <strong>{poker.drawCount}</strong></span>
               <button
                 type="button"
-                className={`dock-toggle-btn ${sandboxOpen ? 'active' : ''}`}
-                onClick={() => setSandboxOpen((s) => !s)}
-                title="Mở bộ bài mẫu thử nghiệm nhanh (Tứ Quý, Thùng Phá Sảnh...)"
-              >
-                ✦ Bài mẫu
-              </button>
-              <button
-                type="button"
                 className="dock-toggle-btn"
                 onClick={() => setPokerDockMinimized((p) => !p)}
                 title={pokerDockMinimized ? 'Mở rộng khay bài' : 'Thu gọn khay bài'}
@@ -1694,6 +2254,7 @@ export default function App() {
 
                   <button
                     type="button"
+                    id="btn-tutorial-draw-cards"
                     className="poker-btn commit hs-draw-primary hs-clean-draw-btn"
                     onClick={() => getEngine()?.drawTurnCards?.()}
                     disabled={!isPlayerTurn}
@@ -1779,6 +2340,7 @@ export default function App() {
                     <div className="poker-action-buttons">
                       <button
                         type="button"
+                        id="btn-tutorial-autoselect-5"
                         className="poker-btn secondary"
                         onClick={() => getEngine()?.autoSelectBest5Cards?.()}
                         disabled={!isPlayerTurn}
@@ -1787,6 +2349,7 @@ export default function App() {
                       </button>
                       <button
                         type="button"
+                        id="btn-tutorial-commit-combo"
                         className={`poker-btn commit ${
                           poker.evaluatedCombo?.isUltimate ? 'ultimate-commit' : ''
                         }`}
@@ -1871,6 +2434,7 @@ export default function App() {
                     {turnPhase === 'ULTIMATE_TARGETING' ? (
                       <button
                         type="button"
+                        id="btn-tutorial-ultimate-confirm"
                         className="poker-btn commit ultimate-commit"
                         onClick={() => getEngine()?.confirmFourKingsUltimate?.()}
                         disabled={!isPlayerTurn}
@@ -1891,55 +2455,123 @@ export default function App() {
                 </div>
               )}
 
-              {/* OPTIONAL SANDBOX PRESETS (Tucked behind "✦ Bài mẫu" button) */}
-              {sandboxOpen && (
-                <div className="poker-sandbox-strip">
-                  <span className="sandbox-label">Thử Bài Mẫu:</span>
-                  <button
-                    type="button"
-                    className="sandbox-chip ultimate"
-                    onClick={() => getEngine()?.triggerPresetHand?.('STRAIGHT_FLUSH')}
-                    disabled={!isPlayerTurn}
-                  >
-                    👑 Thùng Phá Sảnh
-                  </button>
-                  <button
-                    type="button"
-                    className="sandbox-chip ultimate"
-                    onClick={() => getEngine()?.triggerPresetHand?.('FOUR_OF_A_KIND')}
-                    disabled={!isPlayerTurn}
-                  >
-                    ⚡ Tứ Quý
-                  </button>
-                  <button
-                    type="button"
-                    className="sandbox-chip"
-                    onClick={() => getEngine()?.triggerPresetHand?.('FULL_HOUSE')}
-                    disabled={!isPlayerTurn}
-                  >
-                    🔥 Cù Lũ
-                  </button>
-                  <button
-                    type="button"
-                    className="sandbox-chip"
-                    onClick={() => getEngine()?.triggerPresetHand?.('FLUSH')}
-                    disabled={!isPlayerTurn}
-                  >
-                    🌊 Thùng
-                  </button>
-                  <button
-                    type="button"
-                    className="sandbox-chip"
-                    onClick={() => getEngine()?.triggerPresetHand?.('STRAIGHT')}
-                    disabled={!isPlayerTurn}
-                  >
-                    🐎 Sảnh
-                  </button>
-                </div>
-              )}
             </>
           )}
         </section>
+      )}
+
+      {/* HANDS-ON INTERACTIVE POINTER & SPOTLIGHT OVERLAY ("CẦM TAY CHỈ VIỆC" — ZERO WALL OF TEXT) */}
+      {handsOnActive && handsOnSpot && !gameState?.gameOver && (
+        <div
+          className="hands-on-overlay-layer"
+          id="hands-on-overlay"
+          aria-live="polite"
+        >
+          {/* Case 1: Highlighting a DOM Button (Step 1 Draw, Step 2 Auto-Select, Step 2 Commit) */}
+          {handsOnSpot.kind === 'dom' && handsOnSpot.rect && (() => {
+            const { left, top, width, height } = handsOnSpot.rect;
+            const centerX = Math.max(150, Math.min(window.innerWidth - 150, left + width / 2));
+            const bubbleTop = Math.max(64, top - 66);
+            return (
+              <>
+                <div
+                  className="hands-on-dom-spotlight"
+                  style={{
+                    left: `${left - 5}px`,
+                    top: `${top - 5}px`,
+                    width: `${width + 10}px`,
+                    height: `${height + 10}px`
+                  }}
+                  onClick={() => getEngine()?.triggerTutorialStepAction?.()}
+                />
+                <div
+                  className="hands-on-pointer-bubble dom-target"
+                  style={{
+                    left: `${centerX}px`,
+                    top: `${bubbleTop}px`
+                  }}
+                  onClick={() => getEngine()?.triggerTutorialStepAction?.()}
+                  title="Bấm trực tiếp vào nút được khoanh sáng bên dưới!"
+                >
+                  <div className="hop-content">
+                    <span className="hop-step-pill">{handsOnSpot.stepBadge}</span>
+                    <span className="hop-action-label">{handsOnSpot.actionText}</span>
+                    <button
+                      type="button"
+                      className="hop-skip-x"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        finishHandsOnTutorial();
+                      }}
+                      title="Tắt hướng dẫn cầm tay chỉ việc"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="hop-bouncing-hand" aria-hidden="true">
+                    👇
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+
+          {/* Case 2: Pointing Directly at a 3D Chess Piece or 3D Destination Square on the WebGL Canvas */}
+          {handsOnSpot.kind === 'board3d' && handsOnSpot.point && (() => {
+            const px = Math.max(150, Math.min(window.innerWidth - 150, handsOnSpot.point.x));
+            const py = Math.max(120, Math.min(window.innerHeight - 120, handsOnSpot.point.y));
+            return (
+              <>
+                <div
+                  className={`hands-on-3d-reticle ${handsOnSpot.isCapture ? 'capture-reticle' : ''}`}
+                  style={{
+                    left: `${px}px`,
+                    top: `${py}px`
+                  }}
+                  aria-hidden="true"
+                >
+                  <span className="reticle-ring-outer" />
+                  <span className="reticle-ring-inner" />
+                </div>
+
+                <div
+                  className={`hands-on-pointer-bubble board-target ${
+                    handsOnSpot.isCapture ? 'capture-bubble' : ''
+                  }`}
+                  style={{
+                    left: `${px}px`,
+                    top: `${Math.max(62, py - 92)}px`
+                  }}
+                  onClick={() => getEngine()?.triggerTutorialStepAction?.()}
+                >
+                  <div className="hop-content">
+                    <span className="hop-step-pill">{handsOnSpot.stepBadge}</span>
+                    <div className="hop-text-stack">
+                      <span className="hop-action-label">{handsOnSpot.actionText}</span>
+                      {handsOnSpot.subHint && (
+                        <span className="hop-sub-hint">{handsOnSpot.subHint}</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="hop-skip-x"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        finishHandsOnTutorial();
+                      }}
+                      title="Tắt hướng dẫn cầm tay chỉ việc"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="hop-bouncing-hand" aria-hidden="true">
+                    👇
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
       )}
 
       {/* BOTTOM HUD (PRESERVES REQUIRED TEST IDS #controls-hint AND #captured-tray) */}
@@ -2068,9 +2700,9 @@ export default function App() {
       {/* COMMERCIAL SKIN COLLECTION STORE (10 3D SETS) & ELO RANKED PROGRESSION MODAL */}
       {skinStoreOpen && (() => {
         const comm = gameState?.commercial;
-        const currentElo = comm?.elo ?? 1050;
-        const peakElo = Math.max(currentElo, comm?.peakElo ?? 1050);
-        const currentGold = comm?.gold ?? 650;
+        const currentElo = comm?.elo ?? 1000;
+        const peakElo = Math.max(currentElo, comm?.peakElo ?? 1000);
+        const currentGold = comm?.gold ?? 0;
         const ownedIds = comm?.ownedSkinIds || ['classic_sanctum'];
         const equippedId = comm?.equippedSkinId || 'classic_sanctum';
         const previewId = comm?.previewSkinId || null;
@@ -2182,38 +2814,23 @@ export default function App() {
                 </div>
 
                 <div className="skin-store-quick-actions">
+                  <div className="grind-reward-pill" title="Cơ chế tự cày Elo & Vàng trong ván đấu thực chiến">
+                    <span>⚔ Hạ quân địch: <strong>+25~150 🪙</strong></span>
+                    <span>•</span>
+                    <span>🏆 Thắng ván cờ: <strong>+36 Elo &amp; +200~450 🪙</strong></span>
+                  </div>
                   <button
                     type="button"
                     className="store-earn-btn ranked"
                     onClick={() => {
-                      const res = getEngine()?.claimRankedBountyOrSimulateMatch?.('ranked_win');
-                      if (res?.ok && res.matchRecord) {
-                        setStoreFeedback({
-                          type: 'success',
-                          text: `🏆 Thắng Trận Xếp Hạng! +${res.matchRecord.eloDelta} Elo (Đạt ${res.matchRecord.eloAfter} Elo - ${res.matchRecord.tierNameVi}) & +${res.matchRecord.goldReward} 🪙 Vàng!`
-                        });
+                      if (previewId) {
+                        getEngine()?.previewChessSkin3D?.(null);
                       }
+                      setSkinStoreOpen(false);
                     }}
-                    title="Thi đấu phân hạng nhanh để tăng điểm Elo & nhận Vàng mở khóa các bộ Skin bậc cao"
+                    title="Đóng cửa hàng và vào bàn cờ 3D để tự cày Elo & Vàng qua thực chiến"
                   >
-                    ⚔ Đấu Xếp Hạng Nhanh (+Elo &amp; +Vàng)
-                  </button>
-
-                  <button
-                    type="button"
-                    className="store-earn-btn gold"
-                    onClick={() => {
-                      const res = getEngine()?.claimRankedBountyOrSimulateMatch?.('daily_gold');
-                      if (res?.ok) {
-                        setStoreFeedback({
-                          type: 'success',
-                          text: `🪙 Đã nhận +${res.goldAdded || 400} Vàng thưởng Nhiệm Vụ Kho Bạc!`
-                        });
-                      }
-                    }}
-                    title="Nhận thưởng Vàng từ Kho Bạc để mua sắm bộ sưu tập Skin cờ"
-                  >
-                    🎁 Thưởng Kho Bạc (+400 🪙)
+                    ⚔ Vào Bàn Cờ Thực Chiến
                   </button>
                 </div>
               </div>
@@ -2457,7 +3074,7 @@ export default function App() {
                                 onClick={() => {
                                   setStoreFeedback({
                                     type: 'error',
-                                    text: `🔒 Bộ Skin "${skin.nameVi}" yêu cầu đạt ${skin.requiredElo} Elo (Hiện tại: ${peakElo} Elo). Hãy thắng thêm trận hoặc bấm "⚔ Đấu Xếp Hạng Nhanh" ở thanh trên!`
+                                    text: `🔒 Bộ Skin "${skin.nameVi}" yêu cầu đạt ${skin.requiredElo} Elo (Hiện tại: ${peakElo} Elo). Hãy chiến thắng các ván đấu trên bàn cờ để tăng điểm Elo xếp hạng!`
                                   });
                                 }}
                               >
