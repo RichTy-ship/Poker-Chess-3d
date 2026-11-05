@@ -7056,4 +7056,87 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   color: #f8fafc;
 }
 
+/* =========================================================================
+   OPPONENT DISCONNECT ALERT BANNER
+   ========================================================================= */
+.opponent-disconnect-alert {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  max-width: 560px;
+  width: calc(100% - 32px);
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.95) 0%, rgba(127, 29, 29, 0.98) 100%);
+  border: 1.5px solid #ef4444;
+  border-radius: 12px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.5), 0 0 20px rgba(0, 0, 0, 0.8);
+  animation: slideDownAlert 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+}
+
+@keyframes slideDownAlert {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.alert-pulse-icon {
+  font-size: 1.8rem;
+  color: #fef08a;
+  animation: alertIconBlink 1s infinite alternate;
+  flex-shrink: 0;
+}
+
+@keyframes alertIconBlink {
+  from { transform: scale(0.9); opacity: 0.7; }
+  to { transform: scale(1.15); opacity: 1; }
+}
+
+.alert-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.alert-title {
+  font-size: 0.86rem;
+  font-weight: 900;
+  color: #fef08a;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.alert-desc {
+  font-size: 0.76rem;
+  color: #f8fafc;
+  line-height: 1.35;
+}
+
+.alert-countdown {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #fef08a;
+  color: #000000;
+  font-weight: 900;
+  font-size: 0.82rem;
+  animation: alertCountPulse 1s infinite;
+}
+
+@keyframes alertCountPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
 

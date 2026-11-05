@@ -204,6 +204,14 @@ class MultiplayerClient {
         this.emit('opponent_emote', msg);
         break;
 
+      case 'OPPONENT_DISCONNECTED':
+        this.emit('opponent_disconnected', msg);
+        break;
+
+      case 'OPPONENT_RECONNECTED':
+        this.emit('opponent_reconnected', msg);
+        break;
+
       case 'MOVE_CONFIRMED':
         this.emit('move_confirmed', msg);
         break;

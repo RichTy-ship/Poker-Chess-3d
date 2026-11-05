@@ -9125,30 +9125,46 @@ export function initWizardChess() {
       checkmateConfettiRaf = requestAnimationFrame(renderFrame);
     }
 
-    function showCheckmateBanner(winnerColor, defeatedColor) {
+    function showCheckmateBanner(winnerColor, defeatedColor, extraData = null) {
       const overlay = document.getElementById('checkmate-overlay');
       const crownEl = document.getElementById('checkmate-crown');
       const titleEl = document.getElementById('checkmate-title');
       const subEl = document.getElementById('checkmate-subtitle');
 
+      const isMyWin = gameMode === 'multi' ? (winnerColor === multiplayerClient.mySide) : (winnerColor === playerColor);
       const winnerName = winnerColor === 'w' ? 'White' : 'Black';
       const defeatedName = defeatedColor === 'w' ? 'White' : 'Black';
 
-      // Record Ranked Elo & Gold Rewards once per finished match
-      if (!checkmateState.rankedRewardGranted) {
-        checkmateState.rankedRewardGranted = true;
-        const matchRec = recordRankedMatchOutcome(winnerColor);
-        const sign = matchRec.eloDelta >= 0 ? '+' : '';
+      if (extraData?.reason === 'DISCONNECTED') {
+        if (titleEl) titleEl.textContent = isMyWin ? 'ĐỐI THỦ NGẮT KẾT NỐI' : 'BẠN ĐÃ MẤT KẾT NỐI';
         if (subEl) {
-          subEl.textContent = `${winnerName} Triumphs • Elo ${sign}${matchRec.eloDelta} (${matchRec.eloAfter} Elo) • +${matchRec.goldReward} Vàng`;
+          subEl.textContent = isMyWin
+            ? `Chiến Thắng Xử Thua (Forfeit Victory) • ${extraData.detailMessage || 'Đối thủ ngắt kết nối quá 20s'} • ${extraData.eloChange || '+32'} Elo • +${extraData.goldReward || 150} Vàng`
+            : `Thất Bại do mất kết nối • ${extraData.eloChange || '-15'} Elo • +${extraData.goldReward || 50} Vàng`;
         }
-        emitPokerChessSync();
-      } else if (subEl) {
-        subEl.textContent = `${winnerName} Triumphs • The ${defeatedName} King Has Fallen`;
+      } else if (extraData?.reason === 'SURRENDER') {
+        if (titleEl) titleEl.textContent = isMyWin ? 'ĐỐI THỦ ĐẦU HÀNG' : 'BẠN ĐÃ ĐẦU HÀNG';
+        if (subEl) {
+          subEl.textContent = isMyWin
+            ? `Chiến Thắng Xử Thua • ${extraData.detailMessage || 'Đối thủ đã chủ động đầu hàng'} • ${extraData.eloChange || '+32'} Elo • +${extraData.goldReward || 150} Vàng`
+            : `Đầu Hàng • ${extraData.eloChange || '-15'} Elo • +${extraData.goldReward || 50} Vàng`;
+        }
+      } else {
+        if (!checkmateState.rankedRewardGranted) {
+          checkmateState.rankedRewardGranted = true;
+          const matchRec = recordRankedMatchOutcome(winnerColor);
+          const sign = matchRec.eloDelta >= 0 ? '+' : '';
+          if (subEl) {
+            subEl.textContent = `${winnerName} Triumphs • Elo ${sign}${matchRec.eloDelta} (${matchRec.eloAfter} Elo) • +${matchRec.goldReward} Vàng`;
+          }
+          emitPokerChessSync();
+        } else if (subEl) {
+          subEl.textContent = `${winnerName} Triumphs • The ${defeatedName} King Has Fallen`;
+        }
+        if (titleEl) titleEl.textContent = 'Checkmate';
       }
 
       if (crownEl) crownEl.textContent = winnerColor === 'w' ? '♔' : '♚';
-      if (titleEl) titleEl.textContent = 'Checkmate';
       if (overlay) {
         overlay.classList.add('visible');
       }
@@ -9156,9 +9172,16 @@ export function initWizardChess() {
       startCheckmateConfetti(winnerColor);
     }
 
-    function triggerCheckmateSequence(defeatedColor = currentTurn, winnerColor = null) {
-      soundFX.stopLowTimeTickingLoop(true);
+    function triggerCheckmateSequence(defeatedColor = currentTurn, winnerColor = null, extraData = null) {
       const actualWinner = winnerColor || (defeatedColor === 'w' ? 'b' : 'w');
+
+      if (extraData?.reason === 'DISCONNECTED' || extraData?.reason === 'SURRENDER') {
+        showCheckmateBanner(actualWinner, defeatedColor, extraData);
+        if (actualWinner === playerColor || actualWinner === multiplayerClient.mySide) {
+          try { soundFX.playCheckmateFanfare(); } catch {}
+        }
+        return true;
+      }
 
       // Find the defeated King on the board (or use checkmateState.fallenKingPiece if overwritten by attacker)
       let kingPiece = checkmateState.fallenKingPiece || null;
@@ -11049,7 +11072,15 @@ export function initWizardChess() {
 
     multiplayerClient.on('match_ended', (msg) => {
       if (gameMode === 'multi') {
-        triggerCheckmateSequence(msg.defeatedColor, msg.winnerColor);
+        const winnerColor = msg.winnerColor || (multiplayerClient.mySide === 'w' ? 'w' : 'b');
+        const defeatedColor = msg.defeatedColor || (winnerColor === 'w' ? 'b' : 'w');
+        triggerCheckmateSequence(defeatedColor, winnerColor, {
+          reason: msg.reason,
+          detailMessage: msg.detailMessage,
+          eloChange: msg.eloChange,
+          goldReward: msg.goldReward,
+          result: msg.result
+        });
       }
     });
 

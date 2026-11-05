@@ -461,7 +461,46 @@ function handleClientMessage(ws, player, msg) {
 
     case 'SURRENDER': {
       if (!player.matchId) return;
-      endMatch(player.matchId, player.color === 'w' ? 'b' : 'w', 'SURRENDER', `${player.name} đã đầu hàng.`);
+      const match = matches.get(player.matchId);
+      if (match?.disconnectTimeout) {
+        clearTimeout(match.disconnectTimeout);
+        match.disconnectTimeout = null;
+      }
+      endMatch(player.matchId, player.color === 'w' ? 'b' : 'w', 'SURRENDER', `${player.name} đã chủ động đầu hàng.`);
+      break;
+    }
+
+    case 'RECONNECT_MATCH': {
+      const match = matches.get(msg.matchId);
+      if (match && match.status === 'ACTIVE') {
+        const isWhite = match.whitePlayer.id === msg.playerId;
+        const isBlack = match.blackPlayer.id === msg.playerId;
+        if (isWhite || isBlack) {
+          const reconPlayer = isWhite ? match.whitePlayer : match.blackPlayer;
+          const otherPlayer = isWhite ? match.blackPlayer : match.whitePlayer;
+
+          reconPlayer.ws = ws;
+          reconPlayer.isAlive = true;
+          clients.set(ws, reconPlayer);
+
+          if (match.disconnectTimeout) {
+            clearTimeout(match.disconnectTimeout);
+            match.disconnectTimeout = null;
+          }
+
+          sendMsg(reconPlayer.ws, 'RECONNECT_SUCCESS', {
+            matchId: match.id,
+            color: reconPlayer.color,
+            opponent: { name: otherPlayer.name, elo: otherPlayer.elo, skinId: otherPlayer.skinId }
+          });
+          sendMsg(otherPlayer.ws, 'OPPONENT_RECONNECTED', {
+            opponentName: reconPlayer.name,
+            message: `${reconPlayer.name} đã kết nối lại! Trận đấu tiếp tục.`
+          });
+          return;
+        }
+      }
+      sendMsg(ws, 'ERROR', { message: 'Trận đấu đã kết thúc hoặc không tồn tại.' });
       break;
     }
 
@@ -482,11 +521,17 @@ function endMatch(matchId, winnerColor, reason, detailMessage) {
   const match = matches.get(matchId);
   if (!match || match.status === 'ENDED') return;
 
+  if (match.disconnectTimeout) {
+    clearTimeout(match.disconnectTimeout);
+    match.disconnectTimeout = null;
+  }
+
   match.status = 'ENDED';
 
   const isWhiteWinner = winnerColor === 'w';
   const winner = isWhiteWinner ? match.whitePlayer : match.blackPlayer;
   const loser = isWhiteWinner ? match.blackPlayer : match.whitePlayer;
+  const defeatedColor = isWhiteWinner ? 'b' : 'w';
 
   // Elo rating adjustment calculation (K=32)
   const expectedWinner = 1 / (1 + Math.pow(10, (loser.elo - winner.elo) / 400));
@@ -500,6 +545,7 @@ function endMatch(matchId, winnerColor, reason, detailMessage) {
   sendMsg(winner.ws, 'MATCH_ENDED', {
     result: 'VICTORY',
     winnerColor,
+    defeatedColor,
     reason,
     detailMessage,
     eloChange: `+${eloGain}`,
@@ -511,6 +557,7 @@ function endMatch(matchId, winnerColor, reason, detailMessage) {
   sendMsg(loser.ws, 'MATCH_ENDED', {
     result: 'DEFEAT',
     winnerColor,
+    defeatedColor,
     reason,
     detailMessage,
     eloChange: `-${eloLoss}`,
@@ -536,12 +583,37 @@ function handlePlayerDisconnect(player) {
     customRooms.delete(player.customRoomCode);
   }
 
-  // Forfeit ongoing match on disconnection
+  // Forfeit ongoing match on disconnection after a 20-second grace window
   if (player.matchId) {
     const match = matches.get(player.matchId);
     if (match && match.status === 'ACTIVE') {
-      const winnerColor = player.color === 'w' ? 'b' : 'w';
-      endMatch(player.matchId, winnerColor, 'DISCONNECTED', `${player.name} đã ngắt kết nối.`);
+      const isWhite = player.color === 'w';
+      const opponent = isWhite ? match.blackPlayer : match.whitePlayer;
+      const winnerColor = isWhite ? 'b' : 'w';
+
+      if (match.disconnectTimeout) {
+        clearTimeout(match.disconnectTimeout);
+        match.disconnectTimeout = null;
+      }
+
+      const GRACE_SECONDS = 20;
+
+      // Notify the remaining opponent with countdown
+      if (opponent && opponent.ws) {
+        sendMsg(opponent.ws, 'OPPONENT_DISCONNECTED', {
+          opponentName: player.name,
+          opponentColor: player.color,
+          reconnectWindowSec: GRACE_SECONDS,
+          reason: 'Đối thủ đã mất kết nối mạng. Đang chờ kết nối lại...'
+        });
+      }
+
+      // Start 20s countdown. If player does not reconnect within 20s, forfeit!
+      match.disconnectTimeout = setTimeout(() => {
+        if (match.status === 'ACTIVE') {
+          endMatch(player.matchId, winnerColor, 'DISCONNECTED', `${player.name} đã ngắt kết nối quá 20s.`);
+        }
+      }, GRACE_SECONDS * 1000);
     }
   }
 }

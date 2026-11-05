@@ -737,6 +737,10 @@ export default function App() {
            (window.navigator as any).standalone === true;
   });
   const isIOSDevice = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const [opponentDisconnectNotice, setOpponentDisconnectNotice] = useState<{
+    opponentName: string;
+    secondsLeft: number;
+  } | null>(null);
 
   const finishHandsOnTutorial = () => {
     try {
@@ -895,19 +899,49 @@ export default function App() {
     const onRoomCreated = (msg: any) => {
       setCreatedRoomCode(msg.roomCode);
     };
+    const onOpponentDisconnected = (data: any) => {
+      setOpponentDisconnectNotice({
+        opponentName: data?.opponentName || 'Đối thủ',
+        secondsLeft: data?.reconnectWindowSec || 20
+      });
+    };
+    const onOpponentReconnected = () => {
+      setOpponentDisconnectNotice(null);
+    };
+    const onMatchEnded = () => {
+      setOpponentDisconnectNotice(null);
+    };
 
     multiplayerClient.on('stats', onStats);
     multiplayerClient.on('match_found', onMatchFound);
     multiplayerClient.on('queue_status', onQueueStatus);
     multiplayerClient.on('room_created', onRoomCreated);
+    multiplayerClient.on('opponent_disconnected', onOpponentDisconnected);
+    multiplayerClient.on('opponent_reconnected', onOpponentReconnected);
+    multiplayerClient.on('match_ended', onMatchEnded);
 
     return () => {
       multiplayerClient.off('stats', onStats);
       multiplayerClient.off('match_found', onMatchFound);
       multiplayerClient.off('queue_status', onQueueStatus);
       multiplayerClient.off('room_created', onRoomCreated);
+      multiplayerClient.off('opponent_disconnected', onOpponentDisconnected);
+      multiplayerClient.off('opponent_reconnected', onOpponentReconnected);
+      multiplayerClient.off('match_ended', onMatchEnded);
     };
   }, []);
+
+  // Opponent Disconnect Countdown ticker
+  useEffect(() => {
+    if (!opponentDisconnectNotice || opponentDisconnectNotice.secondsLeft <= 0) return;
+    const timer = setInterval(() => {
+      setOpponentDisconnectNotice((prev) => {
+        if (!prev || prev.secondsLeft <= 1) return null;
+        return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [opponentDisconnectNotice]);
 
   // Matchmaking search duration counter
   useEffect(() => {
@@ -1361,6 +1395,23 @@ export default function App() {
       >
         Show UI
       </button>
+
+      {/* OPPONENT DISCONNECTION BANNER & RECONNECTION COUNTDOWN */}
+      {opponentDisconnectNotice && (
+        <div className="opponent-disconnect-alert" role="alert">
+          <span className="alert-pulse-icon">⚠</span>
+          <div className="alert-content">
+            <div className="alert-title">
+              ĐỐI THỦ MẤT KẾT NỐI: <strong>{opponentDisconnectNotice.opponentName}</strong>
+            </div>
+            <div className="alert-desc">
+              Đang chờ kết nối lại... còn{' '}
+              <span className="alert-countdown">{opponentDisconnectNotice.secondsLeft}s</span>
+              {' '}— Nếu hết giờ, bạn sẽ tự động giành chiến thắng xử thua (+Elo, +Vàng)!
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SINGLE-ROW NON-WRAPPING TOP BAR + POPOVER MENU */}
       <div id="hud-top">
