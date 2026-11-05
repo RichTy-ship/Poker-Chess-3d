@@ -1,13 +1,35 @@
 :root {
-  --bg: #080a0f;
-  --hud-bg: rgba(12, 15, 22, 0.92);
-  --hud-border: rgba(212, 175, 55, 0.36);
-  --gold: #d4af37;
-  --gold-bright: #f5d76e;
-  --text: #f0ece1;
-  --muted: #9aa0a6;
+  /* ROYAL TACTICAL — PREMIUM DARK FANTASY DESIGN SYSTEM TOKENS */
+  --bg-primary: #101116;
+  --bg-secondary: #191B23;
+  --bg-panel: #20232C;
+  --gold-primary: #D8B45B;
+  --gold-highlight: #F4D98B;
+  --faction-white: #F1E7D1;
+  --faction-dark: #27252A;
+  --text-primary: #F4F1E8;
+  --text-secondary: #A9A9B2;
+  --state-success: #39C982;
+  --state-warning: #E9A83A;
+  --state-danger: #E65D5D;
+
+  /* Backward Compatibility Mappings */
+  --bg: #101116;
+  --hud-bg: rgba(25, 27, 35, 0.94);
+  --hud-border: rgba(216, 180, 91, 0.42);
+  --gold: #D8B45B;
+  --gold-bright: #F4D98B;
+  --text: #F4F1E8;
+  --muted: #A9A9B2;
   --accent-blue: #4ea8de;
-  --danger: #e63946;
+  --danger: #E65D5D;
+
+  /* Mobile Touch & Safe Area Insets */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --touch-min: 48px;
 }
 
 * {
@@ -20,10 +42,12 @@
 html, body, #root {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  touch-action: manipulation;
 }
 
 #canvas-container {
@@ -6763,3 +6787,368 @@ body.cinematic-ui-hidden .turn-timeout-toast {
 }
 
 
+
+/* =========================================================================
+   ROYAL TACTICAL TOP HUD HIERARCHY
+   ========================================================================= */
+#hud-top {
+  position: fixed;
+  top: calc(8px + var(--safe-top));
+  left: calc(12px + var(--safe-left));
+  right: calc(12px + var(--safe-right));
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  gap: 10px;
+}
+
+.hud-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud-left {
+  flex: 0 0 auto;
+}
+
+.hud-center {
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: 10px;
+  max-width: 620px;
+}
+
+.hud-right {
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.brand-pill {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  background: rgba(25, 27, 35, 0.92);
+  border: 1px solid rgba(216, 180, 91, 0.45);
+  border-radius: 8px;
+  padding: 5px 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+.brand-crown {
+  color: var(--gold-highlight);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.brand-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--gold-highlight);
+  white-space: nowrap;
+}
+
+.menu-master-btn {
+  background: linear-gradient(135deg, rgba(216, 180, 91, 0.25), rgba(25, 27, 35, 0.95)) !important;
+  border-color: var(--gold-primary) !important;
+  color: var(--gold-highlight) !important;
+  font-weight: 800 !important;
+  min-height: 38px;
+  padding: 6px 14px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6) !important;
+  cursor: pointer;
+}
+
+.rules-quick-btn {
+  min-height: 38px;
+  padding: 6px 10px !important;
+}
+
+/* =========================================================================
+   SMART COMPACT ACTION DOCK (FLOATING IN BOTTOM-RIGHT THUMB ZONE)
+   ========================================================================= */
+.smart-action-dock {
+  position: fixed;
+  bottom: calc(12px + var(--safe-bottom));
+  right: calc(14px + var(--safe-right));
+  z-index: 20;
+  pointer-events: auto;
+  max-width: min(340px, calc(100vw - 28px));
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.2s ease;
+}
+
+.smart-dock-card {
+  background: linear-gradient(180deg, rgba(32, 35, 44, 0.97) 0%, rgba(16, 17, 22, 0.98) 100%);
+  border: 1px solid rgba(216, 180, 91, 0.52);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8), 0 0 16px rgba(216, 180, 91, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.smart-dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 5px;
+}
+
+.smart-dock-phase-track {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.dock-step {
+  color: var(--text-secondary);
+  transition: color 0.15s ease;
+}
+
+.dock-step.done {
+  color: var(--state-success);
+}
+
+.dock-step.current {
+  color: var(--gold-highlight);
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(244, 217, 139, 0.45);
+}
+
+.dock-step-sep {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 0.62rem;
+}
+
+.smart-dock-collapse-toggle {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-secondary);
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.smart-dock-collapse-toggle:hover {
+  background: rgba(216, 180, 91, 0.22);
+  color: var(--gold-highlight);
+}
+
+.smart-dock-combo-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(16, 17, 22, 0.85);
+  border: 1px solid rgba(216, 180, 91, 0.32);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+}
+
+.smart-dock-combo-pill .combo-name {
+  font-weight: 800;
+}
+
+.smart-dock-combo-pill .combo-stats {
+  font-weight: 800;
+  color: var(--gold-highlight);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.smart-dock-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.smart-btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.smart-btn:active {
+  transform: scale(0.96);
+}
+
+.smart-btn.primary {
+  background: linear-gradient(135deg, #D8B45B 0%, #B8891E 100%);
+  border: 1px solid #F4D98B;
+  color: #101116;
+  box-shadow: 0 4px 14px rgba(216, 180, 91, 0.35);
+}
+
+.smart-btn.secondary {
+  background: rgba(25, 27, 35, 0.95);
+  border: 1px solid rgba(216, 180, 91, 0.45);
+  color: var(--text-primary);
+}
+
+.smart-btn.ultimate {
+  background: linear-gradient(135deg, #9333ea, #db2777);
+  border: 1px solid #f472b6;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(219, 39, 119, 0.4);
+}
+
+.smart-dock-hint {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-align: center;
+  font-style: italic;
+}
+
+.smart-dock-wait {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 4px 0;
+}
+
+.smart-dock-expand-btn {
+  background: linear-gradient(180deg, rgba(32, 35, 44, 0.96) 0%, rgba(16, 17, 22, 0.98) 100%);
+  border: 1px solid rgba(216, 180, 91, 0.55);
+  color: var(--gold-highlight);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.smart-dock-expand-btn:active {
+  transform: scale(0.96);
+}
+
+/* =========================================================================
+   RESTART CONFIRMATION MODAL
+   ========================================================================= */
+.restart-confirm-card {
+  max-width: 420px !important;
+  padding: 22px !important;
+  text-align: center;
+  background: linear-gradient(180deg, #20232C 0%, #101116 100%) !important;
+  border: 1px solid rgba(230, 93, 93, 0.55) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 24px rgba(230, 93, 93, 0.22) !important;
+}
+
+.restart-confirm-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.restart-confirm-icon {
+  font-size: 1.8rem;
+  color: var(--gold-highlight);
+}
+
+.restart-confirm-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.restart-confirm-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.restart-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.btn-restart-action {
+  flex: 1;
+  min-height: 48px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.btn-restart-action:active {
+  transform: scale(0.96);
+}
+
+.btn-restart-action.cancel {
+  background: rgba(25, 27, 35, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+}
+
+.btn-restart-action.confirm {
+  background: linear-gradient(135deg, #e65d5d 0%, #b91c1c 100%);
+  border: 1px solid #f87171;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(230, 93, 93, 0.45);
+}
+
+/* Drawer button polish */
+.skin-store-drawer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  grid-column: span 2;
+}
+
+.main-menu-drawer-btn {
+  grid-column: span 2;
+  background: linear-gradient(135deg, rgba(216, 180, 91, 0.22), rgba(25, 27, 35, 0.9)) !important;
+  border-color: var(--gold-primary) !important;
+  color: var(--gold-highlight) !important;
+  font-weight: 800 !important;
+}
+
+.restart-drawer-btn {
+  grid-column: span 2;
+}
+
+.restart-drawer-btn.danger-hover:hover {
+  border-color: var(--state-danger) !important;
+  color: #fca5a5 !important;
+}
+
+.side-toggle-btn {
+  grid-column: span 2;
+}

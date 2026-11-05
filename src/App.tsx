@@ -726,6 +726,8 @@ export default function App() {
   const [gameState, setGameState] = useState<PokerChessSyncState | null>(null);
   const [timeoutToast, setTimeoutToast] = useState<TurnTimeoutNoticeUI | null>(null);
   const [phaseAnnouncement, setPhaseAnnouncement] = useState<PhaseAnnouncementUI | null>(null);
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
+  const [smartDockCollapsed, setSmartDockCollapsed] = useState(false);
 
   // PWA Add to Home Screen (A2HS) states
   const deferredPromptRef = useRef<any>(null);
@@ -1412,124 +1414,15 @@ export default function App() {
         </div>
       )}
 
-      {/* SINGLE-ROW NON-WRAPPING TOP BAR + POPOVER MENU */}
-      <div id="hud-top">
-        <div className="hud-group" id="hud-left">
-          <div className="brand-pill">
-            <span className="brand-title">♔ Vương Quyền</span>
+      {/* ROYAL TACTICAL MOBILE-FIRST TOP HUD */}
+      <header id="hud-top" role="banner">
+        {/* LEFT ZONE: Brand & Performance FPS */}
+        <div className="hud-zone hud-left" id="hud-left">
+          <div className="brand-pill" title="Vương Quyền Poker 3D">
+            <span className="brand-crown" aria-hidden="true">♔</span>
+            <span className="brand-title">Vương Quyền</span>
           </div>
 
-          <div
-            className={[
-              'status-pill',
-              isConsideringMove
-                ? 'turn-pulse'
-                : gameState?.isAnimatingMove
-                  ? 'move-executing'
-                  : 'game-ended',
-              currentTurnColor === 'b' ? 'black-turn' : 'white-turn',
-              isPlayerTurn ? 'player-considering' : 'opponent-considering',
-              isTimerLow && isConsideringMove ? 'urgent-pulse' : ''
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            id="status-pill"
-          >
-            <span
-              className={`turn-dot${currentTurnColor === 'b' ? ' black' : ''}${isConsideringMove ? ' pulsing' : ''}`}
-              id="turn-dot"
-            ></span>
-            <span id="turn-text">White to Move</span>
-            <span className="mode-badge" id="mode-badge">Playing as White</span>
-          </div>
-
-          {/* Compact Single-Line 30s Turn Timer */}
-          <div
-            className={`turn-timer-pill ${isTimerLow ? 'low-time-pulse' : ''}`}
-            id="turn-timer-pill"
-            role="timer"
-            aria-live="off"
-            title="Thời gian suy nghĩ mỗi lượt (30 giây). Tự động kết thúc lượt khi về 0s."
-          >
-            <span className="timer-icon" aria-hidden="true">
-              {isTimerLow ? '⚠' : '⏳'}
-            </span>
-            <span className="timer-digits" id="turn-timer-digits">
-              {String(Math.floor(turnSeconds / 60)).padStart(2, '0')}:
-              {String(turnSeconds % 60).padStart(2, '0')}
-            </span>
-          </div>
-
-          {/* Compact Royal King Vitality Strip (Smooth Sliding HP + Hearthstone ATK/HP/Armor Orbs) */}
-          {wKing && bKing && (() => {
-            const wHpPct = Math.max(0, Math.min(100, (wKing.hp / Math.max(1, wKing.maxHp)) * 100));
-            const bHpPct = Math.max(0, Math.min(100, (bKing.hp / Math.max(1, bKing.maxHp)) * 100));
-            return (
-              <div className="king-vitality-strip">
-                <div className="king-hp-chip white-king">
-                  <span className="king-chip-crown" title="Vua Trắng">♔</span>
-                  <span className="hs-king-badge atk" title={`Sức công Vua Trắng: ${wKing.atk}`}>
-                    ⚔{wKing.atk}
-                  </span>
-                  <div
-                    className="king-hp-bar-outer"
-                    title={`Máu Vua Trắng: ${wKing.hp}/${wKing.maxHp} HP (${Math.round(wHpPct)}%)`}
-                  >
-                    <div
-                      className="king-hp-bar-damage-trail"
-                      style={{ width: `${wHpPct}%` }}
-                    />
-                    <div
-                      className={`king-hp-bar-fill white ${wHpPct <= 35 ? 'low-hp' : ''}`}
-                      style={{ width: `${wHpPct}%` }}
-                    />
-                  </div>
-                  <span className="hs-king-badge hp" title={`Máu Vua Trắng: ${wKing.hp}/${wKing.maxHp}`}>
-                    💧{wKing.hp}
-                  </span>
-                  {wKing.armor > 0 && (
-                    <span className="hs-king-badge armor" title={`Giáp Vua Trắng: ${wKing.armor}`}>
-                      🛡{wKing.armor}
-                    </span>
-                  )}
-                </div>
-
-                <span className="king-vs-sep">⚔</span>
-
-                <div className="king-hp-chip black-king">
-                  <span className="king-chip-crown" title="Vua Đen">♚</span>
-                  <span className="hs-king-badge atk" title={`Sức công Vua Đen: ${bKing.atk}`}>
-                    ⚔{bKing.atk}
-                  </span>
-                  <div
-                    className="king-hp-bar-outer"
-                    title={`Máu Vua Đen: ${bKing.hp}/${bKing.maxHp} HP (${Math.round(bHpPct)}%)`}
-                  >
-                    <div
-                      className="king-hp-bar-damage-trail"
-                      style={{ width: `${bHpPct}%` }}
-                    />
-                    <div
-                      className={`king-hp-bar-fill black ${bHpPct <= 35 ? 'low-hp' : ''}`}
-                      style={{ width: `${bHpPct}%` }}
-                    />
-                  </div>
-                  <span className="hs-king-badge hp" title={`Máu Vua Đen: ${bKing.hp}/${bKing.maxHp}`}>
-                    💧{bKing.hp}
-                  </span>
-                  {bKing.armor > 0 && (
-                    <span className="hs-king-badge armor" title={`Giáp Vua Đen: ${bKing.armor}`}>
-                      🛡{bKing.armor}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Right Compact Quick Toolbar (Never wraps onto multiple rows) */}
-        <div className="hud-quick-toolbar">
           {/* Real-time FPS & Performance Mode Switcher */}
           <button
             type="button"
@@ -1543,11 +1436,11 @@ export default function App() {
             id="btn-perf-preset"
             title={`Tốc độ khung hình: ${gameState?.fps ?? 60} FPS | Cấu hình: ${
               gameState?.performancePreset === 'performance'
-                ? '⚡ Siêu Mượt (Max FPS)'
+                ? '⚡ Siêu Mượt'
                 : gameState?.performancePreset === 'ultra'
-                  ? '💎 Đồ Họa Cao (Ultra)'
-                  : '⚖ Cân Bằng (Balanced)'
-            } — Nhấp để đổi cấu hình tối ưu FPS`}
+                  ? '💎 Đồ Họa Cao'
+                  : '⚖ Cân Bằng'
+            } — Chạm để đổi cấu hình`}
             onMouseEnter={() => getEngine()?.playUIHover?.()}
             onClick={() => {
               getEngine()?.playUIClick?.();
@@ -1572,15 +1465,76 @@ export default function App() {
                   : '⚖ Chuẩn'}
             </span>
           </button>
+
+          {/* Engine DOM anchors kept for automated listeners */}
+          <div className="engine-hidden-anchors" style={{ display: 'none' }} aria-hidden="true">
+            <span id="turn-dot"></span>
+            <span id="turn-text">White to Move</span>
+            <span id="mode-badge">Playing as White</span>
+            <div id="status-pill"></div>
+          </div>
+        </div>
+
+        {/* CENTER ZONE: Turn Timer, King Vitality, & Elo Pill */}
+        <div className="hud-zone hud-center" id="hud-center">
+          {/* Turn Timer */}
+          <div
+            className={`turn-timer-pill ${isTimerLow ? 'low-time-pulse' : ''}`}
+            id="turn-timer-pill"
+            role="timer"
+            aria-live="off"
+            title="Thời gian suy nghĩ mỗi lượt (30 giây)"
+          >
+            <span className="timer-icon" aria-hidden="true">
+              {isTimerLow ? '⚠' : '⏳'}
+            </span>
+            <span className="timer-digits" id="turn-timer-digits">
+              {String(Math.floor(turnSeconds / 60)).padStart(2, '0')}:
+              {String(turnSeconds % 60).padStart(2, '0')}
+            </span>
+          </div>
+
+          {/* Compact Royal King Vitality Strip */}
+          {wKing && bKing && (() => {
+            const wHpPct = Math.max(0, Math.min(100, (wKing.hp / Math.max(1, wKing.maxHp)) * 100));
+            const bHpPct = Math.max(0, Math.min(100, (bKing.hp / Math.max(1, bKing.maxHp)) * 100));
+            return (
+              <div className="king-vitality-strip">
+                <div className="king-hp-chip white-king" title={`Vua Trắng: ${wKing.hp}/${wKing.maxHp} HP`}>
+                  <span className="king-chip-crown">♔</span>
+                  <div className="king-hp-bar-outer">
+                    <div
+                      className={`king-hp-bar-fill white ${wHpPct <= 35 ? 'low-hp' : ''}`}
+                      style={{ width: `${wHpPct}%` }}
+                    />
+                  </div>
+                  <span className="king-hp-num">{wKing.hp}</span>
+                  {wKing.armor > 0 && <span className="hs-king-badge armor">🛡{wKing.armor}</span>}
+                </div>
+
+                <span className="king-vs-sep" aria-hidden="true">⚔</span>
+
+                <div className="king-hp-chip black-king" title={`Vua Đen: ${bKing.hp}/${bKing.maxHp} HP`}>
+                  <span className="king-chip-crown">♚</span>
+                  <div className="king-hp-bar-outer">
+                    <div
+                      className={`king-hp-bar-fill black ${bHpPct <= 35 ? 'low-hp' : ''}`}
+                      style={{ width: `${bHpPct}%` }}
+                    />
+                  </div>
+                  <span className="king-hp-num">{bKing.hp}</span>
+                  {bKing.armor > 0 && <span className="hs-king-badge armor">🛡{bKing.armor}</span>}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Elo Rank Pill */}
           <button
             type="button"
             className="hud-btn elo-rank-top-pill"
             id="btn-elo-rank-top"
-            title={`Hạng hiện tại: ${
-              gameState?.commercial?.rankInfo?.tierNameVi || 'Tân Binh Đồng'
-            } (${gameState?.commercial?.elo ?? 1000} Elo) | Độ khó AI: ${
-              gameState?.commercial?.botDifficulty?.nameVi || 'Bot Tân Binh Đồng'
-            } (${gameState?.commercial?.botDifficulty?.descVi || 'Tăng dần theo Elo'}) — Nhấn để xem Bảng Xếp Hạng Elo`}
+            title="Bảng Xếp Hạng Elo & Cấp Độ Bot"
             onMouseEnter={() => getEngine()?.playUIHover?.()}
             onClick={() => {
               getEngine()?.playUIClick?.();
@@ -1589,514 +1543,417 @@ export default function App() {
               setMobileSheetOpen(false);
             }}
           >
-            <span className="elo-tier-icon">
-              {gameState?.commercial?.rankInfo?.tierIcon || '🥉'}
-            </span>
+            <span className="elo-tier-icon">{gameState?.commercial?.rankInfo?.tierIcon || '🥉'}</span>
             <span className="elo-score-text">{gameState?.commercial?.elo ?? 1000} Elo</span>
             <span
               className="bot-elo-tier-tag"
-              style={{
-                color: gameState?.commercial?.botDifficulty?.colorHex || '#f5d76e'
-              }}
+              style={{ color: gameState?.commercial?.botDifficulty?.colorHex || '#f5d76e' }}
             >
               {gameState?.commercial?.botDifficulty?.badgeVi || '🤖 Bot Lv.1'}
             </span>
           </button>
+        </div>
 
+        {/* RIGHT ZONE: Quick Rules & Master Settings/Menu Drawer Button */}
+        <div className="hud-zone hud-right" id="hud-right-zone">
           <button
             type="button"
-            className="hud-btn skin-store-top-btn"
-            id="btn-skin-store"
-            title="Mở Cửa Hàng 10 Bộ Skin Cờ 3D (Mua bằng Vàng & Mở khóa theo Elo — Chỉ trang trí, không cộng chỉ số)"
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              getEngine()?.playUIClick?.();
-              setStoreTab('skins');
-              setSkinStoreOpen(true);
-              setMobileSheetOpen(false);
-            }}
-          >
-            <span className="store-icon">🛒 Skin</span>
-            <span className="gold-wallet-pill">
-              🪙 {(gameState?.commercial?.gold ?? 0).toLocaleString()}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className={`hud-btn tutorial-top-btn ${handsOnActive ? 'active' : ''}`}
-            id="btn-tutorial-open"
-            title="Bật / Tắt Chế Độ Cầm Tay Chỉ Việc (Bàn tay chỉ thẳng từng nút & từng ô cờ 3D trên màn hình)"
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              getEngine()?.playUIClick?.();
-              setHandsOnActive((prev) => !prev);
-              setMobileSheetOpen(false);
-            }}
-          >
-            {handsOnActive ? '👆 Chỉ Việc: BẬT' : '👆 Chỉ Việc'}
-          </button>
-
-          <button
-            type="button"
-            className={`hud-btn tactical-ping-top-btn ${gameState?.tacticalPingMode ? 'active' : ''}`}
-            id="btn-tactical-ping"
-            title="Chế độ Ping Chiến Thuật trên bàn cờ 3D (Phím tắt: G hoặc Alt/Shift + Click vào ô cờ để chỉ điểm cho AI)"
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              getEngine()?.toggleTacticalPingMode?.();
-            }}
-          >
-            <span>{gameState?.tacticalPingMode ? '📍 Ping: BẬT' : '📍 Ping Ô'}</span>
-            {(gameState?.activeTacticalPings?.length || 0) > 0 && (
-              <span className="ping-count-badge">
-                {gameState?.activeTacticalPings?.length}
-              </span>
-            )}
-          </button>
-
-
-          <button
-            type="button"
-            className="hud-btn restart-top-btn"
-            id="btn-restart-top"
-            title="Khởi động lại ván đấu mới (Restart)"
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              getEngine()?.restartGame?.();
-            }}
-          >
-            🔄 Restart
-          </button>
-
-          <button
-            type="button"
-            className={`hud-btn audio-pill-btn ${gameState?.bgmPlaying ? 'active bgm-playing' : ''}`}
-            id="btn-bgm-toggle"
-            title={`${(gameState as any)?.bgmTrack?.title || 'Symphony Battle Orchestra'} — Bấm để Bật/Tắt`}
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              getEngine()?.toggleBattleMusic?.();
-            }}
-          >
-            <span className="audio-icon" aria-hidden="true">
-              {gameState?.bgmPlaying ? '🎻' : '🎼'}
-            </span>
-            <span className="audio-btn-label">
-              {gameState?.bgmPlaying ? 'Nhạc Chiến Trận' : 'Bật Nhạc'}
-            </span>
-            {gameState?.bgmPlaying && (
-              <span className="bgm-eq-bars" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-            )}
-          </button>
-
-          {gameState?.bgmPlaying && (
-            <button
-              type="button"
-              className="hud-btn audio-next-track-btn"
-              id="btn-bgm-next"
-              title={`Đổi bài tiếp theo: ${(gameState as any)?.bgmTrack?.title || 'Kế tiếp'}`}
-              onMouseEnter={() => getEngine()?.playUIHover?.()}
-              onClick={() => {
-                getEngine()?.nextBattleTrack?.();
-              }}
-            >
-              ⏭ Đổi Bài
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="hud-btn main-menu-trigger-btn"
-            id="btn-main-menu-trigger"
-            onClick={() => {
-              getEngine()?.playUIClick?.();
-              setMainMenuOpen(true);
-              setMobileSheetOpen(false);
-            }}
-            title="Mở Menu Chính: Đấu Máy, Đấu Online 1vs1, Cửa Hàng & Cài Đặt"
-          >
-            ☰ Menu Chính
-          </button>
-
-          <button
-            type="button"
-            className="hud-btn primary"
+            className="hud-btn rules-quick-btn"
             onClick={() => {
               setRulesModalOpen(true);
               setMobileSheetOpen(false);
             }}
-            title="Xem Luật Chơi Hearthstone Chess & Bảng Phép Bài"
+            title="Xem Luật Chơi & Bảng Phép Bài"
           >
             📖 Luật
           </button>
 
           <button
             type="button"
-            className={`hud-btn menu-popover-trigger ${mobileSheetOpen ? 'active' : ''}`}
+            className={`hud-btn menu-master-btn ${mobileSheetOpen ? 'active' : ''}`}
             id="btn-mobile-controls"
             aria-expanded={mobileSheetOpen}
             aria-controls="hud-right"
             onClick={() => setMobileSheetOpen((prev) => !prev)}
-            title="Mở bảng Góc Nhìn Camera, Đổi Phe, AI Move & Âm Thanh"
+            title="Mở Bảng Điều Khiển, Cài Đặt & Menu"
           >
-            {mobileSheetOpen ? '✕ Đóng' : '⚙ Menu & Camera'}
+            {mobileSheetOpen ? '✕ Đóng' : '☰ Menu'}
           </button>
         </div>
+      </header>
 
+      {/* BACKDROP */}
+      <div
+        className={`mobile-sheet-backdrop ${mobileSheetOpen ? 'open' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setMobileSheetOpen(false);
+        }}
+        aria-hidden="true"
+      ></div>
+
+      {/* ROYAL TACTICAL QUICK CONTROLS DRAWER */}
+      <div
+        className={`hud-group hud-popover-drawer ${mobileSheetOpen ? 'mobile-sheet-open' : ''}`}
+        id="hud-right"
+      >
         <div
-          className={`mobile-sheet-backdrop ${mobileSheetOpen ? 'open' : ''}`}
+          className="mobile-sheet-handle-wrap"
           onClick={(e) => {
             e.stopPropagation();
             setMobileSheetOpen(false);
           }}
           aria-hidden="true"
-        ></div>
-
-        {/* Popover Control Panel (Contains all required engine button IDs without cluttering the top bar) */}
-        <div
-          className={`hud-group hud-popover-drawer ${mobileSheetOpen ? 'mobile-sheet-open' : ''}`}
-          id="hud-right"
         >
-          <div
-            className="mobile-sheet-handle-wrap"
+          <div className="mobile-sheet-handle"></div>
+        </div>
+
+        <div className="mobile-sheet-header">
+          <span className="mobile-sheet-title">♔ Menu &amp; Cài Đặt</span>
+          <button
+            type="button"
+            className="mobile-sheet-close"
+            id="btn-mobile-sheet-close"
             onClick={(e) => {
               e.stopPropagation();
               setMobileSheetOpen(false);
             }}
-            aria-hidden="true"
+            aria-label="Đóng Menu"
           >
-            <div className="mobile-sheet-handle"></div>
-          </div>
-
-          <div className="mobile-sheet-header">
-            <span className="mobile-sheet-title">Góc Nhìn &amp; Tùy Chọn</span>
-            <button
-              type="button"
-              className="mobile-sheet-close"
-              id="btn-mobile-sheet-close"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMobileSheetOpen(false);
-              }}
-              aria-label="Close Controls"
-            >
-              Đóng ✕
-            </button>
-          </div>
-
-          <div className="mobile-sheet-section-label">Điều Khiển Ván Đấu</div>
-
-          <button
-            className="hud-btn"
-            id="btn-side-toggle"
-            title="Switch between Playing as White and Playing as Black"
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              getEngine()?.playUIClick?.();
-              setMobileSheetOpen(false);
-            }}
-          >
-            Play as Black
+            Đóng ✕
           </button>
-          <button
-            className="hud-btn"
-            id="btn-ai-move"
-            style={{ display: 'none' }}
-            aria-hidden="true"
-            tabIndex={-1}
-          >
-            Auto Move Locked
-          </button>
-          <button
-            className="hud-btn"
-            id="btn-reset"
-            title="Khởi động lại ván cờ mới (Restart)"
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              setMobileSheetOpen(false);
-            }}
-          >
-            🔄 Restart
-          </button>
+        </div>
 
-          <div className="mobile-sheet-section-label">
-            <span>Góc Nhìn Camera 3D</span>
-            <span className="mobile-sheet-section-sub">Nhấn lần 2 để đảo chiều</span>
-          </div>
+        {/* SECTION 1: TÍNH NĂNG CHIẾN THUẬT & TIẾN TRÌNH */}
+        <div className="mobile-sheet-section-label">Chiến Thuật &amp; Cửa Hàng</div>
 
-          <button
-            className="hud-btn active"
-            id="btn-cam-player"
-            title="Player Camera (Click again to flip White / Black view)"
-          >
-            Player Cam
-          </button>
-          <button
-            className="hud-btn"
-            id="btn-cam-top"
-            title="Overhead Board View (Click again to flip White / Black orientation)"
-          >
-            Overhead
-          </button>
-          <button
-            className="hud-btn"
-            id="btn-cam-side"
-            title="Side Profile View (Click again to switch East / West side)"
-          >
-            Side
-          </button>
-          <button
-            className="hud-btn"
-            id="btn-cam-wide"
-            title="Wide Cathedral View (Click again to switch North Rose / South Narthex)"
-          >
-            Cathedral
-          </button>
+        <button
+          type="button"
+          className="hud-btn skin-store-drawer-btn"
+          id="btn-skin-store"
+          onClick={() => {
+            getEngine()?.playUIClick?.();
+            setStoreTab('skins');
+            setSkinStoreOpen(true);
+            setMobileSheetOpen(false);
+          }}
+        >
+          <span>🛒 Cửa Hàng Skin</span>
+          <span className="gold-wallet-pill">🪙 {(gameState?.commercial?.gold ?? 0).toLocaleString()}</span>
+        </button>
 
-          <div className="mobile-sheet-section-label">Âm Thanh &amp; Giao Diện</div>
+        <button
+          type="button"
+          className={`hud-btn ${handsOnActive ? 'active' : ''}`}
+          id="btn-tutorial-open"
+          onClick={() => {
+            getEngine()?.playUIClick?.();
+            setHandsOnActive((prev) => !prev);
+            setMobileSheetOpen(false);
+          }}
+        >
+          {handsOnActive ? '👆 Chỉ Việc: BẬT' : '👆 Chỉ Việc'}
+        </button>
 
+        <button
+          type="button"
+          className={`hud-btn ${gameState?.tacticalPingMode ? 'active' : ''}`}
+          id="btn-tactical-ping"
+          onClick={() => {
+            getEngine()?.toggleTacticalPingMode?.();
+          }}
+        >
+          <span>{gameState?.tacticalPingMode ? '📍 Ping Ô: BẬT' : '📍 Ping Ô 3D'}</span>
+        </button>
+
+        <button
+          type="button"
+          className="hud-btn main-menu-drawer-btn"
+          id="btn-main-menu-trigger"
+          onClick={() => {
+            getEngine()?.playUIClick?.();
+            setMainMenuOpen(true);
+            setMobileSheetOpen(false);
+          }}
+        >
+          👑 Menu Chính
+        </button>
+
+        <button
+          type="button"
+          className="hud-btn restart-drawer-btn danger-hover"
+          id="btn-restart-top"
+          onClick={() => {
+            setRestartConfirmOpen(true);
+          }}
+        >
+          🔄 Khởi Động Lại
+        </button>
+
+        <button
+          className="hud-btn"
+          id="btn-reset"
+          style={{ display: 'none' }}
+          aria-hidden="true"
+        >
+          Restart Engine
+        </button>
+
+        <button
+          className="hud-btn"
+          id="btn-ai-move"
+          style={{ display: 'none' }}
+          aria-hidden="true"
+          tabIndex={-1}
+        >
+          Auto Move Locked
+        </button>
+
+        {/* SECTION 2: GÓC NHÌN CAMERA 3D */}
+        <div className="mobile-sheet-section-label">
+          <span>Góc Nhìn Camera 3D</span>
+          <span className="mobile-sheet-section-sub">Chạm lần 2 đổi hướng</span>
+        </div>
+
+        <button className="hud-btn active" id="btn-cam-player" title="Camera Người Chơi">
+          Player Cam
+        </button>
+        <button className="hud-btn" id="btn-cam-top" title="Góc Nhìn Từ Trên Xuống">
+          Overhead
+        </button>
+        <button className="hud-btn" id="btn-cam-side" title="Góc Nhìn Cạnh Bên">
+          Side View
+        </button>
+        <button className="hud-btn" id="btn-cam-wide" title="Góc Toàn Cảnh">
+          Cathedral
+        </button>
+
+        <button
+          className="hud-btn side-toggle-btn"
+          id="btn-side-toggle"
+          title="Đổi Phe Trắng / Đen"
+          onClick={() => {
+            getEngine()?.playUIClick?.();
+            setMobileSheetOpen(false);
+          }}
+        >
+          🔄 Đổi Phe (Trắng / Đen)
+        </button>
+
+        {/* SECTION 3: ÂM THANH & GIAO DIỆN */}
+        <div className="mobile-sheet-section-label">Âm Thanh &amp; Giao Diện</div>
+
+        <button
+          type="button"
+          className={`hud-btn ${!gameState?.sfxMuted ? 'active' : 'muted'}`}
+          id="btn-sfx-toggle"
+          onClick={() => getEngine()?.toggleSoundMute?.()}
+        >
+          {gameState?.sfxMuted ? '🔇 Hiệu Ứng: TẮT' : '🔊 Hiệu Ứng: BẬT'}
+        </button>
+
+        <button
+          type="button"
+          className={`hud-btn ${gameState?.bgmPlaying ? 'active bgm-playing' : ''}`}
+          id="btn-bgm-toggle"
+          onClick={() => getEngine()?.toggleBattleMusic?.()}
+        >
+          <span>{gameState?.bgmPlaying ? '🎻 Nhạc: BẬT' : '🎼 Nhạc: TẮT'}</span>
+        </button>
+
+        {gameState?.bgmPlaying && (
           <button
             type="button"
-            className={`hud-btn audio-pill-btn ${!gameState?.sfxMuted ? 'active' : 'muted'}`}
-            id="btn-sfx-toggle"
-            title="Bật / Tắt Hiệu Ứng Âm Thanh Tương Tác Chi Tiết (SFX)"
-            onMouseEnter={() => getEngine()?.playUIHover?.()}
-            onClick={() => {
-              getEngine()?.toggleSoundMute?.();
-            }}
-          >
-            <span>{gameState?.sfxMuted ? '🔇 SFX: TẮT' : '🔊 SFX: BẬT'}</span>
-          </button>
-
-          <button
             className="hud-btn"
-            id="btn-hide-ui"
-            title="Toggle HUD visibility (Shortcut: H)"
-            onClick={() => setMobileSheetOpen(false)}
+            id="btn-bgm-next"
+            onClick={() => getEngine()?.nextBattleTrack?.()}
           >
-            Hide UI [H]
+            ⏭ Đổi Bài Nhạc
           </button>
+        )}
 
-          <div className="mobile-sheet-hint">
-            <strong>Mẹo:</strong> Kéo chuột trái xoay góc nhìn • Chuột phải di chuyển • Giữ Alt/Shift + Click hoặc nhấn phím G để Ping ô cờ 3D
-          </div>
-        </div>
+        <button
+          className="hud-btn"
+          id="btn-hide-ui"
+          onClick={() => setMobileSheetOpen(false)}
+        >
+          Ẩn HUD [Phím H]
+        </button>
       </div>
 
-      {/* 3D TACTICAL TILE PING COMMAND BAR (SHOWN WHEN PING MODE IS ACTIVE OR ACTIVE PINGS EXIST ON BOARD) */}
-      {(gameState?.tacticalPingMode || (gameState?.activeTacticalPings?.length || 0) > 0) && (
-        <div
-          className={`tactical-ping-bar ${gameState?.tacticalPingMode ? 'ping-mode-active' : ''}`}
-          id="tactical-ping-bar"
-          role="region"
-          aria-label="Bảng Điều Khiển Ping Chiến Thuật 3D"
-        >
-          <div className="tactical-ping-intents">
-            <span className="tactical-ping-bar-title">
-              {gameState?.tacticalPingMode
-                ? '📍 CHỌN Ô CỜ 3D ĐỂ PING:'
-                : '📍 PING CHIẾN THUẬT AI:'}
-            </span>
-            {Object.values(TACTICAL_PING_INTENTS).map((intentDef) => {
-              const isSelected = (gameState?.selectedPingIntent || 'AUTO') === intentDef.id;
-              return (
-                <button
-                  key={intentDef.id}
-                  type="button"
-                  className={`ping-intent-btn ${isSelected ? 'active' : ''}`}
-                  style={
-                    isSelected
-                      ? {
-                          borderColor: intentDef.colorHex,
-                          color: intentDef.colorHex
-                        }
-                      : undefined
-                  }
-                  title={intentDef.desc}
-                  onClick={() => {
-                    getEngine()?.setTacticalPingIntent?.(intentDef.id);
-                  }}
-                >
-                  <span>{intentDef.icon}</span>
-                  <span>{intentDef.shortLabel}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {(gameState?.activeTacticalPings?.length || 0) > 0 && (
-            <div className="tactical-ping-active-list">
-              {gameState?.activeTacticalPings?.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="active-ping-chip"
-                  style={{ borderColor: p.colorHex, color: p.colorHex }}
-                  title={`${p.label} tại ${p.algebraic.toUpperCase()} (${p.unitDesc || ''}) — Bấm để xóa Ping này`}
-                  onClick={() => {
-                    getEngine()?.removeTacticalPingAt?.(p.r, p.c);
-                  }}
-                >
-                  <span>{p.icon}</span>
-                  <strong>{p.algebraic.toUpperCase()}</strong>
-                  <span className="ping-chip-label">{p.shortLabel || p.label}</span>
-                  <span className="ping-chip-timer">{p.remainingSec}s</span>
-                  <span className="ping-chip-remove">✕</span>
-                </button>
-              ))}
+      {/* SMART COMPACT ACTION DOCK (FLOATING IN THE BOTTOM-RIGHT THUMB ZONE SO IT NEVER COVERS WHITE PIECES) */}
+      {gameState &&
+        gameState.isLoaded &&
+        !gameState.gameOver &&
+        !isCardDockVisible &&
+        !mainMenuOpen &&
+        !gameState.activeCombatBanner && (
+          <aside
+            className={`smart-action-dock phase-${turnPhase.toLowerCase()} ${
+              smartDockCollapsed ? 'dock-collapsed' : ''
+            }`}
+            aria-label="Bảng thao tác lượt cờ"
+          >
+            {smartDockCollapsed ? (
               <button
                 type="button"
-                className="ping-clear-all-btn"
-                title="Xóa toàn bộ Ping chiến thuật trên bàn cờ"
+                className="smart-dock-expand-btn"
+                onClick={() => setSmartDockCollapsed(false)}
+                title="Mở rộng bảng thao tác"
+              >
+                <span>⚡ Thao Tác</span>
+                <span className="dock-expand-arrow">▲</span>
+              </button>
+            ) : (
+              <div className="smart-dock-card">
+                <div className="smart-dock-header">
+                  <div className="smart-dock-phase-track">
+                    <span className="dock-step done">① Bốc</span>
+                    <span className="dock-step-sep">›</span>
+                    <span
+                      className={`dock-step ${
+                        turnPhase === 'EMPOWER_UNIT' || turnPhase === 'ULTIMATE_TARGETING'
+                          ? 'current'
+                          : 'done'
+                      }`}
+                    >
+                      ② Buff
+                    </span>
+                    <span className="dock-step-sep">›</span>
+                    <span className={`dock-step ${turnPhase === 'MOVE_UNIT' ? 'current' : ''}`}>
+                      ③ Đi &amp; Đấu
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="smart-dock-collapse-toggle"
+                    onClick={() => setSmartDockCollapsed(true)}
+                    title="Thu gọn bảng thao tác để nhìn thoáng bàn cờ"
+                  >
+                    ▾
+                  </button>
+                </div>
+
+                <div className="smart-dock-body">
+                  {turnPhase === 'EMPOWER_UNIT' && (
+                    <>
+                      {poker?.committedCombo && (
+                        <div className="smart-dock-combo-pill">
+                          <span className="combo-name" style={{ color: poker.committedCombo.badgeColor }}>
+                            ✨ {poker.committedCombo.nameVi}
+                          </span>
+                          <span className="combo-stats">
+                            +{poker.committedCombo.atkBonus}⚔
+                            {poker.committedCombo.armorBonus > 0 ? ` +${poker.committedCombo.armorBonus}🛡` : ''}
+                          </span>
+                        </div>
+                      )}
+                      <div className="smart-dock-actions">
+                        <button
+                          type="button"
+                          className="smart-btn primary"
+                          onClick={() => getEngine()?.triggerTutorialStepAction?.()}
+                          title="Tự động gắn Buff cho quân tiên phong tốt nhất"
+                        >
+                          ⚡ Tự Gắn Buff
+                        </button>
+                        <button
+                          type="button"
+                          className="smart-btn secondary"
+                          onClick={() => getEngine()?.skipEmpowerPhase?.()}
+                          title="Bỏ qua bước buff và đi quân ngay"
+                        >
+                          ⏭ Đi Quân Ngay
+                        </button>
+                      </div>
+                      <span className="smart-dock-hint">
+                        Chạm 1 quân đồng minh trên bàn 3D để nhận buff
+                      </span>
+                    </>
+                  )}
+
+                  {turnPhase === 'MOVE_UNIT' && (
+                    <div className="smart-dock-actions">
+                      <button
+                        type="button"
+                        className="smart-btn secondary"
+                        onClick={() => setPeekDockDuringMove(true)}
+                        title="Xem lại khay bài poker đang giữ"
+                      >
+                        🃏 Xem Lại Bài
+                      </button>
+                      <button
+                        type="button"
+                        className="smart-btn primary"
+                        onClick={() => getEngine()?.endPlayerTurnNow?.()}
+                        title="Kết thúc lượt cờ ngay"
+                      >
+                        ⌛ Kết Thúc Lượt
+                      </button>
+                    </div>
+                  )}
+
+                  {turnPhase === 'ULTIMATE_TARGETING' && (
+                    <div className="smart-dock-actions">
+                      <button
+                        type="button"
+                        className="smart-btn ultimate"
+                        onClick={() => getEngine()?.confirmFourKingsUltimate?.()}
+                      >
+                        ⚡ Giáng Thiên Phạt ({gameState.ultimateTargetSquares.length || 'Tự Chọn 8'})
+                      </button>
+                    </div>
+                  )}
+
+                  {!isPlayerTurn && (
+                    <div className="smart-dock-wait">
+                      ⏳ Đối thủ ({currentTurnColor === 'w' ? 'Trắng' : 'Đen'}) đang đi...
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </aside>
+        )}
+
+      {/* RESTART CONFIRMATION MODAL */}
+      {restartConfirmOpen && (
+        <div
+          className="codex-modal-backdrop"
+          onClick={() => setRestartConfirmOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="codex-modal-card restart-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="restart-confirm-header">
+              <span className="restart-confirm-icon">🔄</span>
+              <h3 className="restart-confirm-title">Khởi Động Lại Ván Đấu?</h3>
+            </div>
+            <p className="restart-confirm-desc">
+              Bạn có chắc muốn làm mới toàn bộ bàn cờ và bốc lại ván mới không?
+              Mọi tiến trình ván đấu và buff quân hiện tại sẽ được thiết lập lại từ đầu.
+            </p>
+            <div className="restart-confirm-actions">
+              <button
+                type="button"
+                className="btn-restart-action cancel"
+                onClick={() => setRestartConfirmOpen(false)}
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                className="btn-restart-action confirm"
                 onClick={() => {
-                  getEngine()?.clearTacticalPings?.();
+                  setRestartConfirmOpen(false);
+                  setMobileSheetOpen(false);
+                  getEngine()?.restartGame?.();
                 }}
               >
-                ✕ Xóa Hết
+                🔄 Xác Nhận Restart
               </button>
             </div>
-          )}
-
-          {gameState?.tacticalPingMode && (
-            <div className="tactical-ping-hint">
-              Click vào bất kỳ ô cờ 3D nào để đặt cọc tiêu ánh sáng chỉ điểm cho AI • Nhấn <strong>G</strong> hoặc{' '}
-              <button
-                type="button"
-                className="ping-mode-exit-inline"
-                onClick={() => getEngine()?.toggleTacticalPingMode?.(false)}
-              >
-                Thoát Ping
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-
-
-      {/* TEMPORARY 'TIME EXPIRED' TOAST NOTIFICATION WHEN TURN TIMER REACHES 0 */}
-      {timeoutToast && (
-        <div
-          className="turn-timeout-toast"
-          id="turn-timeout-toast"
-          role="alert"
-          aria-live="assertive"
-        >
-          <div className="timeout-toast-icon" aria-hidden="true">
-            ⌛
           </div>
-          <div className="timeout-toast-body">
-            <div className="timeout-toast-title">
-              TIME EXPIRED • HẾT GIỜ SUY NGHĨ (30s)
-            </div>
-            <div className="timeout-toast-desc">
-              {timeoutToast.expiredSide === (gameState?.playerColor || 'w') ? (
-                <>
-                  <strong>Your turn has been skipped!</strong> Lượt của bạn (
-                  {timeoutToast.expiredSide === 'w' ? 'Quân Trắng' : 'Quân Đen'}) đã bị bỏ qua — Chuyển lượt sang phe{' '}
-                  <strong>{timeoutToast.nextSide === 'w' ? 'Trắng' : 'Đen'}</strong>.
-                </>
-              ) : (
-                <>
-                  <strong>Turn skipped!</strong> Lượt của phe{' '}
-                  {timeoutToast.expiredSide === 'w' ? 'Trắng' : 'Đen'} đã hết giờ — Chuyển quyền chỉ huy sang phe{' '}
-                  <strong>{timeoutToast.nextSide === 'w' ? 'Trắng' : 'Đen'}</strong>.
-                </>
-              )}
-            </div>
-            <div className="timeout-toast-progress" key={timeoutToast.id}>
-              <div className="timeout-toast-progress-bar" />
-            </div>
-          </div>
-          <button
-            type="button"
-            className="timeout-toast-close"
-            onClick={() => setTimeoutToast(null)}
-            aria-label="Dismiss Time Expired alert"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Active Combat Clash Banner & Vignette disabled completely for max FPS */}
-
-
-
-      {/* ANIMATED PHASE / TURN / BUFF / COMBAT MILESTONE ANNOUNCEMENT TOAST */}
-      {phaseAnnouncement && gameState?.isLoaded && !gameState?.gameOver && !mainMenuOpen && (
-        <div
-          key={phaseAnnouncement.id}
-          className={`phase-announcement-banner cat-${phaseAnnouncement.category}`}
-          id="phase-announcement-banner"
-          role="status"
-          aria-live="polite"
-        >
-          <span className="phase-ann-badge">{phaseAnnouncement.badge}</span>
-          <span className="phase-ann-title">{phaseAnnouncement.title}</span>
-          <span className="phase-ann-sub">{phaseAnnouncement.subtitle}</span>
-        </div>
-      )}
-
-      {/* LIVE COMBAT FORECAST BANNER (WHEN HOVERING AN ENEMY TARGET) */}
-      {forecast && (
-        <div className={`combat-forecast-card ${outcomeMeta[forecast.outcome].colorClass}`}>
-          <div className="forecast-header">
-            <span className="forecast-outcome-title">{outcomeMeta[forecast.outcome].label}</span>
-            <span className="forecast-coords">
-              {forecast.fromAlgebraic.toUpperCase()} ➔ {forecast.toAlgebraic.toUpperCase()}
-            </span>
-          </div>
-          <div className="forecast-sub">{outcomeMeta[forecast.outcome].sub}</div>
-
-          <div className="forecast-duel-row">
-            <div className="forecast-fighter">
-              <div className="fighter-name">
-                {forecast.attackerUnit.icon} {forecast.attackerUnit.nameVi} (Ta • Lv.{forecast.attackerUnit.level})
-              </div>
-              <div className="fighter-stats">
-                <span>Tổng Công: <strong>{forecast.attTotalAtk}⚔</strong></span>
-                <span>
-                  Máu sau đòn:{' '}
-                  <strong className={forecast.attAfterHp <= 0 ? 'dead-num' : 'alive-num'}>
-                    {forecast.attAfterHp}/{forecast.attackerUnit.maxHp}❤
-                  </strong>
-                </span>
-              </div>
-            </div>
-
-            <div className="forecast-vs">⚡</div>
-
-            <div className="forecast-fighter right">
-              <div className="fighter-name">
-                {forecast.defenderUnit.icon} {forecast.defenderUnit.nameVi} (Địch • Lv.{forecast.defenderUnit.level})
-              </div>
-              <div className="fighter-stats">
-                <span>Phản Đòn: <strong>{forecast.firstStrikeTriggered ? '0 (Bị Phủ Đầu)' : `${forecast.defTotalAtk}⚔`}</strong></span>
-                <span>
-                  Máu sau đòn:{' '}
-                  <strong className={forecast.defAfterHp <= 0 ? 'dead-num' : 'alive-num'}>
-                    {forecast.defAfterHp}/{forecast.defenderUnit.maxHp}❤
-                  </strong>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {forecast.notes.length > 0 && (
-            <div className="forecast-notes">
-              {forecast.notes.map((n, i) => (
-                <span key={i} className="forecast-note-tag">
-                  ✦ {n}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
