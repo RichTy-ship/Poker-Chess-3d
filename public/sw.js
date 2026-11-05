@@ -1,5 +1,5 @@
 // Service Worker for Vương Quyền • Poker Chess 3D PWA
-const CACHE_NAME = 'poker-chess-3d-v2';
+const CACHE_NAME = 'poker-chess-3d-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -26,7 +26,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate or Network-first strategy
+  // Network-first strategy with cache fallback
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
