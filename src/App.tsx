@@ -1044,14 +1044,13 @@ export default function App() {
         ) || null
       : null;
 
-  // Keep the dock visible during DRAW_PHASE, SELECT_CARDS, EMPOWER_UNIT (compact unit-chip selector bar),
-  // and ULTIMATE_TARGETING, then tuck it away during Step 4 (MOVE_UNIT) & active combat so the 3D board is 100% clear.
+  // Keep the dock visible during DRAW_PHASE, SELECT_CARDS, and ULTIMATE_TARGETING,
+  // then tuck it away during Step 2 (EMPOWER_UNIT) & Step 3 (MOVE_UNIT) so the 3D board is 100% clear on mobile/desktop.
   const isCardPhase =
     isPlayerTurn &&
     !gameState?.autoMoveEnabled &&
     (turnPhase === 'DRAW_PHASE' ||
       turnPhase === 'SELECT_CARDS' ||
-      turnPhase === 'EMPOWER_UNIT' ||
       turnPhase === 'ULTIMATE_TARGETING') &&
     !gameState?.activeCombatBanner &&
     !gameState?.isAnimatingMove;
@@ -2614,49 +2613,6 @@ export default function App() {
                 </>
               )}
 
-              {/* STEP 3: COMPACT BUFF TARGET BAR (Cards tucked away so 3D board is clear) */}
-              {turnPhase === 'EMPOWER_UNIT' && poker.committedCombo && (
-                <div className="hs-compact-phase-bar">
-                  <div className="hs-compact-phase-top">
-                    <span className="hs-compact-prompt">
-                      🎯 Chọn quân đồng minh nhận Buff{' '}
-                      <strong style={{ color: poker.committedCombo.badgeColor }}>
-                        {poker.committedCombo.nameVi} (+{poker.committedCombo.atkBonus}⚔
-                        {poker.committedCombo.armorBonus > 0
-                          ? ` +${poker.committedCombo.armorBonus}🛡`
-                          : ''}
-                        )
-                      </strong>
-                      :
-                    </span>
-                    <button
-                      type="button"
-                      className="poker-btn commit"
-                      onClick={() => getEngine()?.skipEmpowerPhase?.()}
-                      disabled={!isPlayerTurn}
-                    >
-                      ⚡ Gắn Nhanh Cho Hậu/Vua
-                    </button>
-                  </div>
-
-                  {friendlyUnits.length > 0 && (
-                    <div className="empower-unit-chips">
-                      {friendlyUnits.slice(0, 8).map((u) => (
-                        <button
-                          key={`${u.r}_${u.c}`}
-                          type="button"
-                          className="empower-unit-chip"
-                          onClick={() => getEngine()?.empowerFriendlyUnitAt?.(u.r, u.c)}
-                        >
-                          <span>{u.icon}</span>
-                          <span>{u.nameVi}</span>
-                          <span className="chip-coord">{u.algebraic.toUpperCase()}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* STEP 4: SLIM BOARD MOVEMENT & COMBAT BAR */}
               {(turnPhase === 'MOVE_UNIT' || turnPhase === 'ULTIMATE_TARGETING') && (

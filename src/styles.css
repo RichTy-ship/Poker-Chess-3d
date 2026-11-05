@@ -2604,22 +2604,7 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   cursor: default;
 }
 
-/* STEP 3 (EMPOWER_UNIT) & STEP 4 (MOVE_UNIT): Compact Phase Bars */
-.hs-compact-phase-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 2px 2px 0;
-}
-
-.hs-compact-phase-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
+/* STEP 4 (MOVE_UNIT): Slim Movement Bar */
 .hs-compact-prompt {
   font-size: 0.74rem;
   color: var(--text);
@@ -2636,53 +2621,6 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   gap: 12px;
   padding: 2px 2px 0;
   flex-wrap: wrap;
-}
-
-.empower-unit-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding-top: 4px;
-  border-top: 1px solid rgba(212, 175, 55, 0.18);
-}
-
-.empower-chips-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--gold-bright);
-}
-
-.empower-unit-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(16, 185, 129, 0.14);
-  border: 1px solid rgba(52, 211, 153, 0.55);
-  color: #ecfdf5;
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-.empower-unit-chip:hover {
-  transform: translateY(-1px);
-  background: rgba(16, 185, 129, 0.28);
-  border-color: #fde047;
-}
-
-.empower-unit-chip .chip-coord {
-  font-family: 'JetBrains Mono', monospace;
-  color: #fef08a;
-}
-
-.empower-unit-chip .chip-stats {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.64rem;
-  color: #a7f3d0;
 }
 
 /* Quick Sandbox Preset Strip (Hidden unless toggled open) */
