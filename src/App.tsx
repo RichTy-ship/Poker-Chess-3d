@@ -726,6 +726,17 @@ export default function App() {
   const [gameState, setGameState] = useState<PokerChessSyncState | null>(null);
   const [timeoutToast, setTimeoutToast] = useState<TurnTimeoutNoticeUI | null>(null);
   const [phaseAnnouncement, setPhaseAnnouncement] = useState<PhaseAnnouncementUI | null>(null);
+  const [realtimeFps, setRealtimeFps] = useState<number>(60);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const fps = getEngine()?.getFPS?.();
+      if (typeof fps === 'number' && fps > 0) {
+        setRealtimeFps(fps);
+      }
+    }, 350);
+    return () => clearInterval(id);
+  }, []);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [smartDockCollapsed, setSmartDockCollapsed] = useState(false);
 
@@ -1378,11 +1389,37 @@ export default function App() {
   return (
     <>
       <div id="loading-overlay">
-        <div className="loader-title">Vương Quyền • Hearthstone Chess</div>
-        <div className="loader-bar-wrap">
-          <div className="loader-bar" id="loader-bar"></div>
+        <div className="loader-crest-container">
+          <div className="loader-arcane-ring" aria-hidden="true">
+            <span className="arcane-suit suit-spade">♠</span>
+            <span className="arcane-suit suit-heart">♥</span>
+            <span className="arcane-suit suit-diamond">♦</span>
+            <span className="arcane-suit suit-club">♣</span>
+          </div>
+          <div className="loader-crown-glow">♔</div>
         </div>
-        <div id="loader-text">Summoning Sanctum Architecture &amp; Sculpted Pieces...</div>
+
+        <div className="loader-brand-title">POKER CHESS 3D</div>
+        <div className="loader-brand-subtitle">Vương Quyền Sanctum • Đại Chiến Phép Bài 3D</div>
+
+        <div className="loader-bar-section">
+          <div className="loader-bar-wrap">
+            <div className="loader-bar" id="loader-bar" style={{ width: '15%' }}>
+              <span className="loader-bar-light-sweep" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="loader-status-row">
+            <span id="loader-text">Khởi tạo thánh địa và điêu khắc quân cờ 3D...</span>
+            <span id="loader-pct" className="loader-pct-badge">15%</span>
+          </div>
+        </div>
+
+        <div className="loader-tactical-tip">
+          <span className="tip-badge">💡 Mẹo Chiến Thuật</span>
+          <span className="tip-content">
+            Ghép bộ <strong>Cù Lũ (Full House)</strong> hoặc <strong>Thùng (Flush)</strong> để nhận lượng lớn Giáp 🛡 và Sức Mạnh ⚔ lật ngược thế cờ!
+          </span>
+        </div>
       </div>
 
       <div id="canvas-container"></div>
@@ -1419,8 +1456,14 @@ export default function App() {
         {/* LEFT ZONE: Brand & Performance FPS */}
         <div className="hud-zone hud-left" id="hud-left">
           <div className="brand-pill" title="Vương Quyền Poker 3D">
-            <span className="brand-crown" aria-hidden="true">♔</span>
-            <span className="brand-title">Vương Quyền</span>
+            <div className="brand-poker-emblem">
+              <span className="emblem-crown">♔</span>
+              <span className="emblem-card-pip">♠</span>
+            </div>
+            <div className="brand-text-col">
+              <span className="brand-title">POKER CHESS</span>
+              <span className="brand-sub">3D VƯƠNG QUYỀN</span>
+            </div>
           </div>
 
           {/* Real-time FPS & Performance Mode Switcher */}
@@ -1456,7 +1499,7 @@ export default function App() {
                     : 'fps-low'
               }`}
             />
-            <span className="fps-val">{gameState?.fps ?? 60} FPS</span>
+            <span className="fps-val" id="realtime-fps-val">{realtimeFps} FPS</span>
             <span className="perf-badge">
               {gameState?.performancePreset === 'performance'
                 ? '⚡ Max'
@@ -2086,15 +2129,15 @@ export default function App() {
                       const total = poker.hand.length;
                       const mid = (total - 1) / 2;
                       const offset = idx - mid;
-                      const rotDeg = offset * 2.4;
-                      const liftY = Math.abs(offset) * 1.8;
+                      const rotDeg = offset * 2.6;
+                      const liftY = Math.abs(offset) * 2.0;
                       return (
                         <button
                           key={card.id}
                           type="button"
                           style={{
                             transform: isSelected
-                              ? `translateY(-12px) rotate(0deg) scale(1.05)`
+                              ? `translateY(-16px) rotate(0deg) scale(1.08)`
                               : `translateY(${liftY}px) rotate(${rotDeg}deg)`
                           }}
                           className={`playing-card hs-card ${card.color} ${
@@ -2103,13 +2146,21 @@ export default function App() {
                           onMouseEnter={() => getEngine()?.playUIHover?.()}
                           onClick={() => getEngine()?.toggleCardSelectionIndex?.(idx)}
                           disabled={!isPlayerTurn}
-                          title={`${card.rankLabel}${card.suitSymbol} — Click để chọn/bỏ chọn`}
+                          title={`${card.rankLabel}${card.suitSymbol} — Chạm để chọn`}
                         >
+                          <div className="card-foil-shine" aria-hidden="true" />
                           <div className="card-corner top">
                             <span className="card-rank">{card.rankLabel}</span>
                             <span className="card-suit-sm">{card.suitSymbol}</span>
                           </div>
-                          <div className="card-center-suit">{card.suitSymbol}</div>
+                          <div className="card-center-suit" aria-hidden="true">
+                            <span className="card-suit-large">{card.suitSymbol}</span>
+                            <span className="card-rank-watermark">{card.rankLabel}</span>
+                          </div>
+                          <div className="card-corner bottom" aria-hidden="true">
+                            <span className="card-rank">{card.rankLabel}</span>
+                            <span className="card-suit-sm">{card.suitSymbol}</span>
+                          </div>
                         </button>
                       );
                     })}

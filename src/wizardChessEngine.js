@@ -2718,6 +2718,8 @@ export function initWizardChess() {
         loadedCount++;
         const pct = Math.min(100, Math.round((loadedCount / totalItems) * 100));
         if (loaderBar) loaderBar.style.width = `${pct}%`;
+        const pctEl = document.getElementById('loader-pct');
+        if (pctEl) pctEl.textContent = `${pct}%`;
         if (loaderText) loaderText.textContent = label;
       }
 
@@ -12467,10 +12469,14 @@ export function initWizardChess() {
       lastRenderTime = now;
 
       frameCount++;
-      if (now - lastFpsTime >= 500) {
+      if (now - lastFpsTime >= 300) {
         currentFPS = Math.round((frameCount * 1000) / (now - lastFpsTime));
         frameCount = 0;
         lastFpsTime = now;
+        const fpsEl = document.getElementById('realtime-fps-val');
+        if (fpsEl) {
+          fpsEl.textContent = `${currentFPS} FPS`;
+        }
       }
       const dt = Math.min(clock.getDelta(), 0.1);
       stepScene(dt || 0.016, true);
