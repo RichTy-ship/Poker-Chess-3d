@@ -91,17 +91,19 @@ export function initWizardChess() {
         localStorage.setItem('pokerchess_perf_mode', preset);
       } catch (e) {}
 
+      // Compute crisp high-DPI pixel ratio for Android/iOS Retina displays (eliminates blurriness/vỡ nét)
+      const dpr = window.devicePixelRatio || 1;
       if (preset === 'performance') {
-        renderer.setPixelRatio(0.85);
+        renderer.setPixelRatio(Math.min(Math.max(dpr, 1.0), 1.5));
         renderer.shadowMap.enabled = false;
       } else if (preset === 'ultra') {
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+        renderer.setPixelRatio(Math.min(dpr, 2.5));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.shadowMap.needsUpdate = true;
       } else {
-        // balanced: native 1.0 pixel ratio and fast PCF shadows
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
+        // balanced: native high-DPI up to 2.0 (crystal sharp on Android 1080p/1440p)
+        renderer.setPixelRatio(Math.min(dpr, 2.0));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.shadowMap.needsUpdate = true;
@@ -12381,6 +12383,11 @@ export function initWizardChess() {
     }
 
     window.addEventListener('resize', () => {
+      const dpr = window.devicePixelRatio || 1;
+      const targetRatio = performancePreset === 'ultra'
+        ? Math.min(dpr, 2.5)
+        : (performancePreset === 'performance' ? Math.min(Math.max(dpr, 1.0), 1.5) : Math.min(dpr, 2.0));
+      renderer.setPixelRatio(targetRatio);
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);

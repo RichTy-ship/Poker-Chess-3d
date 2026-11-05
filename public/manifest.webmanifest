@@ -1,0 +1,26 @@
+{
+  "name": "Vương Quyền • Poker Chess 3D",
+  "short_name": "PokerChess3D",
+  "description": "Cờ Vua 3D Chiến Thuật Phép Thuật Poker - Đấu Máy & Trực Tuyến 1vs1",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#070a12",
+  "theme_color": "#070a12",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "strategy"]
+}

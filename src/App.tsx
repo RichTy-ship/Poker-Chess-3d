@@ -700,6 +700,10 @@ export default function App() {
   const [spSide, setSpSide] = useState<'w' | 'b'>('w');
   const [spBotLevel, setSpBotLevel] = useState<number>(1);
   const [serverStats, setServerStats] = useState({ onlinePlayers: 1, activeMatches: 0, queuedPlayers: 0 });
+  const [isPortrait, setIsPortrait] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && window.innerHeight > window.innerWidth && window.innerWidth <= 850;
+  });
+  const [dismissPortraitPrompt, setDismissPortraitPrompt] = useState(false);
   const initialMenuShownRef = useRef(false);
   const [pokerDockMinimized, setPokerDockMinimized] = useState(false);
   const [peekDockDuringMove, setPeekDockDuringMove] = useState(false);
@@ -862,14 +866,37 @@ export default function App() {
       if (window.innerWidth > 768) {
         setMobileSheetOpen(false);
       }
+      setIsPortrait(window.innerHeight > window.innerWidth && window.innerWidth <= 850);
+    };
+    const handleOrientationChange = () => {
+      setTimeout(() => {
+        setIsPortrait(window.innerHeight > window.innerWidth && window.innerWidth <= 850);
+      }, 150);
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleOrientationChange);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleOrientationChange);
     };
   }, []);
+
+  const requestLandscapeLock = async () => {
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen().catch(() => {});
+      }
+      if (screen.orientation && 'lock' in screen.orientation) {
+        await (screen.orientation as any).lock('landscape').catch(() => {});
+      } else if ((screen as any).lockOrientation) {
+        (screen as any).lockOrientation('landscape');
+      }
+    } catch {
+      // User or browser may prevent orientation locking
+    }
+  };
 
   const getEngine = () => (window as unknown as WizardChessWindow).wizardChess;
 
@@ -2675,6 +2702,44 @@ export default function App() {
         </div>
         <div className="captured-pill" id="captured-tray"></div>
       </div>
+
+      {/* MOBILE PORTRAIT ORIENTATION ENCOURAGEMENT OVERLAY */}
+      {isPortrait && !dismissPortraitPrompt && (
+        <aside
+          className="portrait-orientation-overlay"
+          role="region"
+          aria-label="Cảnh báo xoay màn hình ngang"
+        >
+          <div className="portrait-orientation-card">
+            <div className="rotate-phone-anim">
+              <span className="phone-icon">📱</span>
+              <span className="rotate-arrow">⟳</span>
+            </div>
+            <h2 className="rotate-title">VUI LÒNG XOAY NGANG MÀN HÌNH</h2>
+            <p className="rotate-desc">
+              Game Poker Chess 3D được thiết kế tối ưu nhất ở chế độ màn hình nằm ngang (Landscape) để quan sát trọn vẹn bàn cờ và bộ bài phép.
+            </p>
+            <div className="rotate-actions">
+              <button
+                type="button"
+                className="rotate-btn primary"
+                onClick={async () => {
+                  await requestLandscapeLock();
+                }}
+              >
+                ⛶ Toàn Màn Hình &amp; Xoay Ngang
+              </button>
+              <button
+                type="button"
+                className="rotate-btn secondary"
+                onClick={() => setDismissPortraitPrompt(true)}
+              >
+                Tiếp Tục Chế Độ Dọc
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
 
       {/* COMPREHENSIVE MAIN MENU MODAL */}
       {mainMenuOpen && (
