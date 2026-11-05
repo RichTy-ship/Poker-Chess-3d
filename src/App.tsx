@@ -12,6 +12,7 @@ import {
 import { multiplayerClient } from './multiplayerClient.js';
 import donateQrImage from './assets/donate_qr_clean.png';
 import gameLogoMaster from './assets/game_logo.jpg';
+import { Language, DICTIONARY, getInitialLanguage } from './i18n';
 
 interface PokerCardUI {
   id: string;
@@ -734,6 +735,19 @@ export default function App() {
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [editNameModalOpen, setEditNameModalOpen] = useState(false);
   const [inputPlayerName, setInputPlayerName] = useState('');
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const t = DICTIONARY[lang];
+
+  const toggleLanguage = () => {
+    setLang((prev) => {
+      const next: Language = prev === 'vi' ? 'en' : 'vi';
+      try {
+        localStorage.setItem('pokerchess_lang', next);
+      } catch (e) {}
+      getEngine()?.playUIClick?.();
+      return next;
+    });
+  };
 
   const openEditNameModal = () => {
     const current = gameState?.commercial?.name || 'Kỳ Thủ Vương Quyền';
@@ -1494,8 +1508,8 @@ export default function App() {
           />
         </div>
 
-        <div className="loader-brand-title">VƯƠNG QUYỀN • POKER CHESS 3D</div>
-        <div className="loader-brand-subtitle">Đại Chiến Cờ Thần &amp; Phép Thuật Poker 3D</div>
+        <div className="loader-brand-title">{t.loadingTitle}</div>
+        <div className="loader-brand-subtitle">{t.loadingSub}</div>
 
         <div className="loader-bar-section">
           <div className="loader-bar-wrap">
@@ -1510,7 +1524,7 @@ export default function App() {
         </div>
 
         <div className="loader-tactical-tip">
-          <span className="tip-badge">⚜ BÍ KÍP VƯƠNG QUYỀN ⚜</span>
+          <span className="tip-badge">{t.loadingTipBadge}</span>
           <span className="tip-content">
             Ghép bộ <strong>Cù Lũ (Full House)</strong> hoặc <strong>Thùng Phá Sảnh</strong> để triệu hồi Thiên Phạt ⚡ nhận lượng lớn Giáp 🛡 và Sức Mạnh ⚔!
           </span>
@@ -1703,9 +1717,18 @@ export default function App() {
               setRulesModalOpen(true);
               setMobileSheetOpen(false);
             }}
-            title="Xem Luật Chơi & Bảng Phép Bài"
+            title={lang === 'vi' ? "Xem Luật Chơi & Bảng Phép Bài" : "View Rules & Spell Table"}
           >
-            📖 Luật
+            {t.rulesQuick}
+          </button>
+
+          <button
+            type="button"
+            className="hud-btn lang-toggle-btn"
+            onClick={toggleLanguage}
+            title={lang === 'vi' ? "Chuyển sang English" : "Switch to Tiếng Việt"}
+          >
+            {lang === 'vi' ? '🇻🇳 VI' : '🇬🇧 EN'}
           </button>
 
           <button
@@ -1808,11 +1831,19 @@ export default function App() {
 
         <button
           type="button"
+          className="hud-btn lang-drawer-btn"
+          onClick={toggleLanguage}
+        >
+          {t.drawerLanguage}
+        </button>
+
+        <button
+          type="button"
           className="hud-btn share-drawer-btn"
           id="btn-share-game"
           onClick={handleShareGame}
         >
-          {copiedShareLink ? '✓ Đã Sao Chép Link!' : '📢 Mời Bạn Bè Chơi'}
+          {copiedShareLink ? t.shareCopied : t.shareBtn}
         </button>
 
         <button
@@ -2694,18 +2725,28 @@ export default function App() {
                   className="main-menu-crest-logo"
                 />
                 <div>
-                  <h2 className="main-menu-title">VƯƠNG QUYỀN • POKER CHESS 3D</h2>
-                  <div className="main-menu-subtitle">Hệ Thống Menu Chiến Thuật &amp; Điều Khiển Toàn Diện</div>
+                  <h2 className="main-menu-title">{t.mainMenuTitle}</h2>
+                  <div className="main-menu-subtitle">{t.mainMenuSubtitle}</div>
                 </div>
               </div>
-              <button
-                type="button"
-                className="main-menu-close-btn"
-                onClick={() => setMainMenuOpen(false)}
-                title="Đóng Menu Chính"
-              >
-                ✕
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="lang-pill-btn"
+                  onClick={toggleLanguage}
+                  title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+                >
+                  {lang === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
+                </button>
+                <button
+                  type="button"
+                  className="main-menu-close-btn"
+                  onClick={() => setMainMenuOpen(false)}
+                  title={t.closeQuick}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Profile Ribbon */}
@@ -3895,9 +3936,9 @@ export default function App() {
             <div className="edit-name-header">
               <div className="edit-name-title-row">
                 <span className="edit-name-icon">👑</span>
-                <h3 className="edit-name-title">Đổi Tên Kỳ Thủ</h3>
+                <h3 className="edit-name-title">{t.renameTitle}</h3>
               </div>
-              <div className="edit-name-sub">Tên hiển thị khi thi đấu, trên BXH Elo và cho đối thủ thấy</div>
+              <div className="edit-name-sub">{t.renameSub}</div>
               <button
                 type="button"
                 className="main-menu-close-btn"
@@ -3927,20 +3968,20 @@ export default function App() {
                   className="btn-name-save"
                   disabled={!inputPlayerName.trim()}
                 >
-                  💾 Lưu Tên
+                  {t.renameSave}
                 </button>
                 <button
                   type="button"
                   className="btn-name-cancel"
                   onClick={() => setEditNameModalOpen(false)}
                 >
-                  Hủy
+                  {t.renameCancel}
                 </button>
               </div>
 
               <div className="edit-name-suggestions">
-                <span className="suggest-lbl">Gợi ý danh hiệu:</span>
-                {['Đại Kiện Tướng', 'Thần Cờ 3D', 'Vua Phép Thuật', 'Poker King', 'Kỳ Thánh'].map((sug) => (
+                <span className="suggest-lbl">{t.renameSuggestions}</span>
+                {[t.sugGrandmaster, t.sugChessLegend, t.sugArchmage, t.sugPokerKing, t.sugSanctumLord].map((sug) => (
                   <button
                     key={sug}
                     type="button"
