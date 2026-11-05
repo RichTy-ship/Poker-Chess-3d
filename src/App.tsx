@@ -699,6 +699,7 @@ export default function App() {
   const [spSide, setSpSide] = useState<'w' | 'b'>('w');
   const [spBotLevel, setSpBotLevel] = useState<number>(1);
   const [serverStats, setServerStats] = useState({ onlinePlayers: 1, activeMatches: 0, queuedPlayers: 0 });
+  const [menuTilt, setMenuTilt] = useState<{ rx: number; ry: number }>({ rx: 0, ry: 0 });
   const initialMenuShownRef = useRef(false);
   const [pokerDockMinimized, setPokerDockMinimized] = useState(false);
   const [peekDockDuringMove, setPeekDockDuringMove] = useState(false);
@@ -869,6 +870,21 @@ export default function App() {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  const handleMenuMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rx = ((centerY - y) / centerY) * 3.5;
+    const ry = ((x - centerX) / centerX) * 3.5;
+    setMenuTilt({ rx, ry });
+  };
+
+  const handleMenuMouseLeave = () => {
+    setMenuTilt({ rx: 0, ry: 0 });
+  };
 
   const getEngine = () => (window as unknown as WizardChessWindow).wizardChess;
 
@@ -2683,7 +2699,15 @@ export default function App() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="main-menu-card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="main-menu-card"
+            style={{
+              transform: `perspective(1000px) rotateX(${menuTilt.rx + 1.5}deg) rotateY(${menuTilt.ry}deg) translateZ(12px)`
+            }}
+            onMouseMove={handleMenuMouseMove}
+            onMouseLeave={handleMenuMouseLeave}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="main-menu-header">
               <div className="main-menu-title-wrap">
                 <span className="main-menu-crest">👑</span>
