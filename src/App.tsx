@@ -400,6 +400,7 @@ interface PokerChessSyncState {
   isAnimatingMove?: boolean;
   isConsideringMove?: boolean;
   lastTimeoutNotice?: TurnTimeoutNoticeUI | null;
+  isLoaded?: boolean;
   gameOver: boolean;
   winnerColor: 'w' | 'b' | null;
   defeatedColor: 'w' | 'b' | null;
@@ -987,7 +988,7 @@ export default function App() {
 
   // Real-time Hands-On Spotlight & 3D Board Pointer tracker ("Cầm Tay Chỉ Việc")
   useEffect(() => {
-    if (!handsOnActive || gameState?.gameOver || skinStoreOpen || rulesModalOpen) {
+    if (!handsOnActive || !gameState?.isLoaded || gameState?.gameOver || skinStoreOpen || rulesModalOpen) {
       setHandsOnSpot(null);
       return;
     }
@@ -1931,7 +1932,7 @@ export default function App() {
       {/* Active Combat Clash Banner & Vignette disabled completely for max FPS */}
 
       {/* BOTTOM-DOCKED TURN & COMBAT STATUS BAR (SHOWN ONLY WHEN THE CARD DOCK IS AUTO-HIDDEN) */}
-      {gameState && !gameState.gameOver && !isCardDockVisible && (
+      {gameState && gameState.isLoaded && !gameState.gameOver && !isCardDockVisible && (
         <div
           className={`turn-flow-director-bar phase-${turnPhase.toLowerCase()} ${
             gameState.activeCombatBanner ? 'in-combat' : !isPlayerTurn ? 'opponent-turn' : ''
@@ -2073,7 +2074,7 @@ export default function App() {
       )}
 
       {/* ANIMATED PHASE / TURN / BUFF / COMBAT MILESTONE ANNOUNCEMENT TOAST */}
-      {phaseAnnouncement && !gameState?.gameOver && (
+      {phaseAnnouncement && gameState?.isLoaded && !gameState?.gameOver && (
         <div
           key={phaseAnnouncement.id}
           className={`phase-announcement-banner cat-${phaseAnnouncement.category}`}
@@ -2461,7 +2462,7 @@ export default function App() {
       )}
 
       {/* HANDS-ON INTERACTIVE POINTER & SPOTLIGHT OVERLAY ("CẦM TAY CHỈ VIỆC" — ZERO WALL OF TEXT) */}
-      {handsOnActive && handsOnSpot && !gameState?.gameOver && (
+      {handsOnActive && handsOnSpot && gameState?.isLoaded && !gameState?.gameOver && (
         <div
           className="hands-on-overlay-layer"
           id="hands-on-overlay"

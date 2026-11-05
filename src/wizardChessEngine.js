@@ -1898,6 +1898,7 @@ export function initWizardChess() {
     const gltfLoader = new GLTFLoader();
     const pieceTemplates = {};
     const activeMixers = [];
+    let isAssetsLoaded = false;
     const shatterDebris = [];
     const clock = new THREE.Clock();
     let frameCount = 0;
@@ -2934,7 +2935,9 @@ export function initWizardChess() {
         });
       }
 
+      isAssetsLoaded = true;
       document.getElementById('loading-overlay')?.classList.add('hidden');
+      emitPokerChessSync();
     }
 
     // =========================================================================
@@ -9599,6 +9602,7 @@ export function initWizardChess() {
       const displaySeconds = Math.max(0, Math.ceil(turnTimeRemaining));
 
       return {
+        isLoaded: isAssetsLoaded,
         currentTurn,
         playerColor,
         turnNumber,
