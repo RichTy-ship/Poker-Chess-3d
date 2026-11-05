@@ -9847,6 +9847,7 @@ export function initWizardChess() {
         })),
         commercial: {
           publishMode: true,
+          name: commercialProfile.name || 'Kỳ Thủ Vương Quyền',
           elo: commercialProfile.elo || 1000,
           peakElo: Math.max(commercialProfile.elo || 1000, commercialProfile.peakElo || 1000),
           gold: commercialProfile.gold ?? 0,
@@ -12442,6 +12443,24 @@ export function initWizardChess() {
 
     let manualStepMode = false;
     window.wizardChess.cyclePerformancePreset = cyclePerformancePreset;
+    function setPlayerName(newName) {
+      if (!newName || typeof newName !== 'string') return commercialProfile.name || 'Kỳ Thủ Vương Quyền';
+      const clean = newName.trim().slice(0, 24);
+      if (!clean) return commercialProfile.name || 'Kỳ Thủ Vương Quyền';
+      commercialProfile.name = clean;
+      saveCommercialProfile(commercialProfile);
+      if (typeof multiplayerClient !== 'undefined' && multiplayerClient.updateProfile) {
+        multiplayerClient.updateProfile({
+          name: clean,
+          elo: commercialProfile.elo,
+          equippedSkinId: commercialProfile.equippedSkinId
+        });
+      }
+      emitPokerChessSync();
+      return commercialProfile.name;
+    }
+    window.wizardChess.setPlayerName = setPlayerName;
+    window.wizardChess.getPlayerName = () => commercialProfile.name || 'Kỳ Thủ Vương Quyền';
     window.wizardChess.setPerformancePreset = applyPerformanceSettings;
     window.wizardChess.getPerformancePreset = () => performancePreset;
     window.wizardChess.cyclePathingDisplayMode = cyclePathingDisplayMode;

@@ -7575,3 +7575,219 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   background: linear-gradient(135deg, rgba(56, 189, 248, 0.45), rgba(30, 58, 138, 0.8)) !important;
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
 }
+
+/* =========================================================================
+   PROFILE EDIT PLAYER NAME STYLES & MODAL
+   ========================================================================= */
+.profile-name-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-tier-sub {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+}
+
+.profile-edit-name-btn {
+  background: rgba(216, 180, 91, 0.15);
+  border: 1px solid rgba(216, 180, 91, 0.45);
+  color: var(--gold-bright);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+}
+
+.profile-edit-name-btn:hover {
+  background: rgba(216, 180, 91, 0.3);
+  border-color: var(--gold-bright);
+  transform: translateY(-1px);
+}
+
+.elo-hero-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+}
+
+.elo-hero-player-name {
+  font-family: 'Cinzel', serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.edit-name-modal-card {
+  position: relative;
+  z-index: 10;
+  width: 90%;
+  max-width: 480px;
+  background: linear-gradient(180deg, #182032 0%, #0d1322 100%);
+  border: 2px solid #d4af37;
+  border-radius: 16px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 35px rgba(212, 175, 55, 0.35);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: menuModalPop 0.22s ease-out;
+}
+
+.edit-name-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+}
+
+.edit-name-icon {
+  font-size: 1.8rem;
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+.edit-name-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.2rem;
+  color: var(--gold-bright);
+}
+
+.edit-name-sub {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.edit-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.edit-name-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.edit-name-input {
+  width: 100%;
+  background: rgba(5, 8, 14, 0.85);
+  border: 1.5px solid rgba(212, 175, 55, 0.5);
+  border-radius: 10px;
+  padding: 12px 60px 12px 14px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.edit-name-input:focus {
+  border-color: #facc15;
+  box-shadow: 0 0 16px rgba(250, 204, 21, 0.4);
+}
+
+.edit-name-count {
+  position: absolute;
+  right: 12px;
+  font-size: 0.72rem;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.edit-name-suggestions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.suggest-lbl {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.suggest-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.suggest-chip:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: #d4af37;
+  color: #fef08a;
+  transform: translateY(-1px);
+}
+
+.edit-name-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.btn-name-cancel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.btn-name-cancel:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.btn-name-save {
+  background: linear-gradient(135deg, #d8b45b 0%, #b45309 100%);
+  border: 1px solid #fef08a;
+  color: #0b0f19;
+  font-weight: 800;
+  padding: 9px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 14px rgba(216, 180, 91, 0.35);
+}
+
+.btn-name-save:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(216, 180, 91, 0.55);
+}
+
+.btn-name-save:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

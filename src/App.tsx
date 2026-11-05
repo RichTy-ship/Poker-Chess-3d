@@ -505,6 +505,7 @@ interface PokerChessSyncState {
     remainingSec: number;
   }[];
   commercial?: {
+    name?: string;
     elo: number;
     peakElo: number;
     gold: number;
@@ -568,6 +569,8 @@ interface PokerChessSyncState {
 
 type WizardChessWindow = {
   wizardChess?: {
+    setPlayerName?: (name: string) => string;
+    getPlayerName?: () => string;
     toggleUI?: (force?: boolean) => void;
     toggleAutoMove?: (force?: boolean) => boolean;
     restartGame?: () => void;
@@ -728,6 +731,24 @@ export default function App() {
   const [phaseAnnouncement, setPhaseAnnouncement] = useState<PhaseAnnouncementUI | null>(null);
   const [realtimeFps] = useState<number>(60);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
+  const [editNameModalOpen, setEditNameModalOpen] = useState(false);
+  const [inputPlayerName, setInputPlayerName] = useState('');
+
+  const openEditNameModal = () => {
+    const current = gameState?.commercial?.name || 'Kỳ Thủ Vương Quyền';
+    setInputPlayerName(current);
+    setEditNameModalOpen(true);
+  };
+
+  const handleSavePlayerName = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = inputPlayerName.trim().slice(0, 24);
+    if (clean) {
+      getEngine()?.setPlayerName?.(clean);
+      multiplayerClient.updateProfile({ name: clean });
+    }
+    setEditNameModalOpen(false);
+  };
 
   const handleShareGame = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -2583,6 +2604,80 @@ export default function App() {
         </div>
       )}
 
+
+      {/* EDIT PLAYER NAME MODAL */}
+      {editNameModalOpen && (
+        <div
+          className="main-menu-backdrop"
+          onClick={() => setEditNameModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="edit-name-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-name-header">
+              <span className="edit-name-icon">👑</span>
+              <div>
+                <h3 className="edit-name-title">Đổi Tên Kỳ Thủ</h3>
+                <div className="edit-name-sub">Tên sẽ hiển thị khi thi đấu, trên bảng xếp hạng Elo và cho đối thủ thấy</div>
+              </div>
+              <button
+                type="button"
+                className="main-menu-close-btn"
+                onClick={() => setEditNameModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePlayerName} className="edit-name-form">
+              <div className="edit-name-input-wrap">
+                <input
+                  type="text"
+                  maxLength={24}
+                  className="edit-name-input"
+                  placeholder="Nhập tên kỳ thủ (tối đa 24 ký tự)..."
+                  value={inputPlayerName}
+                  onChange={(e) => setInputPlayerName(e.target.value)}
+                  autoFocus
+                />
+                <span className="edit-name-count">{inputPlayerName.length}/24</span>
+              </div>
+
+              <div className="edit-name-suggestions">
+                <span className="suggest-lbl">Gợi ý danh hiệu:</span>
+                {['Đại Kiện Tướng', 'Thần Cờ 3D', 'Vua Phép Thuật', 'Poker King', 'Kỳ Thánh'].map((sug) => (
+                  <button
+                    key={sug}
+                    type="button"
+                    className="suggest-chip"
+                    onClick={() => setInputPlayerName(sug)}
+                  >
+                    {sug}
+                  </button>
+                ))}
+              </div>
+
+              <div className="edit-name-actions">
+                <button
+                  type="button"
+                  className="btn-name-cancel"
+                  onClick={() => setEditNameModalOpen(false)}
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="btn-name-save"
+                  disabled={!inputPlayerName.trim()}
+                >
+                  💾 Lưu Tên Kỳ Thủ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* COMPREHENSIVE MAIN MENU MODAL */}
       {mainMenuOpen && (
         <div
@@ -2634,11 +2729,26 @@ export default function App() {
             <div className="main-menu-profile-ribbon">
               <div className="profile-ribbon-left">
                 <span className="profile-avatar">🧙</span>
-                <span className="profile-name">
-                  {gameState?.commercial?.rankInfo?.tierNameVi
-                    ? `${gameState.commercial.rankInfo.tierNameVi} • Kỳ Thủ`
-                    : 'Kỳ Thủ Vương Quyền'}
-                </span>
+                <div className="profile-name-stack">
+                  <div className="profile-name-line">
+                    <span className="profile-name">
+                      {gameState?.commercial?.name || 'Kỳ Thủ Vương Quyền'}
+                    </span>
+                    <button
+                      type="button"
+                      className="profile-edit-name-btn"
+                      onClick={openEditNameModal}
+                      title="Chạm để đổi tên kỳ thủ của bạn"
+                    >
+                      ✏️ Đổi Tên
+                    </button>
+                  </div>
+                  <span className="profile-tier-sub">
+                    {gameState?.commercial?.rankInfo?.tierNameVi
+                      ? `${gameState.commercial.rankInfo.tierNameVi} • Bậc Rank`
+                      : 'Tân Binh • Bậc Rank'}
+                  </span>
+                </div>
                 <span className="profile-rank-tag">
                   {gameState?.commercial?.rankInfo?.tierIcon || '🏆'} {gameState?.commercial?.elo ?? 1000} Elo
                 </span>
@@ -3654,7 +3764,18 @@ export default function App() {
                       <div className="elo-hero-badge" style={{ borderColor: rankInfo.tierColor }}>
                         <span className="elo-hero-icon">{rankInfo.tierIcon}</span>
                         <div>
-                          <div className="elo-hero-sub">BẬC XẾP HẠNG HIỆN TẠI</div>
+                          <div className="elo-hero-sub">KỲ THỦ ĐUA RANK ELO</div>
+                          <div className="elo-hero-name-row">
+                            <span className="elo-hero-player-name">{gameState?.commercial?.name || 'Kỳ Thủ Vương Quyền'}</span>
+                            <button
+                              type="button"
+                              className="profile-edit-name-btn elo-edit-chip"
+                              onClick={openEditNameModal}
+                              title="Đổi tên kỳ thủ"
+                            >
+                              ✏️ Đổi Tên
+                            </button>
+                          </div>
                           <div className="elo-hero-tier" style={{ color: rankInfo.tierColor }}>
                             {rankInfo.tierNameVi} ({rankInfo.tierNameEn})
                           </div>

@@ -2957,6 +2957,7 @@ export function getEloRankInfo(elo = 1000) {
 
 export function loadCommercialProfile() {
   const defaultProfile = {
+    name: 'Kỳ Thủ Vương Quyền',
     elo: 1000,
     peakElo: 1000,
     gold: 0,
@@ -2983,7 +2984,11 @@ export function loadCommercialProfile() {
       : 'classic_sanctum';
     const elo = Math.max(800, Number(parsed.elo) || 1000);
     const peakElo = Math.max(elo, Number(parsed.peakElo) || elo);
+    const name = parsed.name && typeof parsed.name === 'string' && parsed.name.trim()
+      ? parsed.name.trim().slice(0, 24)
+      : 'Kỳ Thủ Vương Quyền';
     return {
+      name,
       elo,
       peakElo,
       gold: Math.max(0, Math.round(Number(parsed.gold) ?? 0)),
