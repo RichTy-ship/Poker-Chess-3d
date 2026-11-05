@@ -4,6 +4,23 @@ import { readFileSync, existsSync } from 'fs';
 import { join, extname } from 'path';
 import { fileURLToPath } from 'url';
 import { recordTrafficEvent, getTrafficSummary, renderTrafficDashboardHtml } from './traffic.js';
+import { createInitialBoard, selectBestBotMove, selectBotBuffTarget } from './chessAi.js';
+
+// Pool of 12 Realistic Online Matchmaking Bots with diverse Elo & Skins
+const ONLINE_BOT_POOL = [
+  { name: 'Thần Cờ Gia Định', elo: 1120, rankName: 'Hiệp Sĩ Bạc', skinId: 'emerald_emperor', avatar: '🧙' },
+  { name: 'DragonSlayer_VN', elo: 1240, rankName: 'Chiến Tướng Vàng', skinId: 'molten_basalt', avatar: '🐉' },
+  { name: 'Vua Phép Thuật', elo: 1080, rankName: 'Tân Binh Đồng', skinId: 'nebula_archmage', avatar: '⚡' },
+  { name: 'Bạch Long Kiếm', elo: 1190, rankName: 'Hiệp Sĩ Bạc', skinId: 'glacial_quartz', avatar: '🗡️' },
+  { name: 'Grandmaster_Bao', elo: 1320, rankName: 'Đại Kiện Tướng Bạch Kim', skinId: 'solar_champion', avatar: '👑' },
+  { name: 'ShadowQueen_99', elo: 1150, rankName: 'Hiệp Sĩ Bạc', skinId: 'crypt_undead', avatar: '🧝‍♀️' },
+  { name: 'Kỳ Vương Phố Cổ', elo: 1280, rankName: 'Chiến Tướng Vàng', skinId: 'damascus_judgment', avatar: '🏆' },
+  { name: 'CyberKnight_Pro', elo: 1060, rankName: 'Tân Binh Đồng', skinId: 'classic_sanctum', avatar: '🤖' },
+  { name: 'Thần Bài Poker VN', elo: 1220, rankName: 'Chiến Tướng Vàng', skinId: 'imperial_ivory', avatar: '🃏' },
+  { name: 'DarkSanctum_Master', elo: 1170, rankName: 'Hiệp Sĩ Bạc', skinId: 'cosmic_midnight', avatar: '🌌' },
+  { name: 'QueenGambit_HN', elo: 1260, rankName: 'Chiến Tướng Vàng', skinId: 'emerald_emperor', avatar: '👸' },
+  { name: 'Phong Vân Vô Song', elo: 1350, rankName: 'Đại Kiện Tướng Bạch Kim', skinId: 'solar_champion', avatar: '⚔️' }
+];
 
 const PORT = process.env.PORT || 3001;
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -172,7 +189,7 @@ function sendMsg(ws, type, data = {}) {
 function broadcastServerStats() {
   const statsPayload = {
     type: 'SERVER_STATS',
-    onlinePlayers: clients.size,
+    onlinePlayers: clients.size + ONLINE_BOT_POOL.length,
     activeMatches: matches.size,
     queuedPlayers: matchmakingQueue.length
   };
@@ -185,33 +202,173 @@ function broadcastServerStats() {
 }
 
 /**
- * Matchmaking & Pair Allocation Logic
+ * Matchmaking & Pair Allocation Logic (Human vs Human priority, fallback to Online Bot)
  */
 function attemptMatchmaking() {
-  if (matchmakingQueue.length < 2) return;
+  // 1. If 2 or more real human players are queued, match them together
+  if (matchmakingQueue.length >= 2) {
+    matchmakingQueue.sort((a, b) => a.elo - b.elo);
 
-  // Sort queue by Elo for balanced fair-play matchmaking
-  matchmakingQueue.sort((a, b) => a.elo - b.elo);
+    let i = 0;
+    while (i < matchmakingQueue.length - 1) {
+      const p1 = matchmakingQueue[i];
+      const p2 = matchmakingQueue[i + 1];
 
-  let i = 0;
-  while (i < matchmakingQueue.length - 1) {
-    const p1 = matchmakingQueue[i];
-    const p2 = matchmakingQueue[i + 1];
+      const eloDiff = Math.abs(p1.elo - p2.elo);
+      const waitTime = Math.max(Date.now() - p1.queueTime, Date.now() - p2.queueTime);
+      const maxEloDiffAllowed = 120 + Math.floor(waitTime / 4000) * 80;
 
-    const eloDiff = Math.abs(p1.elo - p2.elo);
-    const waitTime = Math.max(Date.now() - p1.queueTime, Date.now() - p2.queueTime);
-
-    // Dynamic Elo range expansion: Expands by 50 Elo for every 4 seconds waited
-    const maxEloDiffAllowed = 120 + Math.floor(waitTime / 4000) * 80;
-
-    if (eloDiff <= maxEloDiffAllowed || waitTime > 15000) {
-      // Remove pair from queue
-      matchmakingQueue.splice(i, 2);
-      createMatchSession(p1, p2, 'ranked_match');
-    } else {
-      i++;
+      if (eloDiff <= maxEloDiffAllowed || waitTime > 15000) {
+        matchmakingQueue.splice(i, 2);
+        createMatchSession(p1, p2, 'ranked_match');
+      } else {
+        i++;
+      }
     }
   }
+
+  // 2. If a human player has waited >= 3.5 seconds with no other human, match them with an Online Bot!
+  const now = Date.now();
+  for (let i = matchmakingQueue.length - 1; i >= 0; i--) {
+    const player = matchmakingQueue[i];
+    const waitTime = now - (player.queueTime || now);
+    if (waitTime >= 3500) {
+      matchmakingQueue.splice(i, 1);
+      createBotMatchSession(player);
+    }
+  }
+}
+
+// Active queue polling watchdog every 1s so bots trigger reliably
+setInterval(attemptMatchmaking, 1000);
+
+/**
+ * Creates an Online Match session against one of the ~10 Online Bots
+ */
+function createBotMatchSession(humanPlayer) {
+  const matchId = generateId('m');
+
+  // Select a bot closest to the human's current Elo
+  const sortedBots = [...ONLINE_BOT_POOL].sort((a, b) => Math.abs(a.elo - humanPlayer.elo) - Math.abs(b.elo - humanPlayer.elo));
+  const candidateBot = sortedBots[Math.floor(Math.random() * Math.min(3, sortedBots.length))];
+
+  const botPlayer = {
+    playerId: generateId('bot'),
+    isBot: true,
+    ws: null,
+    name: candidateBot.name,
+    elo: candidateBot.elo,
+    rankName: candidateBot.rankName,
+    skinId: candidateBot.skinId,
+    avatar: candidateBot.avatar,
+    matchId
+  };
+
+  const isHumanWhite = Math.random() < 0.5;
+  const whitePlayer = isHumanWhite ? humanPlayer : botPlayer;
+  const blackPlayer = isHumanWhite ? botPlayer : humanPlayer;
+
+  whitePlayer.color = 'w';
+  blackPlayer.color = 'b';
+  humanPlayer.matchId = matchId;
+
+  const matchState = {
+    matchId,
+    matchType: 'ranked_bot_match',
+    isBotMatch: true,
+    botPlayer,
+    humanPlayer,
+    virtualBoard: createInitialBoard(),
+    createdAt: Date.now(),
+    whitePlayer,
+    blackPlayer,
+    turn: 'w',
+    turnStartTime: Date.now(),
+    whiteTimeLeftMs: 120000,
+    blackTimeLeftMs: 120000,
+    turnCount: 1,
+    status: 'ACTIVE',
+    movesHistory: []
+  };
+
+  matches.set(matchId, matchState);
+
+  // Notify human player with rich opponent profile
+  sendMsg(humanPlayer.ws, 'MATCH_FOUND', {
+    matchId,
+    matchType: 'ranked_match',
+    yourColor: humanPlayer.color,
+    yourRole: humanPlayer.color === 'w' ? 'TRẮNG (Đi trước)' : 'ĐEN (Đi sau)',
+    opponent: {
+      name: botPlayer.name,
+      elo: botPlayer.elo,
+      rankName: botPlayer.rankName,
+      skinId: botPlayer.skinId,
+      avatar: botPlayer.avatar
+    },
+    initialTimeMs: 120000
+  });
+
+  broadcastServerStats();
+
+  // If the bot plays White, schedule its opening move!
+  if (botPlayer.color === 'w') {
+    scheduleBotTurn(matchState);
+  }
+}
+
+/**
+ * Schedules and executes the Online Bot's turn with human-like deliberation
+ */
+function scheduleBotTurn(matchState) {
+  if (!matchState || matchState.status !== 'ACTIVE') return;
+  const bot = matchState.botPlayer;
+  const human = matchState.humanPlayer;
+  if (!bot || !human) return;
+
+  // Human-like deliberation time: 1.4s - 2.8s
+  const thinkDelay = 1400 + Math.random() * 1400;
+
+  matchState.botTimer = setTimeout(() => {
+    matchState.botTimer = null;
+    if (matchState.status !== 'ACTIVE' || matchState.turn !== bot.color) return;
+
+    // 1. Bot occasionally deploys a Poker Buff (every 2-3 turns)
+    if (Math.random() < 0.45 || matchState.turnCount <= 2) {
+      const buff = selectBotBuffTarget(matchState.virtualBoard, bot.color);
+      if (buff) {
+        sendMsg(human.ws, 'OPPONENT_BUFF_APPLIED', buff);
+      }
+    }
+
+    // 2. Select optimal chess move
+    const move = selectBestBotMove(matchState.virtualBoard, bot.color);
+    if (!move) {
+      // Checkmate or no moves
+      endMatch(matchState.matchId, human.color, 'CHECKMATE', `${bot.name} bị chiếu bí!`);
+      return;
+    }
+
+    // Update server virtual board
+    const movingPiece = matchState.virtualBoard[move.from.r][move.from.c];
+    matchState.virtualBoard[move.to.r][move.to.c] = movingPiece;
+    matchState.virtualBoard[move.from.r][move.from.c] = null;
+
+    // Switch turn
+    matchState.turn = human.color;
+    matchState.turnCount++;
+
+    // Broadcast move to human player
+    sendMsg(human.ws, 'OPPONENT_MOVED', {
+      from: move.from,
+      to: move.to,
+      pieceType: move.pieceType,
+      targetPiece: move.targetPiece,
+      combatData: null,
+      nextTurn: matchState.turn,
+      turnCount: matchState.turnCount
+    });
+  }, thinkDelay);
 }
 
 /**
@@ -441,24 +598,44 @@ function handleClientMessage(ws, player, msg) {
       match.turn = match.turn === 'w' ? 'b' : 'w';
       match.turnCount++;
 
+      // If Bot match, update server's virtual board
+      if (match.isBotMatch && match.virtualBoard && msg.from && msg.to) {
+        const piece = match.virtualBoard[msg.from.r]?.[msg.from.c];
+        if (piece) {
+          match.virtualBoard[msg.to.r][msg.to.c] = piece;
+          match.virtualBoard[msg.from.r][msg.from.c] = null;
+        }
+        if (msg.targetPiece && msg.targetPiece.type === 'king') {
+          endMatch(player.matchId, player.color, 'KING_CAPTURE', `${player.name} đã bắt Vua đối thủ!`);
+          return;
+        }
+      }
+
       const opponent = player.color === 'w' ? match.blackPlayer : match.whitePlayer;
 
-      // Broadcast move to opponent
-      sendMsg(opponent.ws, 'OPPONENT_MOVED', {
-        from: msg.from,
-        to: msg.to,
-        pieceType: msg.pieceType,
-        targetPiece: msg.targetPiece,
-        combatData: msg.combatData,
-        nextTurn: match.turn,
-        turnCount: match.turnCount
-      });
+      // Broadcast move to opponent (if real socket)
+      if (opponent && opponent.ws) {
+        sendMsg(opponent.ws, 'OPPONENT_MOVED', {
+          from: msg.from,
+          to: msg.to,
+          pieceType: msg.pieceType,
+          targetPiece: msg.targetPiece,
+          combatData: msg.combatData,
+          nextTurn: match.turn,
+          turnCount: match.turnCount
+        });
+      }
 
       // Acknowledge move to sender
       sendMsg(ws, 'MOVE_CONFIRMED', {
         nextTurn: match.turn,
         turnCount: match.turnCount
       });
+
+      // If it is now Bot's turn, trigger Bot response!
+      if (match.isBotMatch && match.turn === match.botPlayer?.color) {
+        scheduleBotTurn(match);
+      }
       break;
     }
 
@@ -558,6 +735,11 @@ function handleClientMessage(ws, player, msg) {
 function endMatch(matchId, winnerColor, reason, detailMessage) {
   const match = matches.get(matchId);
   if (!match || match.status === 'ENDED') return;
+
+  if (match.botTimer) {
+    clearTimeout(match.botTimer);
+    match.botTimer = null;
+  }
 
   if (match.disconnectTimeout) {
     clearTimeout(match.disconnectTimeout);

@@ -7875,7 +7875,8 @@ body.cinematic-ui-hidden .turn-timeout-toast {
 /* Mobile Landscape keyboard-friendly constraints */
 @media (max-height: 520px) {
   .edit-name-backdrop {
-    padding: max(env(safe-area-inset-top, 0px), 6px) 10px 6px !important;
+    padding: max(env(safe-area-inset-top, 0px), 4px) 10px 4px !important;
+    align-items: flex-start !important;
   }
   .edit-name-modal-card {
     padding: 8px 14px;
@@ -7922,6 +7923,30 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   .suggest-chip {
     font-size: 0.65rem;
     padding: 2px 7px;
+  }
+}
+
+/* Extreme Low Height during Virtual Keyboard popup on Landscape Mobile */
+@media (max-height: 380px) {
+  .edit-name-backdrop {
+    padding: 2px 8px !important;
+    align-items: flex-start !important;
+  }
+  .edit-name-modal-card {
+    padding: 6px 10px !important;
+    margin-top: 2px;
+  }
+  .edit-name-suggestions {
+    display: none !important;
+  }
+  .edit-name-header {
+    padding-bottom: 2px !important;
+  }
+  .edit-name-title {
+    font-size: 0.82rem !important;
+  }
+  .edit-name-icon {
+    display: none !important;
   }
 }
 
