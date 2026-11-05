@@ -11232,16 +11232,76 @@ export function initWizardChess() {
       return true;
     }
 
-    // Realtime Multiplayer WebSocket synchronization listeners
-    multiplayerClient.on('opponent_move', (msg) => {
-      if (gameMode === 'multi' && msg.from && msg.to) {
+    // Realtime Multiplayer WebSocket synchronization listeners with Robust Animation-Aware Queue
+    const pendingRemoteMoves = [];
+    let isProcessingRemoteMove = false;
+
+    function processNextRemoteMove() {
+      if (pendingRemoteMoves.length === 0 || isProcessingRemoteMove) return;
+      if (isAnimatingMove) {
+        setTimeout(processNextRemoteMove, 90);
+        return;
+      }
+      const msg = pendingRemoteMoves.shift();
+      if (!msg || !msg.from || !msg.to) {
+        processNextRemoteMove();
+        return;
+      }
+      isProcessingRemoteMove = true;
+
+      // Ensure turn and phase are unlocked for remote move execution
+      const movingPiece = boardState[msg.from.r]?.[msg.from.c];
+      if (movingPiece && movingPiece.color !== currentTurn) {
+        currentTurn = movingPiece.color;
+      }
+      turnPhase = 'MOVE_OR_COMBAT';
+
+      try {
         executeChessMove(msg.from.r, msg.from.c, msg.to.r, msg.to.c, { fromRemote: true });
+      } catch (err) {
+        console.warn('[Remote Move Execution Error]:', err);
+      }
+
+      // Wait until move animation finishes before unlocking next move
+      const checkDone = () => {
+        if (isAnimatingMove) {
+          setTimeout(checkDone, 90);
+        } else {
+          isProcessingRemoteMove = false;
+          if (pendingRemoteMoves.length > 0) {
+            setTimeout(processNextRemoteMove, 60);
+          }
+        }
+      };
+      setTimeout(checkDone, 140);
+    }
+
+    multiplayerClient.on('opponent_move', (msg) => {
+      if (gameMode === 'multi' && msg && msg.from && msg.to) {
+        pendingRemoteMoves.push(msg);
+        processNextRemoteMove();
       }
     });
 
     multiplayerClient.on('opponent_buff', (msg) => {
       if (gameMode === 'multi' && typeof msg.targetRow === 'number' && typeof msg.targetCol === 'number') {
-        empowerFriendlyUnitAt(msg.targetRow, msg.targetCol, { fromRemote: true });
+        try {
+          const targetPiece = boardState[msg.targetRow]?.[msg.targetCol];
+          if (targetPiece) {
+            targetPiece.activeCombo = {
+              id: msg.comboId || 'ONE_PAIR',
+              name: msg.comboName || 'Một Đôi',
+              ringColor: msg.colorHex ? parseInt(msg.colorHex.replace('#', '0x'), 16) : 0xf5d76e,
+              atkBonus: msg.atkBonus || 10,
+              armorBonus: msg.armorBonus || 4
+            };
+            targetPiece.attack = (targetPiece.attack || 30) + (msg.atkBonus || 10);
+            targetPiece.armor = (targetPiece.armor || 0) + (msg.armorBonus || 4);
+            updateUnit3DBadge(targetPiece);
+          }
+        } catch (e) {
+          console.warn('[Opponent Buff Error]:', e);
+        }
       }
     });
 

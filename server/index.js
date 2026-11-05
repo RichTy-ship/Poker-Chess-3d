@@ -330,15 +330,21 @@ function scheduleBotTurn(matchState) {
   const human = matchState.humanPlayer;
   if (!bot || !human) return;
 
-  // Human-like deliberation time: 1.4s - 2.8s
-  const thinkDelay = 1400 + Math.random() * 1400;
+  // Clear existing timer if any
+  if (matchState.botTimer) {
+    clearTimeout(matchState.botTimer);
+    matchState.botTimer = null;
+  }
+
+  // Human-like deliberation time: 2.0s - 3.4s (ensures client previous move animation is 100% finished!)
+  const thinkDelay = 2000 + Math.random() * 1400;
 
   matchState.botTimer = setTimeout(() => {
     matchState.botTimer = null;
     if (matchState.status !== 'ACTIVE' || matchState.turn !== bot.color) return;
 
-    // 1. Bot occasionally deploys a Poker Buff (every 2-3 turns)
-    if (Math.random() < 0.45 || matchState.turnCount <= 2) {
+    // 1. Bot occasionally deploys a Poker Buff
+    if (Math.random() < 0.50 || matchState.turnCount <= 3) {
       const buff = selectBotBuffTarget(matchState.virtualBoard, bot.color);
       if (buff) {
         sendMsg(human.ws, 'OPPONENT_BUFF_APPLIED', buff);
@@ -349,18 +355,26 @@ function scheduleBotTurn(matchState) {
     const move = selectBestBotMove(matchState.virtualBoard, bot.color);
     if (!move) {
       // Checkmate or no moves
+      console.log(`[BOT MATCH] 🏁 ${bot.name} has no legal moves. Checkmate!`);
       endMatch(matchState.matchId, human.color, 'CHECKMATE', `${bot.name} bị chiếu bí!`);
       return;
     }
 
     // Update server virtual board
-    const movingPiece = matchState.virtualBoard[move.from.r][move.from.c];
+    const movingPiece = matchState.virtualBoard[move.from.r]?.[move.from.c] || { type: move.pieceType, color: bot.color };
+    if (movingPiece.type === 'pawn' && (move.to.r === 0 || move.to.r === 7)) {
+      movingPiece.type = 'queen';
+    }
     matchState.virtualBoard[move.to.r][move.to.c] = movingPiece;
-    matchState.virtualBoard[move.from.r][move.from.c] = null;
+    if (matchState.virtualBoard[move.from.r]) {
+      matchState.virtualBoard[move.from.r][move.from.c] = null;
+    }
 
     // Switch turn
     matchState.turn = human.color;
     matchState.turnCount++;
+
+    console.log(`[BOT MOVE] 🤖 ${bot.name} (${bot.color.toUpperCase()}) turn ${matchState.turnCount}: ${move.pieceType} [${move.from.r},${move.from.c}] ➔ [${move.to.r},${move.to.c}]`);
 
     // Broadcast move to human player
     sendMsg(human.ws, 'OPPONENT_MOVED', {
@@ -374,6 +388,20 @@ function scheduleBotTurn(matchState) {
     });
   }, thinkDelay);
 }
+
+// Active Bot Watchdog: Ensures Bot NEVER stands still if it is Bot's turn!
+setInterval(() => {
+  const now = Date.now();
+  for (const match of matches.values()) {
+    if (match.status === 'ACTIVE' && match.isBotMatch && match.turn === match.botPlayer?.color) {
+      if (!match.botTimer && (!match.lastBotCheck || now - match.lastBotCheck > 3500)) {
+        match.lastBotCheck = now;
+        console.log(`[BOT WATCHDOG] 🔄 Auto-triggering pending move for ${match.botPlayer?.name} in match ${match.matchId}`);
+        scheduleBotTurn(match);
+      }
+    }
+  }
+}, 2000);
 
 /**
  * Creates a synchronized 1v1 match between two players
