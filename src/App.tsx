@@ -699,6 +699,7 @@ export default function App() {
   const [spSide, setSpSide] = useState<'w' | 'b'>('w');
   const [spBotLevel, setSpBotLevel] = useState<number>(1);
   const [serverStats, setServerStats] = useState({ onlinePlayers: 1, activeMatches: 0, queuedPlayers: 0 });
+  const initialMenuShownRef = useRef(false);
   const [pokerDockMinimized, setPokerDockMinimized] = useState(false);
   const [peekDockDuringMove, setPeekDockDuringMove] = useState(false);
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
@@ -838,6 +839,14 @@ export default function App() {
     return () => clearInterval(iv);
   }, [isSearchingMatch]);
 
+  // Auto-launch Main Menu on initial game load so players select their mode, skin or Elo first
+  useEffect(() => {
+    if (gameState?.isLoaded && !initialMenuShownRef.current) {
+      initialMenuShownRef.current = true;
+      setMainMenuOpen(true);
+    }
+  }, [gameState?.isLoaded]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -911,6 +920,7 @@ export default function App() {
   const isCardDockVisible = Boolean(
     poker &&
       !gameState?.gameOver &&
+      !mainMenuOpen &&
       (!gameState?.autoMoveEnabled || peekDockDuringMove) &&
       (isCardPhase || (isPlayerTurn && peekDockDuringMove && !gameState?.activeCombatBanner))
   );
@@ -2014,7 +2024,7 @@ export default function App() {
       {/* Active Combat Clash Banner & Vignette disabled completely for max FPS */}
 
       {/* BOTTOM-DOCKED TURN & COMBAT STATUS BAR (SHOWN ONLY WHEN THE CARD DOCK IS AUTO-HIDDEN) */}
-      {gameState && gameState.isLoaded && !gameState.gameOver && !isCardDockVisible && (
+      {gameState && gameState.isLoaded && !gameState.gameOver && !isCardDockVisible && !mainMenuOpen && (
         <div
           className={`turn-flow-director-bar phase-${turnPhase.toLowerCase()} ${
             gameState.activeCombatBanner ? 'in-combat' : !isPlayerTurn ? 'opponent-turn' : ''
@@ -2156,7 +2166,7 @@ export default function App() {
       )}
 
       {/* ANIMATED PHASE / TURN / BUFF / COMBAT MILESTONE ANNOUNCEMENT TOAST */}
-      {phaseAnnouncement && gameState?.isLoaded && !gameState?.gameOver && (
+      {phaseAnnouncement && gameState?.isLoaded && !gameState?.gameOver && !mainMenuOpen && (
         <div
           key={phaseAnnouncement.id}
           className={`phase-announcement-banner cat-${phaseAnnouncement.category}`}
@@ -2830,16 +2840,38 @@ export default function App() {
                     <span className="menu-card-icon">🛒</span>
                     <span className="menu-card-badge">Vật Phẩm 3D</span>
                   </div>
-                  <h3 className="menu-card-title">Cửa Hàng Skin &amp; Bảng Xếp Hạng</h3>
+                  <h3 className="menu-card-title">Kho Skin 3D Quân Cờ</h3>
                   <p className="menu-card-desc">
-                    Khám phá trang phục quân cờ 3D độc quyền: Neon Cyberpunk, Huyết Nguyệt, Bạch Kim Tối Thượng và Bảng Xếp Hạng Elo.
+                    Trang bị &amp; thử nghiệm các bộ skin 3D độc quyền: Neon Cyberpunk, Huyết Nguyệt, Bạch Kim Tối Thượng.
                   </p>
                   <button type="button" className="custom-room-btn" style={{ marginTop: 'auto' }}>
-                    Mở Cửa Hàng ➔
+                    Mở Kho Skin ➔
                   </button>
                 </div>
 
-                {/* 4. Rules & Codex Card */}
+                {/* 4. Elo Leaderboard Card */}
+                <div
+                  className="menu-card-btn"
+                  onClick={() => {
+                    setStoreTab('elo');
+                    setSkinStoreOpen(true);
+                    setMainMenuOpen(false);
+                  }}
+                >
+                  <div className="menu-card-header">
+                    <span className="menu-card-icon">🏆</span>
+                    <span className="menu-card-badge online-badge">Xếp Hạng</span>
+                  </div>
+                  <h3 className="menu-card-title">Bảng Xếp Hạng Elo</h3>
+                  <p className="menu-card-desc">
+                    Xem thứ hạng kỳ thủ toàn cầu, các mốc thăng hạng từ Tân Binh Đồng đến Đại Kiện Tướng và phần thưởng mùa giải.
+                  </p>
+                  <button type="button" className="custom-room-btn" style={{ marginTop: 'auto' }}>
+                    Xem BXH Elo ➔
+                  </button>
+                </div>
+
+                {/* 5. Rules & Codex Card */}
                 <div
                   className="menu-card-btn"
                   onClick={() => {
