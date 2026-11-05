@@ -91,21 +91,28 @@ export function initWizardChess() {
         localStorage.setItem('pokerchess_perf_mode', preset);
       } catch (e) {}
 
-      // Compute crisp high-DPI pixel ratio for Android/iOS Retina displays (eliminates blurriness/vỡ nét)
       const dpr = window.devicePixelRatio || 1;
+      const isMobile =
+        /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 850 && window.matchMedia('(pointer: coarse)').matches);
+
       if (preset === 'performance') {
-        renderer.setPixelRatio(Math.min(Math.max(dpr, 1.0), 1.5));
+        // Performance: 1.0 DPR on laptop/desktop, no shadows for solid 60 FPS
+        renderer.setPixelRatio(isMobile ? Math.min(dpr, 1.25) : 1.0);
         renderer.shadowMap.enabled = false;
       } else if (preset === 'ultra') {
-        renderer.setPixelRatio(Math.min(dpr, 2.5));
+        renderer.setPixelRatio(isMobile ? Math.min(dpr, 2.0) : Math.min(dpr, 1.5));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.shadowMap.needsUpdate = true;
       } else {
-        // balanced: native high-DPI up to 2.0 (crystal sharp on Android 1080p/1440p)
-        renderer.setPixelRatio(Math.min(dpr, 2.0));
+        // Balanced (default):
+        // Laptop/desktop: cap at 1.0 DPR to prevent 4K fillrate strain on integrated GPUs (Intel UHD / Iris Xe / AMD Vega)
+        // Mobile: 1.5 - 1.75 DPR for crisp text & models without blurriness
+        const targetDpr = isMobile ? Math.min(dpr, 1.75) : 1.0;
+        renderer.setPixelRatio(targetDpr);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.type = THREE.PCFShadowMap;
         renderer.shadowMap.needsUpdate = true;
       }
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -4887,7 +4894,7 @@ export function initWizardChess() {
     scene.add(unitPathingGroup);
 
     // Modes: 'ALL' (History + Trajectory), 'TRAJECTORY' (Intended Trajectory only), 'HISTORY' (Move History only), 'OFF'
-    let pathingDisplayMode = 'ALL';
+    let pathingDisplayMode = 'OFF';
     const activeTrajectoryChevrons = [];
     const activeHistoryNodes = [];
     const activeTrajectoryWaypoints = [];
@@ -5176,7 +5183,7 @@ export function initWizardChess() {
 
     function rebuildUnitPathing3D() {
       clearUnitPathing3D();
-      if (pathingDisplayMode === 'OFF' || gameOver) return;
+      return;
 
       const subjectUnit = getActivePathingSubjectUnit();
       if (!subjectUnit) return;
@@ -10264,10 +10271,6 @@ export function initWizardChess() {
             soundFX.playSquareTarget(Boolean(hoveredLegal.capture));
           }
         }
-        rebuildUnitPathing3D();
-        if (prevPiece || nextPiece || selectedSquare) {
-          emitPokerChessSync();
-        }
       }
     });
 
@@ -12461,14 +12464,9 @@ export function initWizardChess() {
     }
 
     window.addEventListener('resize', () => {
-      const dpr = window.devicePixelRatio || 1;
-      const targetRatio = performancePreset === 'ultra'
-        ? Math.min(dpr, 2.5)
-        : (performancePreset === 'performance' ? Math.min(Math.max(dpr, 1.0), 1.5) : Math.min(dpr, 2.0));
-      renderer.setPixelRatio(targetRatio);
+      applyPerformanceSettings(performancePreset);
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
 
