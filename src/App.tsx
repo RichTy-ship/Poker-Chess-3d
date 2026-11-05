@@ -3260,6 +3260,61 @@ export default function App() {
           <div className="checkmate-subtitle" id="checkmate-subtitle">
             White Triumphs • The Black King Has Fallen
           </div>
+                    {/* DONATE / COFFEE SUPPORT CARD AFTER MATCH */}
+          <div className="checkmate-donate-card">
+            <div className="donate-header">
+              <span className="donate-badge">☕ ỦNG HỘ TÁC GIẢ</span>
+              <span className="donate-tagline">Tiếp lửa phát triển Poker Chess 3D</span>
+            </div>
+            <div className="donate-body">
+              <div className="donate-qr-wrapper">
+                <img
+                  src="/assets/donate_qr.jpg"
+                  alt="Mã VietQR Donate - TRƯƠNG MINH HOÀNG"
+                  className="donate-qr-img"
+                  loading="lazy"
+                />
+              </div>
+              <div className="donate-info">
+                <p className="donate-message">
+                  Cảm ơn bạn đã thi đấu! Nếu yêu thích trò chơi, hãy ủng hộ tác giả một ly cà phê nhé!
+                </p>
+                <div className="donate-details">
+                  <div className="donate-row">
+                    <span className="d-label">Chủ TK:</span>
+                    <span className="d-val d-name">TRUONG MINH HOANG</span>
+                  </div>
+                  <div className="donate-row">
+                    <span className="d-label">Ngân hàng:</span>
+                    <span className="d-val">MB Bank (Quân Đội)</span>
+                  </div>
+                  <div className="donate-row">
+                    <span className="d-label">Số TK:</span>
+                    <span className="d-val d-acc">0937057055</span>
+                    <button
+                      type="button"
+                      className="donate-copy-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (navigator.clipboard) {
+                          navigator.clipboard.writeText('0937057055');
+                        }
+                        const target = e.currentTarget;
+                        target.textContent = '✓ Đã chép!';
+                        setTimeout(() => {
+                          target.textContent = '📋 Chép STK';
+                        }, 2000);
+                      }}
+                      title="Sao chép số tài khoản"
+                    >
+                      📋 Chép STK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="checkmate-actions">
             <button className="checkmate-btn" id="btn-checkmate-replay">
               Replay King Fall

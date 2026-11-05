@@ -5451,3 +5451,160 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   background: rgba(14, 116, 144, 0.52);
   color: #ffffff;
 }
+
+
+/* =========================================================================
+   CHECKMATE DONATE / COFFEE SUPPORT CARD
+   ========================================================================= */
+.checkmate-donate-card {
+  margin: 12px auto 16px;
+  max-width: 500px;
+  width: 100%;
+  background: rgba(15, 18, 28, 0.88);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 0 16px rgba(212, 175, 55, 0.08);
+  backdrop-filter: blur(8px);
+  text-align: left;
+}
+
+.donate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.donate-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fde047;
+  text-transform: uppercase;
+}
+
+.donate-tagline {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.donate-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.donate-qr-wrapper {
+  flex-shrink: 0;
+  background: #ffffff;
+  padding: 4px;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donate-qr-img {
+  width: 125px;
+  height: auto;
+  border-radius: 4px;
+  display: block;
+}
+
+.donate-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.donate-message {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #cbd5e1;
+  margin: 0 0 8px 0;
+}
+
+.donate-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.donate-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+}
+
+.d-label {
+  color: #94a3b8;
+  min-width: 60px;
+}
+
+.d-val {
+  color: #f1f5f9;
+  font-weight: 500;
+}
+
+.d-name {
+  color: #fde047;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.d-acc {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.05em;
+}
+
+.donate-copy-btn {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: rgba(212, 175, 55, 0.2);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  color: #fde047;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.donate-copy-btn:hover {
+  background: rgba(212, 175, 55, 0.35);
+  border-color: #fde047;
+}
+
+@media (max-width: 640px) {
+  .checkmate-donate-card {
+    margin: 8px 0 12px;
+    padding: 10px;
+  }
+  .donate-body {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .donate-qr-img {
+    width: 140px;
+  }
+  .donate-row {
+    justify-content: center;
+  }
+}
