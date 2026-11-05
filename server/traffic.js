@@ -5,14 +5,37 @@ import { fileURLToPath } from 'url';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const DATA_FILE = join(__dirname, 'traffic_data.json');
 
-// In-memory traffic state
+// Vietnam Timezone Utility (UTC+7 / Asia/Ho_Chi_Minh)
+export function getVietnamDateParts(d = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(d);
+  const map = {};
+  for (const p of parts) map[p.type] = p.value;
+  return {
+    dateStr: `${map.year}-${map.month}-${map.day}`,
+    hourStr: `${map.hour}:00`,
+    timeVi: `${map.hour}:${map.minute}:${map.second}`,
+    fullDateTimeVi: `${map.hour}:${map.minute}:${map.second} ${map.day}/${map.month}/${map.year}`
+  };
+}
+
+// In-memory traffic state (Synced to Vietnam Timezone UTC+7)
 let stats = {
   totalVisits: 0,
   uniqueIps: {},
   gamesPlayed: 0,
   pvToday: 0,
   totalPlayTimeSec: 0,
-  currentDateStr: new Date().toISOString().slice(0, 10),
+  currentDateStr: getVietnamDateParts().dateStr,
   sources: {
     'Facebook / Messenger': 0,
     'Zalo': 0,
@@ -42,7 +65,7 @@ try {
       stats.gamesPlayed = raw.gamesPlayed || 0;
       stats.pvToday = raw.pvToday || 0;
       stats.totalPlayTimeSec = raw.totalPlayTimeSec || 0;
-      stats.currentDateStr = raw.currentDateStr || new Date().toISOString().slice(0, 10);
+      stats.currentDateStr = raw.currentDateStr || getVietnamDateParts().dateStr;
       stats.sources = { ...stats.sources, ...(raw.sources || {}) };
       stats.devices = { ...stats.devices, ...(raw.devices || {}) };
       stats.hourly = raw.hourly || {};
@@ -136,9 +159,9 @@ export function detectBrowser(userAgent = '') {
 
 // Record traffic event
 export function recordTrafficEvent(req, customPayload = {}) {
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const hourStr = `${String(now.getHours()).padStart(2, '0')}:00`;
+  const vnTime = getVietnamDateParts();
+  const todayStr = vnTime.dateStr;
+  const hourStr = vnTime.hourStr;
 
   // Reset daily PV on new calendar day
   if (stats.currentDateStr !== todayStr) {
@@ -203,13 +226,12 @@ export function recordTrafficEvent(req, customPayload = {}) {
   // Hourly
   stats.hourly[hourStr] = (stats.hourly[hourStr] || 0) + 1;
 
-  // Log entry (prepend)
-  const timeVi = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  // Log entry (prepend, in Vietnam UTC+7 timezone)
   stats.recentLogs.unshift({
     sessionId,
     rawIp: ip,
-    time: timeVi,
-    date: todayStr,
+    time: vnTime.timeVi,
+    date: vnTime.dateStr,
     ip: anonymizeIp(ip),
     source,
     device,
@@ -252,7 +274,8 @@ export function getTrafficSummary(onlinePlayers = 0, activeMatches = 0) {
     devices: stats.devices,
     hourly: stats.hourly,
     recentLogs: stats.recentLogs.slice(0, 30),
-    serverTime: new Date().toISOString()
+    serverTime: getVietnamDateParts().fullDateTimeVi + ' (GMT+7)',
+    serverTimeIso: new Date().toISOString()
   };
 }
 
@@ -601,7 +624,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
         <span class="brand-crest">👑</span>
         <div>
           <h1>VƯƠNG QUYỀN POKER CHESS 3D</h1>
-          <div class="sub-head">Hệ Thống Phân Tích &amp; Thống Kê Traffic Realtime</div>
+          <div class="sub-head">Hệ Thống Phân Tích &amp; Thống Kê Traffic Realtime • <span style="color:var(--blue);font-weight:600;">🕒 Giờ Việt Nam: ${data.serverTime}</span></div>
         </div>
       </div>
       <div class="header-actions">
@@ -688,7 +711,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
 
     <!-- Hourly Activity Chart -->
     <section class="panel">
-      <div class="panel-header">⏱ Phân Bố Lưu Lượng Theo Giờ Trong Ngày</div>
+      <div class="panel-header">⏱ Phân Bố Lưu Lượng Theo Giờ Trong Ngày (24h - Múi Giờ VN GMT+7)</div>
       <div class="hourly-chart">
         ${hoursList.map(h => {
           const heightPct = Math.round((h.count / maxHourly) * 100);
@@ -709,7 +732,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
         <table>
           <thead>
             <tr>
-              <th>Thời gian</th>
+              <th>Thời Gian (Giờ VN - GMT+7)</th>
               <th>IP (Ẩn danh)</th>
               <th>Thiết bị</th>
               <th>Thời Gian Chơi</th>
