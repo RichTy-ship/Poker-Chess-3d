@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { readFileSync, existsSync } from 'fs';
 import { join, extname } from 'path';
 import { fileURLToPath } from 'url';
+import { recordTrafficEvent, getTrafficSummary, renderTrafficDashboardHtml } from './traffic.js';
 
 const PORT = process.env.PORT || 3001;
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -53,6 +54,43 @@ const server = createServer((req, res) => {
       timestamp: Date.now()
     }));
     return;
+  }
+
+  // Interactive Realtime Traffic Dashboard
+  if (urlPath === '/traffic' || urlPath === '/admin/traffic') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderTrafficDashboardHtml(clients.size, matches.size));
+    return;
+  }
+
+  // Traffic Stats JSON API
+  if (urlPath === '/api/traffic') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getTrafficSummary(clients.size, matches.size)));
+    return;
+  }
+
+  // Telemetry event ingestion endpoint
+  if (urlPath === '/api/track' && req.method === 'POST') {
+    let bodyData = '';
+    req.on('data', chunk => {
+      bodyData += chunk;
+      if (bodyData.length > 20000) req.destroy();
+    });
+    req.on('end', () => {
+      try {
+        const payload = bodyData ? JSON.parse(bodyData) : {};
+        recordTrafficEvent(req, payload);
+      } catch (e) {}
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok' }));
+    });
+    return;
+  }
+
+  // Auto-record page view on root route
+  if (urlPath === '/' || urlPath === '/index.html') {
+    recordTrafficEvent(req, { event: 'PAGE_VIEW' });
   }
 
   // Static files serving if dist/ exists
