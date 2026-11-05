@@ -2762,15 +2762,7 @@ export default function App() {
                 >
                   {copiedShareLink ? '✓ Đã chép link!' : '📢 Mời Bạn Bè'}
                 </button>
-                <a
-                  href="/traffic"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="profile-share-btn traffic-link-btn"
-                  title="Mở bảng thống kê traffic realtime"
-                >
-                  📊 Traffic
-                </a>
+
                 <span className="profile-gold-badge">
                   🪙 {(gameState?.commercial?.gold ?? 0).toLocaleString()} Vàng
                 </span>
