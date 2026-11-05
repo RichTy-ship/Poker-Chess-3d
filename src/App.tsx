@@ -11,6 +11,7 @@ import {
 } from './pokerChessCore.js';
 import { multiplayerClient } from './multiplayerClient.js';
 import donateQrImage from './assets/donate_qr_clean.png';
+import gameLogoMaster from './assets/game_logo.jpg';
 
 interface PokerCardUI {
   id: string;
@@ -1481,19 +1482,20 @@ export default function App() {
 
   return (
     <>
-      <div id="loading-overlay">
-        <div className="loader-crest-container">
-          <div className="loader-arcane-ring" aria-hidden="true">
-            <span className="arcane-suit suit-spade">♠</span>
-            <span className="arcane-suit suit-heart">♥</span>
-            <span className="arcane-suit suit-diamond">♦</span>
-            <span className="arcane-suit suit-club">♣</span>
-          </div>
-          <div className="loader-crown-glow">♔</div>
+      <div id="loading-overlay" className="dragon-sanctum-loader">
+        <div className="loader-dragon-ambient" aria-hidden="true" />
+
+        <div className="loader-logo-master-container">
+          <div className="loader-dragon-flare-ring" aria-hidden="true" />
+          <img
+            src={gameLogoMaster}
+            alt="Vương Quyền Poker Chess 3D"
+            className="loader-logo-master-img"
+          />
         </div>
 
-        <div className="loader-brand-title">POKER CHESS 3D</div>
-        <div className="loader-brand-subtitle">Vương Quyền Sanctum • Đại Chiến Phép Bài 3D</div>
+        <div className="loader-brand-title">VƯƠNG QUYỀN • POKER CHESS 3D</div>
+        <div className="loader-brand-subtitle">Đại Chiến Cờ Thần &amp; Phép Thuật Poker 3D</div>
 
         <div className="loader-bar-section">
           <div className="loader-bar-wrap">
@@ -1508,9 +1510,9 @@ export default function App() {
         </div>
 
         <div className="loader-tactical-tip">
-          <span className="tip-badge">💡 Mẹo Chiến Thuật</span>
+          <span className="tip-badge">⚜ BÍ KÍP VƯƠNG QUYỀN ⚜</span>
           <span className="tip-content">
-            Ghép bộ <strong>Cù Lũ (Full House)</strong> hoặc <strong>Thùng (Flush)</strong> để nhận lượng lớn Giáp 🛡 và Sức Mạnh ⚔ lật ngược thế cờ!
+            Ghép bộ <strong>Cù Lũ (Full House)</strong> hoặc <strong>Thùng Phá Sảnh</strong> để triệu hồi Thiên Phạt ⚡ nhận lượng lớn Giáp 🛡 và Sức Mạnh ⚔!
           </span>
         </div>
       </div>
@@ -1549,10 +1551,11 @@ export default function App() {
         {/* LEFT ZONE: Brand & Performance FPS */}
         <div className="hud-zone hud-left" id="hud-left">
           <div className="brand-pill" title="Vương Quyền Poker 3D">
-            <div className="brand-poker-emblem">
-              <span className="emblem-crown">♔</span>
-              <span className="emblem-card-pip">♠</span>
-            </div>
+            <img
+              src={gameLogoMaster}
+              alt="Logo Vương Quyền"
+              className="brand-logo-thumb"
+            />
             <div className="brand-text-col">
               <span className="brand-title">POKER CHESS</span>
               <span className="brand-sub">3D VƯƠNG QUYỀN</span>
@@ -2598,7 +2601,11 @@ export default function App() {
         >
           <div className="a2hs-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="a2hs-badge-row">
-              <span className="a2hs-app-icon">👑</span>
+              <img
+                src={gameLogoMaster}
+                alt="Logo Vương Quyền"
+                className="a2hs-app-icon-img"
+              />
               <div className="a2hs-app-info">
                 <h3 className="a2hs-title">CÀI ĐẶT POKER CHESS 3D</h3>
                 <span className="a2hs-subtitle">Thêm Vào Màn Hình Chính (Web App Native)</span>
@@ -2681,7 +2688,11 @@ export default function App() {
 
             <div className="main-menu-header">
               <div className="main-menu-title-wrap">
-                <span className="main-menu-crest">👑</span>
+                <img
+                  src={gameLogoMaster}
+                  alt="Logo Vương Quyền"
+                  className="main-menu-crest-logo"
+                />
                 <div>
                   <h2 className="main-menu-title">VƯƠNG QUYỀN • POKER CHESS 3D</h2>
                   <div className="main-menu-subtitle">Hệ Thống Menu Chiến Thuật &amp; Điều Khiển Toàn Diện</div>
@@ -3028,7 +3039,11 @@ export default function App() {
           <div className="online-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="main-menu-header">
               <div className="main-menu-title-wrap">
-                <span className="main-menu-crest">⚔️</span>
+                <img
+                  src={gameLogoMaster}
+                  alt="Logo Vương Quyền"
+                  className="main-menu-crest-logo"
+                />
                 <div>
                   <h2 className="main-menu-title">ĐẤU ONLINE 1VS1 THỜI GIAN THỰC</h2>
                   <div className="main-menu-subtitle">Máy Chủ Phục Vụ 100 Kỳ Thủ • Realtime Move Sync</div>
