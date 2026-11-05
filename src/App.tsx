@@ -2129,34 +2129,78 @@ export default function App() {
                       const total = poker.hand.length;
                       const mid = (total - 1) / 2;
                       const offset = idx - mid;
-                      const rotDeg = offset * 2.6;
+                      const rotDeg = offset * 2.5;
                       const liftY = Math.abs(offset) * 2.0;
+                      const isAce = card.rank === 14 || card.rankLabel === 'A';
+                      const isKing = card.rank === 13 || card.rankLabel === 'K';
+                      const isQueen = card.rank === 12 || card.rankLabel === 'Q';
+                      const isJack = card.rank === 11 || card.rankLabel === 'J';
+                      const isFace = isAce || isKing || isQueen || isJack;
+
                       return (
                         <button
                           key={card.id}
                           type="button"
                           style={{
                             transform: isSelected
-                              ? `translateY(-16px) rotate(0deg) scale(1.08)`
+                              ? `translateY(-20px) rotate(0deg) scale(1.12)`
                               : `translateY(${liftY}px) rotate(${rotDeg}deg)`
                           }}
                           className={`playing-card hs-card ${card.color} ${
                             isSelected ? 'selected playable-glow' : ''
-                          }`}
+                          } ${isFace ? 'court-card' : ''}`}
                           onMouseEnter={() => getEngine()?.playUIHover?.()}
                           onClick={() => getEngine()?.toggleCardSelectionIndex?.(idx)}
                           disabled={!isPlayerTurn}
                           title={`${card.rankLabel}${card.suitSymbol} — Chạm để chọn`}
                         >
                           <div className="card-foil-shine" aria-hidden="true" />
+                          
+                          {/* Corner Rank & Suit Index */}
                           <div className="card-corner top">
                             <span className="card-rank">{card.rankLabel}</span>
                             <span className="card-suit-sm">{card.suitSymbol}</span>
                           </div>
-                          <div className="card-center-suit" aria-hidden="true">
-                            <span className="card-suit-large">{card.suitSymbol}</span>
-                            <span className="card-rank-watermark">{card.rankLabel}</span>
+
+                          {/* Selected Checkmark Badge */}
+                          {isSelected && (
+                            <span className="card-selected-badge" aria-hidden="true">✓</span>
+                          )}
+
+                          {/* Center Heraldic Medallion */}
+                          <div className="card-center-medallion" aria-hidden="true">
+                            {isAce && (
+                              <div className="court-sigil ace">
+                                <span className="sigil-suit">{card.suitSymbol}</span>
+                                <span className="sigil-label">ACE</span>
+                              </div>
+                            )}
+                            {isKing && (
+                              <div className="court-sigil king">
+                                <span className="sigil-icon">👑</span>
+                                <span className="sigil-suit">{card.suitSymbol}</span>
+                              </div>
+                            )}
+                            {isQueen && (
+                              <div className="court-sigil queen">
+                                <span className="sigil-icon">♕</span>
+                                <span className="sigil-suit">{card.suitSymbol}</span>
+                              </div>
+                            )}
+                            {isJack && (
+                              <div className="court-sigil jack">
+                                <span className="sigil-icon">⚔️</span>
+                                <span className="sigil-suit">{card.suitSymbol}</span>
+                              </div>
+                            )}
+                            {!isFace && (
+                              <div className="pip-medallion">
+                                <span className="pip-suit-glyph">{card.suitSymbol}</span>
+                              </div>
+                            )}
                           </div>
+
+                          {/* Inverted Bottom Corner */}
                           <div className="card-corner bottom" aria-hidden="true">
                             <span className="card-rank">{card.rankLabel}</span>
                             <span className="card-suit-sm">{card.suitSymbol}</span>

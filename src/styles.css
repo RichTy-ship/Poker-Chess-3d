@@ -2307,79 +2307,163 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   padding: 6px 2px 2px;
 }
 
+/* =========================================================================
+   ROYAL TACTICAL AAA POKER CHESS 3D PLAYING CARDS
+   ========================================================================= */
 .poker-cards-fan,
 .hs-clean-fan {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  gap: 8px;
-  flex: 1;
-  padding: 10px 4px 4px;
+  height: 118px;
+  padding: 8px 6px 4px;
+  perspective: 900px;
 }
 
-/* =========================================================================
-   ROYAL TACTICAL 3D PLAYING CARDS
-   ========================================================================= */
 .playing-card {
   position: relative;
-  width: 66px;
-  height: 92px;
+  width: 68px;
+  height: 102px;
+  margin-left: -10px;
   border-radius: 9px;
-  background: linear-gradient(165deg, #fffef9 0%, #f5ebd3 60%, #e4d3b0 100%);
-  border: 2px solid rgba(216, 180, 91, 0.82);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.75), inset 0 0 6px rgba(216, 180, 91, 0.2);
+  background: radial-gradient(circle at 50% 30%, #ffffff 0%, #faf5ec 58%, #ede1c5 100%);
+  border: 1.5px solid #d4af37;
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.82),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.85),
+    inset 0 0 0 2.5px rgba(212, 175, 55, 0.45);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 4px 6px;
+  padding: 4px 5px;
   cursor: pointer;
-  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: transform 0.22s cubic-bezier(0.2, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.2s ease, z-index 0.1s;
   color: #0f172a;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
   overflow: hidden;
 }
 
-.playing-card.red {
-  color: #dc2626;
+.playing-card:first-child {
+  margin-left: 0;
 }
 
+/* Card Faction Colors & Regal Contrast */
+.playing-card.red {
+  color: #b91c1c;
+  background: radial-gradient(circle at 50% 30%, #fffdfd 0%, #fff1f2 60%, #fed7aa 100%);
+}
+
+.playing-card.black {
+  color: #0f172a;
+  background: radial-gradient(circle at 50% 30%, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
+}
+
+/* Prismatic Holographic Foil Sheen */
 .playing-card .card-foil-shine {
   position: absolute;
-  top: -60%;
-  left: -80%;
-  width: 160%;
-  height: 220%;
-  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%);
+  inset: -100%;
+  background: linear-gradient(
+    125deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.3) 46%,
+    rgba(254, 240, 138, 0.45) 50%,
+    rgba(56, 189, 248, 0.35) 54%,
+    transparent 65%
+  );
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.2s ease, transform 0.4s ease;
-  transform: rotate(25deg);
+  transition: opacity 0.25s ease, transform 0.45s ease;
+  transform: rotate(30deg) translate(-25%, -25%);
 }
 
 .playing-card:hover:not(:disabled) .card-foil-shine,
 .playing-card.selected .card-foil-shine {
   opacity: 1;
-  transform: rotate(25deg) translate(30%, 30%);
+  transform: rotate(30deg) translate(25%, 25%);
 }
 
+/* Hover & Selected Elevation */
 .playing-card:hover:not(:disabled) {
-  z-index: 6;
-  border-color: #34d399;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.85), 0 0 16px rgba(52, 211, 153, 0.6);
+  z-index: 20 !important;
+  border-color: #facc15;
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.9),
+    0 0 16px rgba(250, 204, 21, 0.6),
+    inset 0 0 0 1.5px #fff;
 }
 
 .playing-card.selected {
-  z-index: 10;
-  border: 2px solid #22c55e;
+  z-index: 25 !important;
+  border-color: #22c55e;
   box-shadow:
-    0 16px 32px rgba(0, 0, 0, 0.9),
-    0 0 18px rgba(34, 197, 94, 0.85),
-    0 0 28px rgba(244, 217, 139, 0.4),
-    inset 0 0 12px rgba(244, 217, 139, 0.45);
-  background: linear-gradient(165deg, #ffffff 0%, #fff6db 50%, #f6e5bc 100%);
+    0 20px 40px rgba(0, 0, 0, 0.95),
+    0 0 0 2px #22c55e,
+    0 0 24px rgba(34, 197, 94, 0.7),
+    0 0 12px rgba(250, 204, 21, 0.5),
+    inset 0 0 0 1.5px #fff;
+  background: radial-gradient(circle at 50% 30%, #ffffff 0%, #fffbeb 50%, #fef3c7 100%);
 }
 
-.playing-card .card-center-suit {
+/* Corner Ranks & Suit Indices with Royal Serif */
+.card-corner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.92;
+  pointer-events: none;
+  width: 18px;
+}
+
+.card-rank {
+  font-family: 'Cinzel', serif;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.card-suit-sm {
+  font-size: 0.74rem;
+  line-height: 1;
+  margin-top: -1px;
+}
+
+.card-corner.bottom {
+  align-self: flex-end;
+  transform: rotate(180deg);
+}
+
+/* Golden Checkmark Selected Badge */
+.card-selected-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  border: 1.5px solid #bbf7d0;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.65);
+  animation: badgePop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 12;
+}
+
+@keyframes badgePop {
+  from { transform: scale(0.3); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Center Heraldic Medallion */
+.card-center-medallion {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -2388,63 +2472,77 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  width: 38px;
+  height: 38px;
 }
 
-.playing-card .card-suit-large {
-  font-size: 1.85rem;
-  opacity: 0.82;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+.pip-medallion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, transparent 80%);
 }
 
-.playing-card .card-rank-watermark {
-  position: absolute;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.9rem;
-  font-weight: 900;
-  opacity: 0.08;
-  color: #000000;
+.pip-suit-glyph {
+  font-size: 1.6rem;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
 }
 
-.playing-card .card-corner.bottom {
-  align-self: flex-end;
-  transform: rotate(180deg);
+.court-sigil {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(212, 175, 55, 0.65);
+  background: radial-gradient(circle, rgba(254, 240, 138, 0.38) 0%, transparent 82%);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+}
+
+.court-sigil.ace {
+  border-width: 2px;
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.45);
+}
+
+.court-sigil.ace .sigil-suit {
+  font-size: 1.75rem;
+  filter: drop-shadow(0 2px 4px rgba(212, 175, 55, 0.5));
+}
+
+.court-sigil.ace .sigil-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #92400e;
+  margin-top: -3px;
+}
+
+.court-sigil .sigil-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.court-sigil .sigil-suit {
+  font-size: 0.98rem;
+  line-height: 1;
 }
 
 .playing-card.just-drawn {
-  border-color: rgba(56, 189, 248, 0.85);
+  border-color: rgba(56, 189, 248, 0.9);
 }
 
 .playing-card:disabled {
-  opacity: 0.68;
+  opacity: 0.65;
   cursor: default;
-}
-
-.card-corner {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.05;
-  padding-left: 1px;
-}
-
-.card-rank {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.84rem;
-  font-weight: 800;
-}
-
-.card-suit-sm {
-  font-size: 0.68rem;
-}
-
-.card-center-suit {
-  position: absolute;
-  top: 56%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 1.5rem;
-  opacity: 0.92;
-  pointer-events: none;
 }
 
 @keyframes hsPulseReady {
@@ -3921,27 +4019,69 @@ body.cinematic-ui-hidden .turn-timeout-toast {
 
   .poker-cards-fan,
   .hs-clean-fan {
-    padding: 4px 2px 2px;
-    gap: 6px;
+    height: 84px;
+    padding: 2px 2px 2px;
   }
 
   .playing-card {
-    width: 48px;
-    height: 66px;
-    padding: 3px 4px;
+    width: 52px;
+    height: 76px;
+    margin-left: -7px;
+    padding: 2px 3px;
     border-radius: 6px;
   }
 
   .card-rank {
-    font-size: 0.72rem;
+    font-size: 0.76rem;
   }
 
   .card-suit-sm {
-    font-size: 0.56rem;
+    font-size: 0.58rem;
   }
 
-  .card-center-suit {
-    font-size: 1.12rem;
+  .card-center-medallion {
+    width: 28px;
+    height: 28px;
+  }
+
+  .pip-medallion {
+    width: 24px;
+    height: 24px;
+  }
+
+  .pip-suit-glyph {
+    font-size: 1.15rem;
+  }
+
+  .court-sigil {
+    width: 28px;
+    height: 28px;
+  }
+
+  .court-sigil.ace .sigil-suit {
+    font-size: 1.25rem;
+  }
+
+  .court-sigil.ace .sigil-label {
+    display: none;
+  }
+
+  .court-sigil .sigil-icon {
+    font-size: 0.72rem;
+  }
+
+  .court-sigil .sigil-suit {
+    font-size: 0.76rem;
+  }
+
+  .card-selected-badge {
+    width: 14px;
+    height: 14px;
+    font-size: 8px;
+  }
+
+  .card-corner.bottom {
+    display: none;
   }
 
   .poker-combo-bar {
