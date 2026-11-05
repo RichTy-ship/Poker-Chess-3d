@@ -32,6 +32,7 @@ import {
   TACTICAL_PING_INTENTS,
   soundFX
 } from './pokerChessCore.js';
+import { multiplayerClient } from './multiplayerClient.js';
 
 /** @type {any} */
 const THREE = THREE_NS;
@@ -4379,10 +4380,19 @@ export function initWizardChess() {
     }
 
     // =========================================================================
-    // Progressive Bot Difficulty Scaling by Player Elo Rating
+    // Progressive Bot Difficulty Scaling by Player Elo Rating or Explicit Choice
     // =========================================================================
+    let customBotLevel = null;
+
+    function setBotDifficultyLevel(lvl) {
+      customBotLevel = typeof lvl === 'number' && lvl >= 1 && lvl <= 5 ? lvl : null;
+      emitPokerChessSync();
+      return customBotLevel;
+    }
+
     function getBotDifficultyProfile(eloRating = commercialProfile?.elo || 1000) {
-      const elo = Number(eloRating) || 1000;
+      const explicitLevel = typeof customBotLevel === 'number' ? customBotLevel : null;
+      const elo = explicitLevel === 1 ? 900 : explicitLevel === 2 ? 1200 : explicitLevel === 3 ? 1400 : explicitLevel === 4 ? 1650 : explicitLevel === 5 ? 1900 : (Number(eloRating) || 1000);
       if (elo < 1150) {
         return {
           level: 1,
@@ -6382,7 +6392,7 @@ export function initWizardChess() {
       return comboEval;
     }
 
-    function empowerFriendlyUnitAt(r, c) {
+    function empowerFriendlyUnitAt(r, c, options = {}) {
       const piece = boardState[r]?.[c];
       if (!piece || piece.color !== currentTurn) return false;
       const appliedCombo =
@@ -6398,6 +6408,19 @@ export function initWizardChess() {
           ringColor: 0xf5d76e
         };
       const res = applyComboEmpowermentToUnit(piece, appliedCombo, boardState, turnNumber);
+      if (gameMode === 'multi' && !options?.fromRemote) {
+        multiplayerClient.sendPokerBuff({
+          targetRow: r,
+          targetCol: c,
+          targetPieceType: piece.type,
+          comboId: appliedCombo.id,
+          comboName: appliedCombo.name,
+          atkBonus: res.atkBonus,
+          armorBonus: res.armorBonus,
+          healInstant: res.healInstant,
+          colorHex: appliedCombo.colorHex
+        });
+      }
       soundFX.playComboEmpower(appliedCombo.rank || 1);
       const wPos = boardToWorld(r, c);
       spawnDivineLightningBeam(wPos, appliedCombo.ringColor || 0xf5d76e, 0.075);
@@ -6553,14 +6576,21 @@ export function initWizardChess() {
       validMoves = [];
       updateTurnUI();
 
-      if (gameMode === 'multi' && roomCode && !options.fromRemote) {
-        sendMultiplayerMove({
-          playerToken,
-          color: piece.color,
+      if (gameMode === 'multi' && !options.fromRemote) {
+        multiplayerClient.sendChessMove({
           from: { r: fromR, c: fromC },
           to: { r: toR, c: toC },
-          promotion: 'queen'
+          pieceType: piece.type
         });
+        if (roomCode) {
+          sendMultiplayerMove({
+            playerToken,
+            color: piece.color,
+            from: { r: fromR, c: fromC },
+            to: { r: toR, c: toC },
+            promotion: 'queen'
+          });
+        }
       }
 
       const startPos = boardToWorld(fromR, fromC);
@@ -8102,7 +8132,8 @@ export function initWizardChess() {
     }
 
     function triggerAIMoveNow() {
-      if (isAnimatingMove || gameOver) return false;
+      try {
+        if (isAnimatingMove || gameOver) return false;
 
       if (preMoveHighlightTask) {
         preMoveHighlightTask = null;
@@ -8227,7 +8258,11 @@ export function initWizardChess() {
         return handleTurnTimeout();
       }
       return moved;
+    } catch (err) {
+      console.error('[AI Move Exception]', err);
+      return handleTurnTimeout();
     }
+  }
 
     function maybeScheduleAIMove() {
       if (aiTimer) {
@@ -10255,16 +10290,23 @@ export function initWizardChess() {
       if (turnPhase === 'EMPOWER_UNIT') {
         if (clickedPiece && clickedPiece.color === currentTurn) {
           empowerFriendlyUnitAt(clickedR, clickedC);
+          return;
         } else {
-          soundFX.playWarningLocked();
-          spawnFloatingCombatText(
-            boardToWorld(clickedR, clickedC),
-            '🎯 BƯỚC 3: CHỌN 1 QUÂN ĐỒNG MINH ĐỂ GẮN BUFF!',
-            '#f5d76e',
-            0.88
-          );
+          // If clicked empty square, enemy, or destination: auto-empower best friendly unit so turn is NEVER locked!
+          const bestUnit = findBestMovableFriendlyUnit(currentTurn);
+          if (bestUnit) {
+            empowerFriendlyUnitAt(bestUnit.r, bestUnit.c);
+            // If the square clicked is a legal move for this unit, execute the move immediately!
+            const moves = getLegalMovesForPiece(bestUnit.r, bestUnit.c);
+            const matchingMove = moves && moves.find((m) => m.r === clickedR && m.c === clickedC);
+            if (matchingMove) {
+              executeChessMove(bestUnit.r, bestUnit.c, clickedR, clickedC);
+            }
+          } else {
+            skipEmpowerPhase();
+          }
+          return;
         }
-        return;
       }
 
       // 4. Step 4 (MOVE_OR_COMBAT): Execute a legal move / RPG combat if a friendly unit is already selected
@@ -10912,6 +10954,56 @@ export function initWizardChess() {
       checkmateState.bannerVisible = false;
     });
 
+    function startSinglePlayerMatch(side = 'w', botLevel = 1) {
+      soundFX.playUIClick();
+      gameMode = 'single';
+      roomCode = null;
+      playerColor = side === 'b' ? 'b' : 'w';
+      if (typeof botLevel === 'number') {
+        customBotLevel = botLevel;
+      }
+      resetChessBoard(true, false);
+      setCameraForSide(playerColor, false);
+      updateTurnUI();
+      emitPokerChessSync();
+      return true;
+    }
+
+    function startMultiplayerMatch(matchInfo) {
+      soundFX.playUIClick();
+      gameMode = 'multi';
+      roomCode = matchInfo.matchId || matchInfo.roomCode || 'ROOM_1V1';
+      playerColor = matchInfo.myColor === 'b' ? 'b' : 'w';
+      resetChessBoard(true, false);
+      setCameraForSide(playerColor, false);
+      addCombatLog(
+        `⚔️ TRẬN ĐẤU ONLINE 1VS1 BẮT ĐẦU! Đối thủ: ${matchInfo.opponent?.name || 'Kỳ Thủ'} (${matchInfo.opponent?.elo || 1050} Elo) - Bạn cầm quân ${playerColor === 'w' ? 'TRẮNG (Đi trước)' : 'ĐEN (Đi sau)'}!`,
+        'gold'
+      );
+      updateTurnUI();
+      emitPokerChessSync();
+      return true;
+    }
+
+    // Realtime Multiplayer WebSocket synchronization listeners
+    multiplayerClient.on('opponent_move', (msg) => {
+      if (gameMode === 'multi' && msg.from && msg.to) {
+        executeChessMove(msg.from.r, msg.from.c, msg.to.r, msg.to.c, { fromRemote: true });
+      }
+    });
+
+    multiplayerClient.on('opponent_buff', (msg) => {
+      if (gameMode === 'multi' && typeof msg.targetRow === 'number' && typeof msg.targetCol === 'number') {
+        empowerFriendlyUnitAt(msg.targetRow, msg.targetCol, { fromRemote: true });
+      }
+    });
+
+    multiplayerClient.on('match_ended', (msg) => {
+      if (gameMode === 'multi') {
+        triggerCheckmateSequence(msg.defeatedColor, msg.winnerColor);
+      }
+    });
+
     // =========================================================================
     // Programmatic API for Automated Verification & Camera Inspection
     // =========================================================================
@@ -10938,6 +11030,16 @@ export function initWizardChess() {
       toggleAutoMove,
       restartGame: restartGameMatch,
       resetChessBoard,
+      startSinglePlayerMatch,
+      startMultiplayerMatch,
+      setBotDifficultyLevel,
+      setPlayerColor: (color) => {
+        playerColor = color === 'b' ? 'b' : 'w';
+        resetChessBoard(true, false);
+        setCameraForSide(playerColor, false);
+        updateTurnUI();
+        emitPokerChessSync();
+      },
       openLobbyModal,
       closeLobbyModal,
       toggleUI,

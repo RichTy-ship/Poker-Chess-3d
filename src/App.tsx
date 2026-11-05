@@ -9,6 +9,7 @@ import {
   TACTICAL_PING_INTENTS,
   getEloRankInfo
 } from './pokerChessCore.js';
+import { multiplayerClient } from './multiplayerClient.js';
 
 interface PokerCardUI {
   id: string;
@@ -569,6 +570,10 @@ type WizardChessWindow = {
     toggleUI?: (force?: boolean) => void;
     toggleAutoMove?: (force?: boolean) => boolean;
     restartGame?: () => void;
+    startSinglePlayerMatch?: (side?: 'w' | 'b', botLevel?: number) => boolean;
+    startMultiplayerMatch?: (matchData: any) => boolean;
+    setBotDifficultyLevel?: (lvl: number) => number;
+    setPlayerColor?: (color: 'w' | 'b') => void;
     drawTurnCards?: () => boolean;
     useManaCoin?: () => boolean;
     endPlayerTurnNow?: () => boolean;
@@ -684,6 +689,16 @@ export default function App() {
   } | null>(null);
 
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [mainMenuOpen, setMainMenuOpen] = useState(false);
+  const [onlineModalOpen, setOnlineModalOpen] = useState(false);
+  const [isSearchingMatch, setIsSearchingMatch] = useState(false);
+  const [searchQueueSeconds, setSearchQueueSeconds] = useState(0);
+  const [matchFoundInfo, setMatchFoundInfo] = useState<any | null>(null);
+  const [customRoomInput, setCustomRoomInput] = useState('');
+  const [createdRoomCode, setCreatedRoomCode] = useState<string | null>(null);
+  const [spSide, setSpSide] = useState<'w' | 'b'>('w');
+  const [spBotLevel, setSpBotLevel] = useState<number>(1);
+  const [serverStats, setServerStats] = useState({ onlinePlayers: 1, activeMatches: 0, queuedPlayers: 0 });
   const [pokerDockMinimized, setPokerDockMinimized] = useState(false);
   const [peekDockDuringMove, setPeekDockDuringMove] = useState(false);
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
@@ -774,12 +789,63 @@ export default function App() {
     };
   }, []);
 
+  // Realtime 1vs1 Multiplayer WebSocket Connection & Lifecycle
+  useEffect(() => {
+    multiplayerClient.connect();
+
+    const onStats = (stats: any) => {
+      if (stats) setServerStats(stats);
+    };
+    const onMatchFound = (match: any) => {
+      setIsSearchingMatch(false);
+      setMatchFoundInfo(match);
+      setTimeout(() => {
+        getEngine()?.startMultiplayerMatch?.(match);
+        setMatchFoundInfo(null);
+        setOnlineModalOpen(false);
+        setMainMenuOpen(false);
+      }, 2400);
+    };
+    const onQueueStatus = (status: any) => {
+      setIsSearchingMatch(Boolean(status?.isQueued));
+    };
+    const onRoomCreated = (msg: any) => {
+      setCreatedRoomCode(msg.roomCode);
+    };
+
+    multiplayerClient.on('stats', onStats);
+    multiplayerClient.on('match_found', onMatchFound);
+    multiplayerClient.on('queue_status', onQueueStatus);
+    multiplayerClient.on('room_created', onRoomCreated);
+
+    return () => {
+      multiplayerClient.off('stats', onStats);
+      multiplayerClient.off('match_found', onMatchFound);
+      multiplayerClient.off('queue_status', onQueueStatus);
+      multiplayerClient.off('room_created', onRoomCreated);
+    };
+  }, []);
+
+  // Matchmaking search duration counter
+  useEffect(() => {
+    if (!isSearchingMatch) {
+      setSearchQueueSeconds(0);
+      return;
+    }
+    const iv = setInterval(() => {
+      setSearchQueueSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [isSearchingMatch]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setMobileSheetOpen(false);
         setRulesModalOpen(false);
         setSkinStoreOpen(false);
+        setMainMenuOpen(false);
+        setOnlineModalOpen(false);
       }
     };
     const handleResize = () => {
@@ -988,7 +1054,7 @@ export default function App() {
 
   // Real-time Hands-On Spotlight & 3D Board Pointer tracker ("Cầm Tay Chỉ Việc")
   useEffect(() => {
-    if (!handsOnActive || !gameState?.isLoaded || gameState?.gameOver || skinStoreOpen || rulesModalOpen) {
+    if (!handsOnActive || !gameState?.isLoaded || gameState?.gameOver || skinStoreOpen || rulesModalOpen || mainMenuOpen || onlineModalOpen) {
       setHandsOnSpot(null);
       return;
     }
@@ -1128,7 +1194,9 @@ export default function App() {
     poker,
     pokerDockMinimized,
     skinStoreOpen,
-    rulesModalOpen
+    rulesModalOpen,
+    mainMenuOpen,
+    onlineModalOpen
   ]);
 
   const outcomeMeta: Record<
@@ -1497,6 +1565,20 @@ export default function App() {
               ⏭ Đổi Bài
             </button>
           )}
+
+          <button
+            type="button"
+            className="hud-btn main-menu-trigger-btn"
+            id="btn-main-menu-trigger"
+            onClick={() => {
+              getEngine()?.playUIClick?.();
+              setMainMenuOpen(true);
+              setMobileSheetOpen(false);
+            }}
+            title="Mở Menu Chính: Đấu Máy, Đấu Online 1vs1, Cửa Hàng & Cài Đặt"
+          >
+            ☰ Menu Chính
+          </button>
 
           <button
             type="button"
@@ -2021,19 +2103,19 @@ export default function App() {
             <div className="director-actions">
               <button
                 type="button"
-                className="director-action-btn secondary"
-                onClick={() => setPeekDockDuringMove(true)}
-                title="Mở khay chọn nhanh quân đồng minh hoặc xem lại bài"
+                className="director-action-btn primary"
+                onClick={() => getEngine()?.triggerTutorialStepAction?.()}
+                title="Tự động gắn Buff cho quân tiên phong tốt nhất"
               >
-                🃏 Xem Bài
+                ⚡ Tự Gắn Buff
               </button>
               <button
                 type="button"
-                className="director-action-btn primary"
+                className="director-action-btn secondary"
                 onClick={() => getEngine()?.skipEmpowerPhase?.()}
-                title="Tự động truyền Buff cho Hậu hoặc Vua"
+                title="Bỏ qua bước buff và đi quân ngay"
               >
-                ⚡ Gắn Nhanh (Hậu/Vua)
+                ⏭ Đi Quân Ngay
               </button>
             </div>
           )}
@@ -2469,7 +2551,7 @@ export default function App() {
           aria-live="polite"
         >
           {/* Case 1: Highlighting a DOM Button (Step 1 Draw, Step 2 Auto-Select, Step 2 Commit) */}
-          {handsOnSpot.kind === 'dom' && handsOnSpot.rect && (() => {
+          {handsOnSpot.kind === 'dom' && handsOnSpot.rect && handsOnSpot.rect.width > 15 && handsOnSpot.rect.height > 15 && (() => {
             const { left, top, width, height } = handsOnSpot.rect;
             const centerX = Math.max(150, Math.min(window.innerWidth - 150, left + width / 2));
             const bubbleTop = Math.max(64, top - 66);
@@ -2582,6 +2664,429 @@ export default function App() {
         </div>
         <div className="captured-pill" id="captured-tray"></div>
       </div>
+
+      {/* COMPREHENSIVE MAIN MENU MODAL */}
+      {mainMenuOpen && (
+        <div
+          className="main-menu-backdrop"
+          onClick={() => setMainMenuOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="main-menu-card" onClick={(e) => e.stopPropagation()}>
+            <div className="main-menu-header">
+              <div className="main-menu-title-wrap">
+                <span className="main-menu-crest">👑</span>
+                <div>
+                  <h2 className="main-menu-title">VƯƠNG QUYỀN • POKER CHESS 3D</h2>
+                  <div className="main-menu-subtitle">Hệ Thống Menu Chiến Thuật &amp; Điều Khiển Toàn Diện</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="main-menu-close-btn"
+                onClick={() => setMainMenuOpen(false)}
+                title="Đóng Menu Chính"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Profile Ribbon */}
+            <div className="main-menu-profile-ribbon">
+              <div className="profile-ribbon-left">
+                <span className="profile-avatar">🧙</span>
+                <span className="profile-name">
+                  {gameState?.commercial?.rankInfo?.tierNameVi
+                    ? `${gameState.commercial.rankInfo.tierNameVi} • Kỳ Thủ`
+                    : 'Kỳ Thủ Vương Quyền'}
+                </span>
+                <span className="profile-rank-tag">
+                  {gameState?.commercial?.rankInfo?.tierIcon || '🏆'} {gameState?.commercial?.elo ?? 1000} Elo
+                </span>
+              </div>
+              <div className="profile-ribbon-right">
+                <span className="profile-gold-badge">
+                  🪙 {(gameState?.commercial?.gold ?? 0).toLocaleString()} Vàng
+                </span>
+              </div>
+            </div>
+
+            {/* Menu Body Cards Grid */}
+            <div className="main-menu-body">
+              <div className="main-menu-grid">
+                {/* 1. Single Player vs AI Card */}
+                <div className="menu-card-btn">
+                  <div className="menu-card-header">
+                    <span className="menu-card-icon">🤖</span>
+                    <span className="menu-card-badge bot-badge">Chơi Đơn • AI</span>
+                  </div>
+                  <h3 className="menu-card-title">Đấu Với Máy (Luyện Tập)</h3>
+                  <p className="menu-card-desc">
+                    Luyện cờ Poker Chess theo cấp độ Bot Elo. Không tính điểm xếp hạng Online.
+                  </p>
+
+                  <div className="sp-config-tray">
+                    <div className="sp-config-row">
+                      <span className="sp-config-label">Chọn Phe:</span>
+                      <div className="sp-chip-group">
+                        <button
+                          type="button"
+                          className={`sp-chip-btn ${spSide === 'w' ? 'active' : ''}`}
+                          onClick={() => setSpSide('w')}
+                        >
+                          ⚪ Trắng (Trước)
+                        </button>
+                        <button
+                          type="button"
+                          className={`sp-chip-btn ${spSide === 'b' ? 'active' : ''}`}
+                          onClick={() => setSpSide('b')}
+                        >
+                          ⚫ Đen (Sau)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="sp-config-row">
+                      <span className="sp-config-label">Cấp Độ Bot:</span>
+                      <div className="sp-chip-group">
+                        <button
+                          type="button"
+                          className={`sp-chip-btn ${spBotLevel === 1 ? 'active' : ''}`}
+                          onClick={() => setSpBotLevel(1)}
+                        >
+                          🥉 Dễ (800)
+                        </button>
+                        <button
+                          type="button"
+                          className={`sp-chip-btn ${spBotLevel === 2 ? 'active' : ''}`}
+                          onClick={() => setSpBotLevel(2)}
+                        >
+                          🥈 Vừa (1100)
+                        </button>
+                        <button
+                          type="button"
+                          className={`sp-chip-btn ${spBotLevel === 3 ? 'active' : ''}`}
+                          onClick={() => setSpBotLevel(3)}
+                        >
+                          🥇 Khó (1400)
+                        </button>
+                        <button
+                          type="button"
+                          className={`sp-chip-btn ${spBotLevel === 4 ? 'active' : ''}`}
+                          onClick={() => setSpBotLevel(4)}
+                        >
+                          💎 Thầy (1700)
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="sp-start-btn"
+                      onClick={() => {
+                        getEngine()?.startSinglePlayerMatch?.(spSide, spBotLevel);
+                        setMainMenuOpen(false);
+                      }}
+                    >
+                      ⚔️ Bắt Đầu Trận Đấu Máy
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Realtime 1v1 Online Card */}
+                <div
+                  className="menu-card-btn featured-online"
+                  onClick={() => {
+                    setOnlineModalOpen(true);
+                    setMainMenuOpen(false);
+                  }}
+                >
+                  <div className="menu-card-header">
+                    <span className="menu-card-icon">⚔️</span>
+                    <span className="menu-card-badge online-badge">
+                      🟢 Trực Tuyến ({serverStats.onlinePlayers} Người)
+                    </span>
+                  </div>
+                  <h3 className="menu-card-title">Đấu Online 1vs1 Thời Gian Thực</h3>
+                  <p className="menu-card-desc">
+                    Ghép trận Realtime Matchmaking (100 CCU Server) theo Rank Elo, hoặc tự tạo phòng thách đấu riêng cùng bạn bè!
+                  </p>
+                  <button type="button" className="custom-room-btn primary" style={{ marginTop: 'auto' }}>
+                    ⚡ Vào Sảnh Đấu Online ➔
+                  </button>
+                </div>
+
+                {/* 3. Skin Store Card */}
+                <div
+                  className="menu-card-btn"
+                  onClick={() => {
+                    setStoreTab('skins');
+                    setSkinStoreOpen(true);
+                    setMainMenuOpen(false);
+                  }}
+                >
+                  <div className="menu-card-header">
+                    <span className="menu-card-icon">🛒</span>
+                    <span className="menu-card-badge">Vật Phẩm 3D</span>
+                  </div>
+                  <h3 className="menu-card-title">Cửa Hàng Skin &amp; Bảng Xếp Hạng</h3>
+                  <p className="menu-card-desc">
+                    Khám phá trang phục quân cờ 3D độc quyền: Neon Cyberpunk, Huyết Nguyệt, Bạch Kim Tối Thượng và Bảng Xếp Hạng Elo.
+                  </p>
+                  <button type="button" className="custom-room-btn" style={{ marginTop: 'auto' }}>
+                    Mở Cửa Hàng ➔
+                  </button>
+                </div>
+
+                {/* 4. Rules & Codex Card */}
+                <div
+                  className="menu-card-btn"
+                  onClick={() => {
+                    setRulesModalOpen(true);
+                    setMainMenuOpen(false);
+                  }}
+                >
+                  <div className="menu-card-header">
+                    <span className="menu-card-icon">📖</span>
+                    <span className="menu-card-badge">Sổ Tay</span>
+                  </div>
+                  <h3 className="menu-card-title">Luật Chơi &amp; Sổ Tay Phép Bài</h3>
+                  <p className="menu-card-desc">
+                    Chi tiết 9 cấp bậc Poker, thuộc tính RPG Công ⚔, Giáp 🛡, Máu ❤ và hiệu ứng đặc biệt của các Ô Thánh Tích.
+                  </p>
+                  <button type="button" className="custom-room-btn" style={{ marginTop: 'auto' }}>
+                    Mở Sổ Tay Luật ➔
+                  </button>
+                </div>
+              </div>
+
+              {/* Settings, Camera & Audio Controls Quick Strip */}
+              <div className="sp-config-tray" style={{ marginTop: '4px' }}>
+                <div className="sp-config-row">
+                  <span className="sp-config-label">⚙️ Cài Đặt Nhanh:</span>
+                  <div className="sp-chip-group">
+                    <button
+                      type="button"
+                      className="sp-chip-btn"
+                      onClick={() => getEngine()?.toggleBattleMusic?.()}
+                    >
+                      {gameState?.bgmPlaying ? '🎵 Tắt BGM' : '🎵 Bật BGM'}
+                    </button>
+                    <button
+                      type="button"
+                      className="sp-chip-btn"
+                      onClick={() => getEngine()?.toggleSoundMute?.()}
+                    >
+                      {gameState?.sfxMuted ? '🔊 Bật SFX' : '🔇 Tắt SFX'}
+                    </button>
+                    <button
+                      type="button"
+                      className="sp-chip-btn"
+                      onClick={() => setHandsOnActive((prev) => !prev)}
+                    >
+                      {handsOnActive ? '💡 Chỉ Việc: BẬT' : '💡 Chỉ Việc: TẮT'}
+                    </button>
+                    <button
+                      type="button"
+                      className="sp-chip-btn"
+                      onClick={() => {
+                        getEngine()?.restartGame?.();
+                        setMainMenuOpen(false);
+                      }}
+                    >
+                      🔄 Reset Ván Mới
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 1VS1 ONLINE MULTIPLAYER REALTIME MODAL */}
+      {onlineModalOpen && (
+        <div
+          className="main-menu-backdrop"
+          onClick={() => {
+            if (isSearchingMatch) {
+              multiplayerClient.leaveMatchmaking();
+              setIsSearchingMatch(false);
+            }
+            setOnlineModalOpen(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="online-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="main-menu-header">
+              <div className="main-menu-title-wrap">
+                <span className="main-menu-crest">⚔️</span>
+                <div>
+                  <h2 className="main-menu-title">ĐẤU ONLINE 1VS1 THỜI GIAN THỰC</h2>
+                  <div className="main-menu-subtitle">Máy Chủ Phục Vụ 100 Kỳ Thủ • Realtime Move Sync</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="main-menu-close-btn"
+                onClick={() => {
+                  if (isSearchingMatch) {
+                    multiplayerClient.leaveMatchmaking();
+                    setIsSearchingMatch(false);
+                  }
+                  setOnlineModalOpen(false);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Server Status Header */}
+            <div className="online-server-status-bar">
+              <span>
+                <span className="online-status-dot" />
+                Máy Chủ Trực Tuyến: <strong>{serverStats.onlinePlayers}</strong> người chơi đang online
+              </span>
+              <span>
+                ⚔️ <strong>{serverStats.activeMatches}</strong> trận đang đấu • ⏳ <strong>{serverStats.queuedPlayers}</strong> người trong hàng chờ
+              </span>
+            </div>
+
+            {/* Case A: Match Found Transition Screen */}
+            {matchFoundInfo ? (
+              <div className="match-found-banner">
+                <h3 style={{ color: '#fde047', margin: 0, fontSize: '1.2rem', textTransform: 'uppercase' }}>
+                  🔥 ĐÃ TÌM THẤY TRẬN ĐẤU!
+                </h3>
+                <div className="match-found-versus">
+                  <div className="vs-combatant-card">
+                    <span className="vs-icon-badge">🧙</span>
+                    <span className="vs-name">Bạn</span>
+                    <span className="vs-role">
+                      {matchFoundInfo.myColor === 'w' ? '⚪ Quân Trắng (Đi Trước)' : '⚫ Quân Đen (Đi Sau)'}
+                    </span>
+                  </div>
+
+                  <span className="vs-sep-badge">VS</span>
+
+                  <div className="vs-combatant-card">
+                    <span className="vs-icon-badge">👤</span>
+                    <span className="vs-name">{matchFoundInfo.opponent?.name || 'Đối Thủ Bí Ẩn'}</span>
+                    <span className="vs-role">
+                      🏆 {matchFoundInfo.opponent?.elo || 1050} Elo • {matchFoundInfo.myColor === 'w' ? '⚫ Quân Đen' : '⚪ Quân Trắng'}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ color: '#38bdf8', fontSize: '0.85rem', fontWeight: 700 }}>
+                  Đang khởi tạo bàn cờ 3D và bước vào trận chiến...
+                </div>
+              </div>
+            ) : isSearchingMatch ? (
+              /* Case B: Searching Radar Pulse Screen */
+              <div className="online-radar-container">
+                <div className="radar-circle-wrap">
+                  <div className="radar-ring" />
+                  <div className="radar-ring" />
+                  <div className="radar-ring" />
+                  <span className="radar-center-icon">📡</span>
+                </div>
+                <h3 className="radar-title">Đang Tìm Đối Thủ Ngang Trình Elo...</h3>
+                <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                  Hệ thống đang ghép cặp người chơi có điểm xếp hạng tương đương trên máy chủ
+                </div>
+                <div className="radar-timer">
+                  00:{String(searchQueueSeconds).padStart(2, '0')}
+                </div>
+                <button
+                  type="button"
+                  className="radar-cancel-btn"
+                  onClick={() => {
+                    multiplayerClient.leaveMatchmaking();
+                    setIsSearchingMatch(false);
+                  }}
+                >
+                  ✕ Hủy Tìm Trận
+                </button>
+              </div>
+            ) : (
+              /* Case C: Online Lobby Idle State */
+              <div className="main-menu-body">
+                {/* 1. Quick Matchmaking Option */}
+                <div
+                  className="menu-card-btn featured-online"
+                  onClick={() => {
+                    multiplayerClient.joinMatchmaking();
+                    setIsSearchingMatch(true);
+                    setSearchQueueSeconds(0);
+                  }}
+                >
+                  <div className="menu-card-header">
+                    <span className="menu-card-icon">⚡</span>
+                    <span className="menu-card-badge online-badge">Xếp Hạng Elo</span>
+                  </div>
+                  <h3 className="menu-card-title">Tìm Trận Nhanh (Ranked Match)</h3>
+                  <p className="menu-card-desc">
+                    Tự động tìm kiếm đối thủ gần mức Elo của bạn. Chiến thắng nhận thưởng Elo và Vàng tích lũy!
+                  </p>
+                  <button type="button" className="custom-room-btn primary" style={{ marginTop: 'auto' }}>
+                    🎮 Bắt Đầu Tìm Trận Ngay
+                  </button>
+                </div>
+
+                {/* 2. Custom Room Section */}
+                <div className="online-custom-room-section">
+                  <div className="custom-room-title">🏰 Phòng Tùy Chỉnh (Giao Hữu Bạn Bè)</div>
+
+                  <div className="custom-room-row">
+                    <button
+                      type="button"
+                      className="custom-room-btn"
+                      onClick={() => multiplayerClient.createCustomRoom()}
+                    >
+                      🎲 Tạo Mã Phòng Mới
+                    </button>
+                    {createdRoomCode && (
+                      <span style={{ color: '#fde047', fontSize: '0.82rem', fontWeight: 800 }}>
+                        Mã của bạn: <strong>{createdRoomCode}</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="custom-room-row">
+                    <input
+                      type="text"
+                      className="custom-room-input"
+                      placeholder="Nhập mã phòng 4 ký tự (VD: A8K2)..."
+                      maxLength={6}
+                      value={customRoomInput}
+                      onChange={(e) => setCustomRoomInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customRoomInput.trim()) {
+                          multiplayerClient.joinCustomRoom(customRoomInput.trim().toUpperCase());
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="custom-room-btn primary"
+                      disabled={!customRoomInput.trim()}
+                      onClick={() => {
+                        if (customRoomInput.trim()) {
+                          multiplayerClient.joinCustomRoom(customRoomInput.trim().toUpperCase());
+                        }
+                      }}
+                    >
+                      Vào Phòng ➔
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* RULES & COMBO CODEX MODAL */}
       {rulesModalOpen && (
