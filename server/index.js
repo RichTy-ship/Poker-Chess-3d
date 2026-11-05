@@ -75,10 +75,11 @@ const server = createServer((req, res) => {
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
       const fileData = readFileSync(filePath);
 
-      // Cache policies: 1 year for static hashed assets and 3D GLBs, no-cache for index.html
+      // Cache policies: 1 year for Vite hashed assets, no-cache for index.html and non-hashed dynamic assets
+      const isHashed = urlPath.includes('-') && (urlPath.endsWith('.js') || urlPath.endsWith('.css') || urlPath.endsWith('.png'));
       const cacheControl = (ext === '.html')
         ? 'no-cache, no-store, must-revalidate'
-        : 'public, max-age=31536000, immutable';
+        : (isHashed ? 'public, max-age=31536000, immutable' : 'no-cache, must-revalidate');
 
       res.writeHead(200, {
         'Content-Type': contentType,

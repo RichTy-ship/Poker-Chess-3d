@@ -10,6 +10,7 @@ import {
   getEloRankInfo
 } from './pokerChessCore.js';
 import { multiplayerClient } from './multiplayerClient.js';
+import donateQrImage from './assets/donate_qr_clean.png';
 
 interface PokerCardUI {
   id: string;
@@ -2962,7 +2963,7 @@ export default function App() {
                 <div className="donate-body">
                   <div className="donate-qr-wrapper">
                     <img
-                      src="/assets/donate_qr.jpg"
+                      src={donateQrImage}
                       alt="Mã VietQR Donate - TRƯƠNG MINH HOÀNG"
                       className="donate-qr-img"
                       loading="lazy"
@@ -3882,7 +3883,7 @@ export default function App() {
             <div className="donate-body">
               <div className="donate-qr-wrapper">
                 <img
-                  src="/assets/donate_qr.jpg"
+                  src={donateQrImage}
                   alt="Mã VietQR Donate - TRƯƠNG MINH HOÀNG"
                   className="donate-qr-img"
                   loading="lazy"
