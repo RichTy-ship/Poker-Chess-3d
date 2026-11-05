@@ -76,8 +76,8 @@ export function initWizardChess() {
       (window.innerWidth <= 850 && window.matchMedia('(pointer: coarse)').matches);
 
     const renderer = new THREE.WebGLRenderer({
-      antialias: !isMobileDevice, // Disable MSAA on mobile (400+ PPI AMOLED makes MSAA redundant while preventing TBDR GPU thermal throttling)
-      powerPreference: isMobileDevice ? 'default' : 'high-performance',
+      antialias: true,
+      powerPreference: 'high-performance',
       preserveDrawingBuffer: isAutomatedTest
     });
 
@@ -101,22 +101,21 @@ export function initWizardChess() {
         (window.innerWidth <= 850 && window.matchMedia('(pointer: coarse)').matches);
 
       if (preset === 'performance') {
-        // Performance / Cool Battery Saver: 1.0 DPR, shadows off
-        renderer.setPixelRatio(1.0);
+        // Performance: 1.0 DPR on laptop/desktop, 1.25 on mobile, shadows off
+        renderer.setPixelRatio(isMobile ? Math.min(dpr, 1.25) : 1.0);
         renderer.shadowMap.enabled = false;
       } else if (preset === 'ultra') {
-        renderer.setPixelRatio(isMobile ? Math.min(dpr, 1.5) : Math.min(dpr, 1.25));
+        renderer.setPixelRatio(isMobile ? Math.min(dpr, 2.5) : Math.min(dpr, 1.5));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.shadowMap.needsUpdate = true;
       } else {
         // Balanced (default):
-        // Mobile: 1.25 DPR (ultra-sharp on 1.5K/1080p phones while cutting pixel fillrate by 50% vs 1.75x to keep phone cool)
-        // Laptop/desktop: 1.0 DPR (smooth 60 FPS on integrated GPUs)
-        const targetDpr = isMobile ? Math.min(dpr, 1.25) : 1.0;
+        // Crystal sharp graphics up to 2.0 DPR on Mobile (eliminates any pixelation / vỡ hình) & 1.25 on Laptop
+        const targetDpr = isMobile ? Math.min(dpr, 2.0) : Math.min(dpr, 1.25);
         renderer.setPixelRatio(targetDpr);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFShadowMap;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.shadowMap.needsUpdate = true;
       }
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -296,8 +295,8 @@ export function initWizardChess() {
     const keyLight = new THREE.DirectionalLight(0xfff0d6, 2.55);
     keyLight.position.set(3.8, 8.5, 4.2);
     keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = isMobileDevice ? 512 : 1024;
-    keyLight.shadow.mapSize.height = isMobileDevice ? 512 : 1024;
+    keyLight.shadow.mapSize.width = 1024;
+    keyLight.shadow.mapSize.height = 1024;
     keyLight.shadow.camera.near = 1.0;
     keyLight.shadow.camera.far = 22.0;
     const d = 3.2;
