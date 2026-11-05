@@ -5947,6 +5947,7 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   align-items: center;
   justify-content: space-between;
   padding: 10px 24px;
+  min-height: 52px;
   background: rgba(9, 13, 22, 0.75);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.82rem;
@@ -6781,8 +6782,10 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   }
 
   .main-menu-profile-ribbon {
-    padding: 5px 16px;
+    padding: max(env(safe-area-inset-top, 0px), 8px) 16px 6px;
     font-size: 0.74rem;
+    min-height: 46px;
+    align-items: center;
   }
 
   .profile-avatar {
@@ -7630,68 +7633,99 @@ body.cinematic-ui-hidden .turn-timeout-toast {
   color: #fff;
 }
 
+/* Pinned Backdrop: Sits cleanly at top with highest z-index so mobile keyboards never bury the modal */
+.edit-name-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  background: rgba(0, 0, 0, 0.88) !important;
+  backdrop-filter: blur(10px) !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: max(env(safe-area-inset-top, 0px), 14px) 12px 12px !important;
+  overflow-y: auto !important;
+}
+
 .edit-name-modal-card {
   position: relative;
-  z-index: 10;
-  width: 90%;
-  max-width: 480px;
-  background: linear-gradient(180deg, #182032 0%, #0d1322 100%);
+  z-index: 100;
+  width: min(520px, calc(100vw - 24px));
+  background: linear-gradient(180deg, #182236 0%, #0d1424 100%);
   border: 2px solid #d4af37;
-  border-radius: 16px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 35px rgba(212, 175, 55, 0.35);
-  padding: 22px 24px;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95), 0 0 35px rgba(212, 175, 55, 0.35);
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+  margin: 0 auto;
   animation: menuModalPop 0.22s ease-out;
 }
 
 .edit-name-header {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  position: relative;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.edit-name-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .edit-name-icon {
-  font-size: 1.8rem;
-  background: rgba(212, 175, 55, 0.15);
-  border: 1px solid rgba(212, 175, 55, 0.4);
-  padding: 6px 10px;
-  border-radius: 10px;
+  font-size: 1.4rem;
+  background: rgba(212, 175, 55, 0.18);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  padding: 3px 7px;
+  border-radius: 8px;
 }
 
 .edit-name-title {
   font-family: 'Cinzel', serif;
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   color: var(--gold-bright);
 }
 
 .edit-name-sub {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: #94a3b8;
-  margin-top: 3px;
-  line-height: 1.35;
+  margin-top: 1px;
 }
 
 .edit-name-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+}
+
+/* Single-row action layout: Input, Save button and Cancel button on the same row */
+.edit-name-input-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .edit-name-input-wrap {
   position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
 }
 
 .edit-name-input {
   width: 100%;
-  background: rgba(5, 8, 14, 0.85);
-  border: 1.5px solid rgba(212, 175, 55, 0.5);
-  border-radius: 10px;
-  padding: 12px 60px 12px 14px;
+  height: 42px;
+  background: rgba(6, 9, 16, 0.95);
+  border: 1.5px solid rgba(212, 175, 55, 0.6);
+  border-radius: 8px;
+  padding: 8px 50px 8px 12px;
   color: #fff;
   font-size: 1rem;
   font-weight: 600;
@@ -7701,83 +7735,31 @@ body.cinematic-ui-hidden .turn-timeout-toast {
 
 .edit-name-input:focus {
   border-color: #facc15;
-  box-shadow: 0 0 16px rgba(250, 204, 21, 0.4);
+  box-shadow: 0 0 16px rgba(250, 204, 21, 0.45);
 }
 
 .edit-name-count {
   position: absolute;
-  right: 12px;
-  font-size: 0.72rem;
+  right: 10px;
+  font-size: 0.7rem;
   color: #64748b;
   pointer-events: none;
 }
 
-.edit-name-suggestions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.suggest-lbl {
-  font-size: 0.72rem;
-  color: #94a3b8;
-  width: 100%;
-  margin-bottom: 2px;
-}
-
-.suggest-chip {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e2e8f0;
-  font-size: 0.72rem;
-  padding: 3px 9px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.suggest-chip:hover {
-  background: rgba(212, 175, 55, 0.2);
-  border-color: #d4af37;
-  color: #fef08a;
-  transform: translateY(-1px);
-}
-
-.edit-name-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.btn-name-cancel {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #cbd5e1;
-  padding: 9px 16px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.15s ease;
-}
-
-.btn-name-cancel:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-
 .btn-name-save {
+  height: 42px;
   background: linear-gradient(135deg, #d8b45b 0%, #b45309 100%);
   border: 1px solid #fef08a;
   color: #0b0f19;
   font-weight: 800;
-  padding: 9px 20px;
+  padding: 0 18px;
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.88rem;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   transition: all 0.15s ease;
   box-shadow: 0 4px 14px rgba(216, 180, 91, 0.35);
 }
@@ -7790,4 +7772,107 @@ body.cinematic-ui-hidden .turn-timeout-toast {
 .btn-name-save:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.btn-name-cancel {
+  height: 42px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.btn-name-cancel:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.edit-name-suggestions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.suggest-lbl {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-right: 2px;
+}
+
+.suggest-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.suggest-chip:hover {
+  background: rgba(212, 175, 55, 0.22);
+  border-color: #d4af37;
+  color: #fef08a;
+  transform: translateY(-1px);
+}
+
+/* Mobile Landscape keyboard-friendly constraints */
+@media (max-height: 520px) {
+  .edit-name-backdrop {
+    padding: max(env(safe-area-inset-top, 0px), 6px) 10px 6px !important;
+  }
+  .edit-name-modal-card {
+    padding: 8px 14px;
+    gap: 6px;
+    border-radius: 10px;
+  }
+  .edit-name-header {
+    padding-bottom: 4px;
+  }
+  .edit-name-sub {
+    display: none;
+  }
+  .edit-name-title {
+    font-size: 0.92rem;
+  }
+  .edit-name-icon {
+    font-size: 1.15rem;
+    padding: 1px 5px;
+  }
+  .edit-name-form {
+    gap: 6px;
+  }
+  .edit-name-input {
+    height: 36px;
+    font-size: 0.88rem;
+    padding: 6px 45px 6px 10px;
+  }
+  .btn-name-save {
+    height: 36px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+  }
+  .btn-name-cancel {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+  .edit-name-suggestions {
+    gap: 4px;
+  }
+  .suggest-lbl {
+    font-size: 0.65rem;
+  }
+  .suggest-chip {
+    font-size: 0.65rem;
+    padding: 2px 7px;
+  }
 }

@@ -11,6 +11,7 @@ let stats = {
   uniqueIps: {},
   gamesPlayed: 0,
   pvToday: 0,
+  totalPlayTimeSec: 0,
   currentDateStr: new Date().toISOString().slice(0, 10),
   sources: {
     'Facebook / Messenger': 0,
@@ -40,6 +41,7 @@ try {
       stats.uniqueIps = raw.uniqueIps || {};
       stats.gamesPlayed = raw.gamesPlayed || 0;
       stats.pvToday = raw.pvToday || 0;
+      stats.totalPlayTimeSec = raw.totalPlayTimeSec || 0;
       stats.currentDateStr = raw.currentDateStr || new Date().toISOString().slice(0, 10);
       stats.sources = { ...stats.sources, ...(raw.sources || {}) };
       stats.devices = { ...stats.devices, ...(raw.devices || {}) };
@@ -73,6 +75,18 @@ function anonymizeIp(ip) {
     if (parts.length === 4) return `${parts[0]}.${parts[1]}.xxx.xxx`;
   }
   return clean.slice(0, 8) + '...';
+}
+
+// Format duration into readable Vietnamese format (e.g. 45s, 4p 12s, 1h 35p)
+export function formatDuration(seconds = 0) {
+  const sec = Math.max(0, Math.round(seconds));
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const remS = sec % 60;
+  if (m < 60) return remS > 0 ? `${m}p ${remS}s` : `${m} phút`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  return remM > 0 ? `${h}h ${remM}p` : `${h} giờ`;
 }
 
 // Detect source from Referrer or query
@@ -138,44 +152,75 @@ export function recordTrafficEvent(req, customPayload = {}) {
   const ref = customPayload.referrer || req.headers['referer'] || '';
 
   const eventType = customPayload.event || 'PAGE_VIEW';
+  const sessionId = customPayload.sessionId || `s_${ip.replace(/[^a-zA-Z0-9]/g, '')}`;
+  const durationSec = Math.max(0, Math.round(customPayload.sessionDurationSec || 0));
+
+  // 1. HEARTBEAT event: Player is actively playing
+  if (eventType === 'HEARTBEAT') {
+    const existingLog = stats.recentLogs.find(l => l.sessionId === sessionId || l.rawIp === ip);
+    if (existingLog) {
+      const prev = existingLog.durationSec || 0;
+      const delta = Math.max(0, durationSec - prev);
+      existingLog.durationSec = durationSec;
+      existingLog.lastActiveTime = Date.now();
+      stats.totalPlayTimeSec = (stats.totalPlayTimeSec || 0) + delta;
+      scheduleSave();
+    }
+    return;
+  }
+
+  // 2. MATCH START event
+  if (eventType === 'START_MATCH') {
+    stats.gamesPlayed++;
+    const existingLog = stats.recentLogs.find(l => l.sessionId === sessionId);
+    if (existingLog) {
+      existingLog.event = `Đang chơi ${customPayload.mode || 'Trận đấu'}`;
+      existingLog.lastActiveTime = Date.now();
+    }
+    scheduleSave();
+    return;
+  }
+
+  // 3. PAGE VIEW event
   const source = customPayload.source || detectSource(ref, ua);
   const device = customPayload.device || detectDevice(ua);
   const browser = detectBrowser(ua);
 
-  if (eventType === 'START_MATCH') {
-    stats.gamesPlayed++;
-  } else {
-    stats.totalVisits++;
-    stats.pvToday++;
+  stats.totalVisits++;
+  stats.pvToday++;
 
-    // Track unique IP
-    if (!stats.uniqueIps[ip]) {
-      stats.uniqueIps[ip] = true;
-    }
+  // Track unique IP
+  if (!stats.uniqueIps[ip]) {
+    stats.uniqueIps[ip] = true;
+  }
 
-    // Source breakdown
-    stats.sources[source] = (stats.sources[source] || 0) + 1;
+  // Source breakdown
+  stats.sources[source] = (stats.sources[source] || 0) + 1;
 
-    // Device breakdown
-    stats.devices[device] = (stats.devices[device] || 0) + 1;
+  // Device breakdown
+  stats.devices[device] = (stats.devices[device] || 0) + 1;
 
-    // Hourly
-    stats.hourly[hourStr] = (stats.hourly[hourStr] || 0) + 1;
+  // Hourly
+  stats.hourly[hourStr] = (stats.hourly[hourStr] || 0) + 1;
 
-    // Log entry (prepend)
-    const timeVi = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-    stats.recentLogs.unshift({
-      time: timeVi,
-      date: todayStr,
-      ip: anonymizeIp(ip),
-      source,
-      device,
-      browser,
-      event: eventType === 'PAGE_VIEW' ? 'Ghé thăm trang' : eventType
-    });
-    if (stats.recentLogs.length > 50) {
-      stats.recentLogs.pop();
-    }
+  // Log entry (prepend)
+  const timeVi = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  stats.recentLogs.unshift({
+    sessionId,
+    rawIp: ip,
+    time: timeVi,
+    date: todayStr,
+    ip: anonymizeIp(ip),
+    source,
+    device,
+    browser,
+    durationSec: 0,
+    lastActiveTime: Date.now(),
+    event: 'Ghé thăm trang'
+  });
+
+  if (stats.recentLogs.length > 50) {
+    stats.recentLogs.pop();
   }
 
   scheduleSave();
@@ -184,6 +229,9 @@ export function recordTrafficEvent(req, customPayload = {}) {
 // Return JSON summary
 export function getTrafficSummary(onlinePlayers = 0, activeMatches = 0) {
   const uniqueCount = Object.keys(stats.uniqueIps).length;
+  const totalPlaySec = stats.totalPlayTimeSec || 0;
+  const avgPlaySec = Math.round(totalPlaySec / Math.max(1, stats.totalVisits));
+
   return {
     status: 'ok',
     live: {
@@ -194,7 +242,11 @@ export function getTrafficSummary(onlinePlayers = 0, activeMatches = 0) {
       totalVisits: stats.totalVisits,
       uniqueVisitors: uniqueCount,
       todayVisits: stats.pvToday,
-      gamesPlayed: stats.gamesPlayed
+      gamesPlayed: stats.gamesPlayed,
+      totalPlayTimeSec: totalPlaySec,
+      totalPlayTimeFormatted: formatDuration(totalPlaySec),
+      avgPlayTimeSec: avgPlaySec,
+      avgPlayTimeFormatted: formatDuration(avgPlaySec)
     },
     sources: stats.sources,
     devices: stats.devices,
@@ -235,7 +287,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vương Quyền Poker Chess 3D — Thống Kê Traffic Realtime</title>
+  <title>Vương Quyền Poker Chess 3D — Thống Kê Traffic &amp; Thời Gian Chơi</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -261,7 +313,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
       padding: 24px 16px 40px;
     }
     .container {
-      max-width: 1100px;
+      max-width: 1160px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
@@ -346,7 +398,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
     /* KPI Grid */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 14px;
     }
     .kpi-card {
@@ -369,17 +421,20 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
     .kpi-card.highlight::after {
       background: linear-gradient(90deg, var(--green), transparent);
     }
+    .kpi-card.blue-bar::after {
+      background: linear-gradient(90deg, var(--blue), transparent);
+    }
     .kpi-label {
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.05em;
       color: var(--muted);
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .kpi-val {
-      font-size: 1.85rem;
+      font-size: 1.75rem;
       font-weight: 800;
       color: #fff;
       font-family: 'Cinzel', serif;
@@ -387,6 +442,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
     .kpi-val.green { color: #34d399; }
     .kpi-val.gold { color: var(--gold-bright); }
     .kpi-val.blue { color: #38bdf8; }
+    .kpi-val.purple { color: #c084fc; }
     .kpi-sub {
       font-size: 0.72rem;
       color: var(--muted);
@@ -517,6 +573,18 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
     .badge.direct { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.4); }
     .badge.event { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
 
+    .duration-pill {
+      font-family: monospace;
+      font-weight: 700;
+      color: #fde047;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .duration-pill.active {
+      color: #34d399;
+    }
+
     .refresh-chip {
       font-size: 0.72rem;
       color: var(--muted);
@@ -533,7 +601,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
         <span class="brand-crest">👑</span>
         <div>
           <h1>VƯƠNG QUYỀN POKER CHESS 3D</h1>
-          <div class="sub-head">Hệ Thống Phân Tích &amp; Thống Kê Traffic Thời Gian Thực</div>
+          <div class="sub-head">Hệ Thống Phân Tích &amp; Thống Kê Traffic Realtime</div>
         </div>
       </div>
       <div class="header-actions">
@@ -543,7 +611,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
       </div>
     </header>
 
-    <!-- KPI Metric Cards -->
+    <!-- KPI Metric Cards with Playtime Analytics -->
     <section class="kpi-grid">
       <div class="kpi-card highlight">
         <div class="kpi-label">
@@ -555,7 +623,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
       </div>
 
       <div class="kpi-card">
-        <div class="kpi-label">Tổng Lượt Ghé Thăm (PV)</div>
+        <div class="kpi-label">Tổng Lượt Xem (PV)</div>
         <div class="kpi-val gold">${data.totals.totalVisits.toLocaleString()}</div>
         <div class="kpi-sub">Hôm nay: +${data.totals.todayVisits.toLocaleString()} lượt</div>
       </div>
@@ -566,10 +634,22 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
         <div class="kpi-sub">Địa chỉ IP phân biệt</div>
       </div>
 
+      <div class="kpi-card blue-bar">
+        <div class="kpi-label">⏱ Thời Gian Chơi TB</div>
+        <div class="kpi-val blue">${data.totals.avgPlayTimeFormatted}</div>
+        <div class="kpi-sub">Trung bình mỗi kỳ thủ</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">⏳ Tổng Thời Gian Chơi</div>
+        <div class="kpi-val purple">${data.totals.totalPlayTimeFormatted}</div>
+        <div class="kpi-sub">Tích lũy toàn server</div>
+      </div>
+
       <div class="kpi-card">
         <div class="kpi-label">Số Trận Đã Đấu</div>
         <div class="kpi-val gold">${data.totals.gamesPlayed.toLocaleString()}</div>
-        <div class="kpi-sub">Bao gồm Đấu Máy &amp; Online</div>
+        <div class="kpi-sub">Đấu Máy AI &amp; Online 1v1</div>
       </div>
     </section>
 
@@ -622,7 +702,7 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
       </div>
     </section>
 
-    <!-- Recent Visit Log -->
+    <!-- Recent Visit Log with Playtime Column -->
     <section class="panel">
       <div class="panel-header">📋 Nhật Ký 30 Phiên Ghé Thăm Gần Nhất</div>
       <div class="table-wrap">
@@ -632,20 +712,26 @@ export function renderTrafficDashboardHtml(onlinePlayers = 0, activeMatches = 0)
               <th>Thời gian</th>
               <th>IP (Ẩn danh)</th>
               <th>Thiết bị</th>
-              <th>Trình duyệt</th>
+              <th>Thời Gian Chơi</th>
               <th>Nguồn giới thiệu</th>
-              <th>Hành động</th>
+              <th>Trạng thái / Hành động</th>
             </tr>
           </thead>
           <tbody>
             ${data.recentLogs.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">Chưa có lượt truy cập mới. Hãy chia sẻ link game để xem dữ liệu realtime!</td></tr>' : data.recentLogs.map(l => {
               const srcClass = l.source.includes('Facebook') ? 'fb' : l.source.includes('Zalo') ? 'zalo' : 'direct';
+              const isRecent = (Date.now() - (l.lastActiveTime || 0)) < 45000;
               return `
                 <tr>
                   <td><strong>${l.time}</strong> <span style="font-size:0.7rem;color:var(--muted);">${l.date}</span></td>
                   <td>${l.ip}</td>
-                  <td>${l.device}</td>
-                  <td>${l.browser}</td>
+                  <td>${l.device} (${l.browser})</td>
+                  <td>
+                    <span class="duration-pill ${isRecent ? 'active' : ''}">
+                      ${isRecent ? '🟢' : '⏱'} ${formatDuration(l.durationSec || 0)}
+                      ${isRecent ? '<span style="font-size:0.68rem;color:#34d399;">(Đang chơi)</span>' : ''}
+                    </span>
+                  </td>
                   <td><span class="badge ${srcClass}">${l.source}</span></td>
                   <td><span class="badge event">${l.event}</span></td>
                 </tr>

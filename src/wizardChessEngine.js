@@ -111,11 +111,12 @@ export function initWizardChess() {
         renderer.shadowMap.needsUpdate = true;
       } else {
         // Balanced (default):
-        // Crystal sharp graphics up to 2.0 DPR on Mobile (eliminates any pixelation / vỡ hình) & 1.25 on Laptop
-        const targetDpr = isMobile ? Math.min(dpr, 2.0) : Math.min(dpr, 1.25);
+        // Crystal sharp graphics up to 2.0 DPR on Mobile & 1.15 on Laptop/PC
+        // Uses hardware PCFShadowMap for silky-smooth 60 FPS on integrated & dedicated PC GPUs alike
+        const targetDpr = isMobile ? Math.min(dpr, 2.0) : Math.min(dpr, 1.15);
         renderer.setPixelRatio(targetDpr);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.type = THREE.PCFShadowMap;
         renderer.shadowMap.needsUpdate = true;
       }
       renderer.setSize(window.innerWidth, window.innerHeight);

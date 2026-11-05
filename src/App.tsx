@@ -753,8 +753,8 @@ export default function App() {
   const handleShareGame = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const shareData = {
-      title: 'Vương Quyền • Poker Chess 3D',
-      text: 'Vào chiến cờ Vương Quyền Poker Chess 3D cùng mình nhé! Chơi mượt ngay trên trình duyệt điện thoại và PC:',
+      title: 'Poker Chess 3D - Game Khó Chơi, Dễ Nghiện 👑',
+      text: '🔥 Đua rank Elo thể hiện não to! Đỉnh cao kết hợp Cờ 3D x Phép Bài Poker. Thách đấu cùng mình nhé:',
       url: 'https://web-production-f6397.up.railway.app/'
     };
     if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare(shareData)) {
@@ -766,7 +766,7 @@ export default function App() {
       }
     }
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      await navigator.clipboard.writeText('https://web-production-f6397.up.railway.app/');
+      await navigator.clipboard.writeText('🔥 Poker Chess 3D - Game Khó Chơi, Dễ Nghiện! Đua rank Elo thể hiện não to: https://web-production-f6397.up.railway.app/');
       setCopiedShareLink(true);
       setTimeout(() => setCopiedShareLink(false), 2500);
     }
@@ -774,20 +774,63 @@ export default function App() {
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [smartDockCollapsed, setSmartDockCollapsed] = useState(false);
 
-  // Client Traffic Tracking on Startup
+  // Session Tracking & Playtime Heartbeat Analytics
+  const sessionStartTimeRef = useRef<number>(Date.now());
+  const sessionIdRef = useRef<string>(
+    's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7)
+  );
+
   useEffect(() => {
-    try {
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'PAGE_VIEW',
-          referrer: typeof document !== 'undefined' ? document.referrer : '',
-          screenWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
-          screenHeight: typeof window !== 'undefined' ? window.innerHeight : 0
-        })
-      }).catch(() => {});
-    } catch (e) {}
+    const sessionId = sessionIdRef.current;
+    const sessionStart = sessionStartTimeRef.current;
+
+    const sendHeartbeat = () => {
+      const elapsedSec = Math.max(1, Math.round((Date.now() - sessionStart) / 1000));
+      const payload = JSON.stringify({
+        event: 'HEARTBEAT',
+        sessionId,
+        sessionDurationSec: elapsedSec
+      });
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        navigator.sendBeacon('/api/track', payload);
+      } else {
+        fetch('/api/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true
+        }).catch(() => {});
+      }
+    };
+
+    // Initial page view event
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'PAGE_VIEW',
+        sessionId,
+        referrer: typeof document !== 'undefined' ? document.referrer : '',
+        screenWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
+        screenHeight: typeof window !== 'undefined' ? window.innerHeight : 0
+      })
+    }).catch(() => {});
+
+    // Heartbeat every 20 seconds while user is active
+    const heartbeatInterval = setInterval(sendHeartbeat, 20000);
+
+    const onVisibilityChange = () => {
+      sendHeartbeat();
+    };
+
+    window.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('beforeunload', sendHeartbeat);
+
+    return () => {
+      clearInterval(heartbeatInterval);
+      window.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('beforeunload', sendHeartbeat);
+    };
   }, []);
 
   // PWA Add to Home Screen (A2HS) states
@@ -2605,78 +2648,7 @@ export default function App() {
       )}
 
 
-      {/* EDIT PLAYER NAME MODAL */}
-      {editNameModalOpen && (
-        <div
-          className="main-menu-backdrop"
-          onClick={() => setEditNameModalOpen(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="edit-name-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="edit-name-header">
-              <span className="edit-name-icon">👑</span>
-              <div>
-                <h3 className="edit-name-title">Đổi Tên Kỳ Thủ</h3>
-                <div className="edit-name-sub">Tên sẽ hiển thị khi thi đấu, trên bảng xếp hạng Elo và cho đối thủ thấy</div>
-              </div>
-              <button
-                type="button"
-                className="main-menu-close-btn"
-                onClick={() => setEditNameModalOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
 
-            <form onSubmit={handleSavePlayerName} className="edit-name-form">
-              <div className="edit-name-input-wrap">
-                <input
-                  type="text"
-                  maxLength={24}
-                  className="edit-name-input"
-                  placeholder="Nhập tên kỳ thủ (tối đa 24 ký tự)..."
-                  value={inputPlayerName}
-                  onChange={(e) => setInputPlayerName(e.target.value)}
-                  autoFocus
-                />
-                <span className="edit-name-count">{inputPlayerName.length}/24</span>
-              </div>
-
-              <div className="edit-name-suggestions">
-                <span className="suggest-lbl">Gợi ý danh hiệu:</span>
-                {['Đại Kiện Tướng', 'Thần Cờ 3D', 'Vua Phép Thuật', 'Poker King', 'Kỳ Thánh'].map((sug) => (
-                  <button
-                    key={sug}
-                    type="button"
-                    className="suggest-chip"
-                    onClick={() => setInputPlayerName(sug)}
-                  >
-                    {sug}
-                  </button>
-                ))}
-              </div>
-
-              <div className="edit-name-actions">
-                <button
-                  type="button"
-                  className="btn-name-cancel"
-                  onClick={() => setEditNameModalOpen(false)}
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="btn-name-save"
-                  disabled={!inputPlayerName.trim()}
-                >
-                  💾 Lưu Tên Kỳ Thủ
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* COMPREHENSIVE MAIN MENU MODAL */}
       {mainMenuOpen && (
@@ -3895,6 +3867,79 @@ export default function App() {
           </div>
         );
       })()}
+
+      {/* EDIT PLAYER NAME MODAL (Optimized for Mobile Soft Keyboard) */}
+      {editNameModalOpen && (
+        <div
+          className="main-menu-backdrop edit-name-backdrop"
+          onClick={() => setEditNameModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="edit-name-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-name-header">
+              <div className="edit-name-title-row">
+                <span className="edit-name-icon">👑</span>
+                <h3 className="edit-name-title">Đổi Tên Kỳ Thủ</h3>
+              </div>
+              <div className="edit-name-sub">Tên hiển thị khi thi đấu, trên BXH Elo và cho đối thủ thấy</div>
+              <button
+                type="button"
+                className="main-menu-close-btn"
+                onClick={() => setEditNameModalOpen(false)}
+                title="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePlayerName} className="edit-name-form">
+              <div className="edit-name-input-action-row">
+                <div className="edit-name-input-wrap">
+                  <input
+                    type="text"
+                    maxLength={24}
+                    className="edit-name-input"
+                    placeholder="Nhập tên kỳ thủ..."
+                    value={inputPlayerName}
+                    onChange={(e) => setInputPlayerName(e.target.value)}
+                    autoFocus
+                  />
+                  <span className="edit-name-count">{inputPlayerName.length}/24</span>
+                </div>
+                <button
+                  type="submit"
+                  className="btn-name-save"
+                  disabled={!inputPlayerName.trim()}
+                >
+                  💾 Lưu Tên
+                </button>
+                <button
+                  type="button"
+                  className="btn-name-cancel"
+                  onClick={() => setEditNameModalOpen(false)}
+                >
+                  Hủy
+                </button>
+              </div>
+
+              <div className="edit-name-suggestions">
+                <span className="suggest-lbl">Gợi ý danh hiệu:</span>
+                {['Đại Kiện Tướng', 'Thần Cờ 3D', 'Vua Phép Thuật', 'Poker King', 'Kỳ Thánh'].map((sug) => (
+                  <button
+                    key={sug}
+                    type="button"
+                    className="suggest-chip"
+                    onClick={() => setInputPlayerName(sug)}
+                  >
+                    {sug}
+                  </button>
+                ))}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* VICTORY / CHECKMATE OVERLAY */}
       <div id="checkmate-overlay" role="status" aria-live="polite">
