@@ -12453,8 +12453,11 @@ export function initWizardChess() {
     };
 
     let lastRenderTime = 0;
-    const TARGET_FPS = 60;
-    const targetIntervalMs = (1000 / TARGET_FPS) - 1.2; // ~15.4ms: locks cleanly to 60 FPS on 120Hz/144Hz displays
+    // CRITICAL FPS FIX:
+    // On mobile devices with 120Hz/144Hz high-refresh displays, cap to 60 FPS using a 12.0ms threshold (~83 FPS cutoff).
+    // This cleanly halves 120Hz (8.33ms) to 60 FPS to prevent battery heating, while NEVER skipping frames on 60Hz displays (16.6ms).
+    // On PC / Desktop (isMobileDevice === false), do NOT throttle at all (targetIntervalMs = 0) so desktop GPUs render at native monitor refresh rate smoothly without frame skipping.
+    const targetIntervalMs = isMobileDevice ? 12.0 : 0;
 
     function animate(timestamp) {
       if (!navigator.webdriver && !manualStepMode) {
@@ -12469,13 +12472,17 @@ export function initWizardChess() {
       lastRenderTime = now;
 
       frameCount++;
-      if (now - lastFpsTime >= 300) {
+      if (now - lastFpsTime >= 500) {
         currentFPS = Math.round((frameCount * 1000) / (now - lastFpsTime));
         frameCount = 0;
         lastFpsTime = now;
         const fpsEl = document.getElementById('realtime-fps-val');
         if (fpsEl) {
           fpsEl.textContent = `${currentFPS} FPS`;
+        }
+        const fpsDot = document.getElementById('realtime-fps-dot');
+        if (fpsDot) {
+          fpsDot.className = `fps-dot ${currentFPS >= 50 ? 'fps-good' : currentFPS >= 30 ? 'fps-med' : 'fps-low'}`;
         }
       }
       const dt = Math.min(clock.getDelta(), 0.1);

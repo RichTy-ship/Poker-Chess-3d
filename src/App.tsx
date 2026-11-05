@@ -726,17 +726,7 @@ export default function App() {
   const [gameState, setGameState] = useState<PokerChessSyncState | null>(null);
   const [timeoutToast, setTimeoutToast] = useState<TurnTimeoutNoticeUI | null>(null);
   const [phaseAnnouncement, setPhaseAnnouncement] = useState<PhaseAnnouncementUI | null>(null);
-  const [realtimeFps, setRealtimeFps] = useState<number>(60);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      const fps = getEngine()?.getFPS?.();
-      if (typeof fps === 'number' && fps > 0) {
-        setRealtimeFps(fps);
-      }
-    }, 350);
-    return () => clearInterval(id);
-  }, []);
+  const [realtimeFps] = useState<number>(60);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [smartDockCollapsed, setSmartDockCollapsed] = useState(false);
 
@@ -1491,6 +1481,7 @@ export default function App() {
             }}
           >
             <span
+              id="realtime-fps-dot"
               className={`fps-dot ${
                 (gameState?.fps ?? 60) >= 50
                   ? 'fps-good'
