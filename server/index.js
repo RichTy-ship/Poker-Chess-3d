@@ -619,6 +619,17 @@ function handleClientMessage(ws, player, msg) {
         return;
       }
 
+      const inBoard = (sq) =>
+        sq && Number.isInteger(sq.r) && Number.isInteger(sq.c) && sq.r >= 0 && sq.r < 8 && sq.c >= 0 && sq.c < 8;
+      if (!inBoard(msg.from) || !inBoard(msg.to) || (msg.from.r === msg.to.r && msg.from.c === msg.to.c)) {
+        sendMsg(ws, 'ERROR', { message: 'Nước đi không hợp lệ.' });
+        return;
+      }
+      // Duplicate / replayed move guard (min 120ms between moves of the same player)
+      const nowTs = Date.now();
+      if (player.lastMoveAt && nowTs - player.lastMoveAt < 120) return;
+      player.lastMoveAt = nowTs;
+
       // Record move
       match.movesHistory.push({
         playerColor: player.color,
@@ -642,8 +653,12 @@ function handleClientMessage(ws, player, msg) {
           match.virtualBoard[msg.from.r][msg.from.c] = null;
         }
         if (msg.targetPiece && msg.targetPiece.type === 'king') {
-          endMatch(player.matchId, player.color, 'KING_CAPTURE', `${player.name} đã bắt Vua đối thủ!`);
-          return;
+          // Route through the verification gate instead of ending instantly on a client-supplied claim
+          handleVictoryClaim(player, {
+            winnerColor: player.color,
+            reason: 'KING_CAPTURE',
+            message: `${player.name} đã bắt Vua đối thủ!`
+          });
         }
       }
 
@@ -757,12 +772,74 @@ function handleClientMessage(ws, player, msg) {
 
     case 'MATCH_VICTORY_CHECK': {
       if (!player.matchId) return;
-      if (msg.winnerColor) {
-        endMatch(player.matchId, msg.winnerColor, msg.reason || 'CHECKMATE', msg.message || 'Chiếu bí / Tiêu diệt Vua!');
-      }
+      handleVictoryClaim(player, msg);
       break;
     }
   }
+}
+
+/**
+ * Anti-cheat victory verification.
+ * The server cannot replay the RPG combat engine, so it uses cross-checking instead of blind trust:
+ *  - A player conceding (claiming the OPPONENT won) is always accepted: no incentive to fake it.
+ *  - A player claiming their OWN win is accepted only when the opponent confirms it, or stays silent
+ *    for the confirmation window (loser's client gone). A contested claim (both claim own win) never ends the match.
+ *  - Claims are rejected before a minimum number of turns, and only for the real winner colours 'w' / 'b'.
+ */
+const VICTORY_MIN_TURNS = 3;
+const VICTORY_CONFIRM_WINDOW_MS = 6000;
+const BOT_VICTORY_CONFIRM_MS = 1200;
+
+function handleVictoryClaim(player, msg) {
+  const match = matches.get(player.matchId);
+  if (!match || match.status !== 'ACTIVE') return;
+  const claimed = msg.winnerColor;
+  if (claimed !== 'w' && claimed !== 'b') return;
+  if (player.color !== 'w' && player.color !== 'b') return;
+
+  const reason = typeof msg.reason === 'string' ? msg.reason.slice(0, 40) : 'CHECKMATE';
+  const text = typeof msg.message === 'string' ? msg.message.slice(0, 160) : 'Tiêu diệt Vua!';
+
+  if ((match.turnCount || 0) < VICTORY_MIN_TURNS) {
+    console.warn(`[ANTI-CHEAT] Rejected early victory claim from ${player.name} (turn ${match.turnCount})`);
+    return;
+  }
+
+  // Concession: always valid
+  if (claimed !== player.color) {
+    endMatch(match.matchId, claimed, reason, text);
+    return;
+  }
+
+  match.victoryClaims = match.victoryClaims || {};
+  match.victoryClaims[player.color] = claimed;
+  const opponentColor = player.color === 'w' ? 'b' : 'w';
+  const opponentClaim = match.victoryClaims[opponentColor];
+
+  if (opponentClaim === claimed) {
+    endMatch(match.matchId, claimed, reason, text);
+    return;
+  }
+  if (opponentClaim && opponentClaim !== claimed) {
+    console.warn(`[ANTI-CHEAT] Disputed victory in match ${match.matchId}: both sides claim a win. Match continues.`);
+    if (match.victoryTimer) {
+      clearTimeout(match.victoryTimer);
+      match.victoryTimer = null;
+    }
+    return;
+  }
+
+  if (match.victoryTimer) return;
+  const waitMs = match.isBotMatch ? BOT_VICTORY_CONFIRM_MS : VICTORY_CONFIRM_WINDOW_MS;
+  match.victoryTimer = setTimeout(() => {
+    match.victoryTimer = null;
+    if (match.status !== 'ACTIVE') return;
+    const claims = match.victoryClaims || {};
+    const contested = claims[opponentColor] && claims[opponentColor] !== claimed;
+    if (!contested) {
+      endMatch(match.matchId, claimed, reason, text);
+    }
+  }, waitMs);
 }
 
 /**
@@ -780,6 +857,10 @@ function endMatch(matchId, winnerColor, reason, detailMessage) {
   if (match.disconnectTimeout) {
     clearTimeout(match.disconnectTimeout);
     match.disconnectTimeout = null;
+  }
+  if (match.victoryTimer) {
+    clearTimeout(match.victoryTimer);
+    match.victoryTimer = null;
   }
 
   match.status = 'ENDED';
