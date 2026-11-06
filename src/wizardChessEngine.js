@@ -2966,6 +2966,9 @@ export function initWizardChess() {
     let validMoves = [];
     let isAnimatingMove = false;
     let moveAnimationStartTime = 0;
+    const PIECE_NAMES_VI = Object.fromEntries(
+      Object.entries(UNIT_BASE_STATS).map(([k, v]) => [k, v.name])
+    );
     let gameOver = false;
     let capturedByWhite = 0;
     let capturedByBlack = 0;
@@ -4277,6 +4280,7 @@ export function initWizardChess() {
       checkmateState.kingFallAngleDeg = 0;
       checkmateState.phase = 'none';
       checkmateState.rankedRewardGranted = false;
+      checkmateState.victoryReported = false;
       stopCheckmateConfetti();
       const overlay = document.getElementById('checkmate-overlay');
       if (overlay) {
@@ -9450,6 +9454,13 @@ export function initWizardChess() {
     function triggerCheckmateSequence(defeatedColor = currentTurn, winnerColor = null, extraData = null) {
       const actualWinner = winnerColor || (defeatedColor === 'w' ? 'b' : 'w');
 
+      if (gameMode === 'multi' && !extraData && !checkmateState.victoryReported) {
+        checkmateState.victoryReported = true;
+        try {
+          multiplayerClient.checkVictory(actualWinner, 'KING_CAPTURE', 'Vua đã bị hạ gục!');
+        } catch (e) {}
+      }
+
       if (extraData?.reason === 'DISCONNECTED' || extraData?.reason === 'SURRENDER') {
         showCheckmateBanner(actualWinner, defeatedColor, extraData);
         if (actualWinner === playerColor || actualWinner === multiplayerClient.mySide) {
@@ -11371,10 +11382,16 @@ export function initWizardChess() {
       }
       turnPhase = 'MOVE_OR_COMBAT';
 
+      let remoteApplied = false;
       try {
-        executeChessMove(msg.from.r, msg.from.c, msg.to.r, msg.to.c, { fromRemote: true });
+        remoteApplied = executeChessMove(msg.from.r, msg.from.c, msg.to.r, msg.to.c, { fromRemote: true });
       } catch (err) {
         console.warn('[Remote Move Execution Error]:', err);
+      }
+      if (!remoteApplied && !gameOver && currentTurn !== playerColor) {
+        // Server board desynced from RPG combat results: skip the impossible move, hand turn back to the player
+        console.warn('[Remote Move] could not be applied, passing turn to local player', msg);
+        try { recoverStalledTurn(currentTurn); } catch (e) { console.error(e); }
       }
 
       // Wait until move animation finishes before unlocking next move
@@ -12084,11 +12101,21 @@ export function initWizardChess() {
           updateTurnUI();
           emitPokerChessSync();
         }
+        else if (activeMoveTweens.length === 0 && animElapsedMs > 600) {
+          // Flag stuck on with no running tween (finishMove never reached): release it
+          isAnimatingMove = false;
+          orbitControls.enabled = true;
+          if (activeDuelSavedCam) {
+            camera.position.copy(activeDuelSavedCam.pos);
+            orbitControls.target.copy(activeDuelSavedCam.target);
+            activeDuelSavedCam = null;
+          }
+          if (!gameOver && !checkmateState.active) checkKingDeathAndEndGame();
+          updateTurnUI();
+        }
       } else if (activeMoveTweens.length > 0 && !isAnimatingMove) {
         isAnimatingMove = true;
         moveAnimationStartTime = performance.now();
-      } else if (activeMoveTweens.length === 0 && isAnimatingMove) {
-        isAnimatingMove = false;
       }
 
       for (let i = activeMoveTweens.length - 1; i >= 0; i--) {

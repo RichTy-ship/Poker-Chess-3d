@@ -437,9 +437,9 @@ function createMatchSession(playerA, playerB, matchType = 'ranked_match', roomCo
   };
 
   matches.set(matchId, matchState);
-  console.log(`[PVP MATCH] ⚔️ Paired ${player1.name} (${player1.elo} Elo) vs ${player2.name} (${player2.elo} Elo) [Match: ${matchId}]`);
+  console.log(`[PVP MATCH] ⚔️ Paired ${playerA.name} (${playerA.elo} Elo) vs ${playerB.name} (${playerB.elo} Elo) [Match: ${matchId}]`);
   try {
-    recordTrafficEvent(null, { event: 'PVP_MATCH_CREATED', p1: player1.name, p2: player2.name, p1Elo: player1.elo, p2Elo: player2.elo });
+    recordTrafficEvent(null, { event: 'PVP_MATCH_CREATED', p1: playerA.name, p2: playerB.name, p1Elo: playerA.elo, p2Elo: playerB.elo });
   } catch (e) {}
 
   // Notify White player
