@@ -13,13 +13,12 @@ export const PIECE_VALUES = {
 };
 
 export const BOT_COMBOS = [
-  { id: 'ONE_PAIR', name: 'Một Đôi', atkBonus: 6, armorBonus: 2, healInstant: 0, colorHex: '#38bdf8' },
-  { id: 'TWO_PAIR', name: 'Thú (Hai Đôi)', atkBonus: 8, armorBonus: 4, healInstant: 0, colorHex: '#a855f7' },
-  { id: 'THREE_OF_A_KIND', name: 'Sám Cô', atkBonus: 10, armorBonus: 3, healInstant: 4, colorHex: '#ec4899' },
-  { id: 'STRAIGHT', name: 'Sảnh', atkBonus: 12, armorBonus: 5, healInstant: 0, colorHex: '#eab308' },
-  { id: 'FLUSH', name: 'Thùng Đồng Chất', atkBonus: 14, armorBonus: 6, healInstant: 6, colorHex: '#3b82f6' },
-  { id: 'FULL_HOUSE', name: 'Cù Lũ', atkBonus: 16, armorBonus: 8, healInstant: 8, colorHex: '#f97316' },
-  { id: 'FOUR_OF_A_KIND', name: 'Tứ Quý', atkBonus: 20, armorBonus: 10, healInstant: 10, colorHex: '#ef4444' }
+  { id: 'ONE_PAIR', name: 'Một Đôi', atkBonus: 2, armorBonus: 2, healInstant: 0, colorHex: '#38bdf8' },
+  { id: 'TWO_PAIR', name: 'Hai Đôi', atkBonus: 3, armorBonus: 2, healInstant: 0, colorHex: '#2dd4bf' },
+  { id: 'THREE_OF_A_KIND', name: 'Sám Cô', atkBonus: 5, armorBonus: 0, healInstant: 0, colorHex: '#a855f7' },
+  { id: 'STRAIGHT', name: 'Sảnh', atkBonus: 4, armorBonus: 2, healInstant: 0, colorHex: '#4ade80' },
+  { id: 'FLUSH', name: 'Thùng', atkBonus: 4, armorBonus: 0, healInstant: 0, colorHex: '#3b82f6' },
+  { id: 'FULL_HOUSE', name: 'Cù Lũ', atkBonus: 5, armorBonus: 4, healInstant: 4, colorHex: '#f59e0b' }
 ];
 
 export function createInitialBoard() {

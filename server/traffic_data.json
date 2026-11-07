@@ -1,0 +1,43 @@
+{
+  "totalVisits": 1,
+  "uniqueIps": {
+    "127.0.0.1": true
+  },
+  "gamesPlayed": 0,
+  "pvToday": 1,
+  "totalPlayTimeSec": 0,
+  "currentDateStr": "2026-11-07",
+  "sources": {
+    "Facebook / Messenger": 0,
+    "Zalo": 0,
+    "Direct / Bookmark": 1,
+    "Telegram": 0,
+    "Google / Search": 0,
+    "Khác": 0
+  },
+  "devices": {
+    "Android": 0,
+    "iPhone / iPad": 0,
+    "Windows PC": 0,
+    "Mac / Linux": 0,
+    "Khác": 1
+  },
+  "hourly": {
+    "21:00": 1
+  },
+  "recentLogs": [
+    {
+      "sessionId": "s_127001",
+      "rawIp": "127.0.0.1",
+      "time": "21:25:16",
+      "date": "2026-11-07",
+      "ip": "127.0.xxx.xxx",
+      "source": "Direct / Bookmark",
+      "device": "Khác",
+      "browser": "Trình duyệt khác",
+      "durationSec": 0,
+      "lastActiveTime": 1794061516022,
+      "event": "Ghé thăm trang"
+    }
+  ]
+}

@@ -44,9 +44,8 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2'
 };
 
-// HTTP Server: Serves API healthcheck and production static build files
-const server = createServer((req, res) => {
-  // CORS Headers
+// API & Telemetry Middleware (Shared between standalone production server and Vite dev server on port 3000)
+export function handleApiMiddleware(req, res, /** @type {any} */ next = undefined) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -54,37 +53,37 @@ const server = createServer((req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
-    return;
+    return true;
   }
 
-  const urlPath = req.url.split('?')[0];
+  const urlPath = (req.url || '/').split('?')[0];
 
   // Health check endpoint
   if (urlPath === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'ok',
-      onlinePlayers: clients.size,
+      onlinePlayers: clients.size + ONLINE_BOT_POOL.length,
       activeMatches: matches.size,
       queuedPlayers: matchmakingQueue.length,
       uptimeSeconds: Math.round(process.uptime()),
       timestamp: Date.now()
     }));
-    return;
+    return true;
   }
 
   // Interactive Realtime Traffic Dashboard
   if (urlPath === '/traffic' || urlPath === '/admin/traffic') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(renderTrafficDashboardHtml(clients.size, matches.size));
-    return;
+    return true;
   }
 
   // Traffic Stats JSON API
   if (urlPath === '/api/traffic') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(getTrafficSummary(clients.size, matches.size)));
-    return;
+    return true;
   }
 
   // Telemetry event ingestion endpoint
@@ -102,13 +101,28 @@ const server = createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'ok' }));
     });
-    return;
+    return true;
   }
 
   // Auto-record page view on root route
   if (urlPath === '/' || urlPath === '/index.html') {
-    recordTrafficEvent(req, { event: 'PAGE_VIEW' });
+    try {
+      recordTrafficEvent(req, { event: 'PAGE_VIEW' });
+    } catch (e) {}
   }
+
+  if (typeof next === 'function') {
+    next();
+    return false;
+  }
+  return false;
+}
+
+// HTTP Server: Serves API healthcheck and production static build files
+const server = createServer((req, res) => {
+  if (handleApiMiddleware(req, res)) return;
+
+  const urlPath = (req.url || '/').split('?')[0];
 
   // Static files serving if dist/ exists
   if (existsSync(distDir)) {
@@ -165,8 +179,28 @@ const server = createServer((req, res) => {
   }));
 });
 
-// WebSocket Server attached to HTTP server
-const wss = new WebSocketServer({ server });
+// WebSocket Server using noServer mode so it can safely attach to both standalone HTTP server and Vite dev server
+const wss = new WebSocketServer({ noServer: true });
+const attachedServers = new WeakSet();
+
+export function attachMultiplayerServer(httpServer) {
+  if (!httpServer || attachedServers.has(httpServer)) return wss;
+  attachedServers.add(httpServer);
+
+  httpServer.on('upgrade', (req, socket, head) => {
+    // Ignore Vite HMR WebSocket upgrades so Vite dev server works without conflict
+    const proto = req.headers['sec-websocket-protocol'] || '';
+    if (proto.includes('vite-hmr')) return;
+
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  });
+
+  return wss;
+}
+
+attachMultiplayerServer(server);
 
 /**
  * Client Store & Matchmaking State
@@ -240,7 +274,7 @@ function attemptMatchmaking() {
 }
 
 // Active queue polling watchdog every 1s so bots trigger reliably
-setInterval(attemptMatchmaking, 1000);
+setInterval(attemptMatchmaking, 1000).unref();
 
 /**
  * Creates an Online Match session against one of the ~10 Online Bots
@@ -401,11 +435,32 @@ setInterval(() => {
       }
     }
   }
-}, 2000);
+}, 2000).unref();
 
 /**
  * Creates a synchronized 1v1 match between two players
  */
+function applySnapshotToVirtualBoard(virtualBoard, snapshot) {
+  if (!Array.isArray(snapshot) || snapshot.length !== 8 || !virtualBoard) return;
+  for (let r = 0; r < 8; r++) {
+    if (!Array.isArray(snapshot[r])) continue;
+    for (let c = 0; c < 8; c++) {
+      const cell = snapshot[r][c];
+      virtualBoard[r][c] = cell
+        ? {
+            type: cell.type,
+            color: cell.color,
+            hasMoved: Boolean(cell.hasMoved),
+            hp: cell.hp,
+            maxHp: cell.maxHp,
+            armor: cell.armor,
+            level: cell.level
+          }
+        : null;
+    }
+  }
+}
+
 function createMatchSession(playerA, playerB, matchType = 'ranked_match', roomCode = null) {
   const matchId = generateId('m');
 
@@ -419,17 +474,18 @@ function createMatchSession(playerA, playerB, matchType = 'ranked_match', roomCo
   whitePlayer.matchId = matchId;
   blackPlayer.matchId = matchId;
 
-  // Turn time bank: 90s initial per player, +5s increment per move
+  // Turn time bank: 120s initial per player
   const matchState = {
     matchId,
     matchType,
     roomCode,
+    virtualBoard: createInitialBoard(),
     createdAt: Date.now(),
     whitePlayer,
     blackPlayer,
     turn: 'w',
     turnStartTime: Date.now(),
-    whiteTimeLeftMs: 120000, // 2 minutes
+    whiteTimeLeftMs: 120000,
     blackTimeLeftMs: 120000,
     turnCount: 1,
     status: 'ACTIVE',
@@ -502,7 +558,7 @@ wss.on('connection', (ws, req) => {
   sendMsg(ws, 'CONNECTED', {
     playerId,
     serverTime: Date.now(),
-    onlinePlayers: clients.size,
+    onlinePlayers: clients.size + ONLINE_BOT_POOL.length,
     activeMatches: matches.size
   });
 
@@ -545,8 +601,13 @@ function handleClientMessage(ws, player, msg) {
 
     case 'JOIN_QUEUE': {
       if (player.matchId) {
-        sendMsg(ws, 'ERROR', { message: 'Bạn đang trong trận đấu!' });
-        return;
+        const existingMatch = matches.get(player.matchId);
+        if (!existingMatch || existingMatch.status !== 'ACTIVE') {
+          player.matchId = null;
+        } else {
+          sendMsg(ws, 'ERROR', { message: 'Bạn đang trong trận đấu!' });
+          return;
+        }
       }
       if (!matchmakingQueue.includes(player)) {
         player.queueTime = Date.now();
@@ -619,17 +680,6 @@ function handleClientMessage(ws, player, msg) {
         return;
       }
 
-      const inBoard = (sq) =>
-        sq && Number.isInteger(sq.r) && Number.isInteger(sq.c) && sq.r >= 0 && sq.r < 8 && sq.c >= 0 && sq.c < 8;
-      if (!inBoard(msg.from) || !inBoard(msg.to) || (msg.from.r === msg.to.r && msg.from.c === msg.to.c)) {
-        sendMsg(ws, 'ERROR', { message: 'Nước đi không hợp lệ.' });
-        return;
-      }
-      // Duplicate / replayed move guard (min 120ms between moves of the same player)
-      const nowTs = Date.now();
-      if (player.lastMoveAt && nowTs - player.lastMoveAt < 120) return;
-      player.lastMoveAt = nowTs;
-
       // Record move
       match.movesHistory.push({
         playerColor: player.color,
@@ -645,20 +695,56 @@ function handleClientMessage(ws, player, msg) {
       match.turn = match.turn === 'w' ? 'b' : 'w';
       match.turnCount++;
 
-      // If Bot match, update server's virtual board
-      if (match.isBotMatch && match.virtualBoard && msg.from && msg.to) {
-        const piece = match.virtualBoard[msg.from.r]?.[msg.from.c];
-        if (piece) {
-          match.virtualBoard[msg.to.r][msg.to.c] = piece;
-          match.virtualBoard[msg.from.r][msg.from.c] = null;
+      // Update server's virtual board accurately (respecting RPG Combat Outcomes: BREAKTHROUGH, CLASH_REPEL, COUNTER_KILL, MUTUAL_DESTRUCTION)
+      if (match.virtualBoard && msg.from && msg.to) {
+        if (Array.isArray(msg.boardSnapshot)) {
+          applySnapshotToVirtualBoard(match.virtualBoard, msg.boardSnapshot);
+        } else {
+          const piece = match.virtualBoard[msg.from.r]?.[msg.from.c] || {
+            type: msg.pieceType || 'pawn',
+            color: player.color,
+            hasMoved: true
+          };
+          const outcome = msg.combatData?.outcome || 'BREAKTHROUGH';
+          if (outcome === 'CLASH_REPEL') {
+            // Both survive; attacker bounces back to msg.from, defender holds msg.to
+            piece.hasMoved = true;
+            match.virtualBoard[msg.from.r][msg.from.c] = piece;
+          } else if (outcome === 'COUNTER_KILL') {
+            // Attacker died to counter-attack; defender holds msg.to
+            match.virtualBoard[msg.from.r][msg.from.c] = null;
+          } else if (outcome === 'MUTUAL_DESTRUCTION') {
+            // Both died simultaneously
+            match.virtualBoard[msg.from.r][msg.from.c] = null;
+            match.virtualBoard[msg.to.r][msg.to.c] = null;
+          } else {
+            // Standard move or BREAKTHROUGH
+            piece.hasMoved = true;
+            if (piece.type === 'king' && msg.from.r === msg.to.r && Math.abs(msg.to.c - msg.from.c) === 2) {
+              const rookFromC = msg.to.c > msg.from.c ? 7 : 0;
+              const rookToC = msg.to.c > msg.from.c ? 5 : 3;
+              const rook = match.virtualBoard[msg.from.r]?.[rookFromC];
+              if (rook) {
+                rook.hasMoved = true;
+                match.virtualBoard[msg.from.r][rookToC] = rook;
+                match.virtualBoard[msg.from.r][rookFromC] = null;
+              }
+            }
+            if (piece.type === 'pawn' && (msg.to.r === 0 || msg.to.r === 7)) {
+              piece.type = 'queen';
+            }
+            match.virtualBoard[msg.to.r][msg.to.c] = piece;
+            match.virtualBoard[msg.from.r][msg.from.c] = null;
+          }
         }
-        if (msg.targetPiece && msg.targetPiece.type === 'king') {
-          // Route through the verification gate instead of ending instantly on a client-supplied claim
-          handleVictoryClaim(player, {
-            winnerColor: player.color,
-            reason: 'KING_CAPTURE',
-            message: `${player.name} đã bắt Vua đối thủ!`
-          });
+
+        const outcome = msg.combatData?.outcome || 'BREAKTHROUGH';
+        if (
+          msg.targetPiece?.type === 'king' &&
+          (outcome === 'BREAKTHROUGH' || outcome === 'MUTUAL_DESTRUCTION')
+        ) {
+          endMatch(player.matchId, player.color, 'KING_CAPTURE', `${player.name} đã tiêu diệt Vua đối thủ!`);
+          return;
         }
       }
 
@@ -690,25 +776,76 @@ function handleClientMessage(ws, player, msg) {
       break;
     }
 
+    case 'SYNC_BOARD': {
+      if (!player.matchId) return;
+      const match = matches.get(player.matchId);
+      if (!match || match.status !== 'ACTIVE') return;
+
+      if (match.virtualBoard && Array.isArray(msg.boardSnapshot)) {
+        applySnapshotToVirtualBoard(match.virtualBoard, msg.boardSnapshot);
+      }
+      if (msg.gameOver && msg.winnerColor) {
+        endMatch(player.matchId, msg.winnerColor, msg.reason || 'KING_CAPTURE', msg.message || 'Vua đã ngã xuống!');
+      }
+      break;
+    }
+
+    case 'TURN_TIMEOUT': {
+      if (!player.matchId) return;
+      const match = matches.get(player.matchId);
+      if (!match || match.status !== 'ACTIVE') return;
+
+      if (match.turn === player.color) {
+        match.turn = player.color === 'w' ? 'b' : 'w';
+        match.turnCount++;
+        const opponent = player.color === 'w' ? match.blackPlayer : match.whitePlayer;
+        if (opponent && opponent.ws) {
+          sendMsg(opponent.ws, 'OPPONENT_TURN_TIMEOUT', {
+            expiredSide: player.color,
+            nextTurn: match.turn,
+            turnCount: match.turnCount
+          });
+        }
+        if (match.isBotMatch && match.turn === match.botPlayer?.color) {
+          scheduleBotTurn(match);
+        }
+      }
+      break;
+    }
+
     case 'APPLY_POKER_BUFF': {
       if (!player.matchId) return;
       const match = matches.get(player.matchId);
       if (!match || match.status !== 'ACTIVE') return;
 
+      if (
+        match.virtualBoard &&
+        typeof msg.targetRow === 'number' &&
+        typeof msg.targetCol === 'number'
+      ) {
+        const targetCell = match.virtualBoard[msg.targetRow]?.[msg.targetCol];
+        if (targetCell) {
+          targetCell.atkBonus = (targetCell.atkBonus || 0) + (msg.atkBonus || 0);
+          targetCell.armorBonus = (targetCell.armorBonus || 0) + (msg.armorBonus || 0);
+        }
+      }
+
       const opponent = player.color === 'w' ? match.blackPlayer : match.whitePlayer;
 
       // Broadcast opponent's Poker Buff deployment in real-time
-      sendMsg(opponent.ws, 'OPPONENT_BUFF_APPLIED', {
-        comboId: msg.comboId,
-        comboName: msg.comboName,
-        targetRow: msg.targetRow,
-        targetCol: msg.targetCol,
-        targetPieceType: msg.targetPieceType,
-        atkBonus: msg.atkBonus,
-        armorBonus: msg.armorBonus,
-        healInstant: msg.healInstant,
-        colorHex: msg.colorHex
-      });
+      if (opponent && opponent.ws) {
+        sendMsg(opponent.ws, 'OPPONENT_BUFF_APPLIED', {
+          comboId: msg.comboId,
+          comboName: msg.comboName,
+          targetRow: msg.targetRow,
+          targetCol: msg.targetCol,
+          targetPieceType: msg.targetPieceType,
+          atkBonus: msg.atkBonus,
+          armorBonus: msg.armorBonus,
+          healInstant: msg.healInstant,
+          colorHex: msg.colorHex
+        });
+      }
       break;
     }
 
@@ -717,11 +854,13 @@ function handleClientMessage(ws, player, msg) {
       const match = matches.get(player.matchId);
       if (!match) return;
       const opponent = player.color === 'w' ? match.blackPlayer : match.whitePlayer;
-      sendMsg(opponent.ws, 'OPPONENT_EMOTE', {
-        emoteId: msg.emoteId,
-        emoteText: msg.emoteText,
-        senderName: player.name
-      });
+      if (opponent && opponent.ws) {
+        sendMsg(opponent.ws, 'OPPONENT_EMOTE', {
+          emoteId: msg.emoteId,
+          emoteText: msg.emoteText,
+          senderName: player.name
+        });
+      }
       break;
     }
 
@@ -739,8 +878,10 @@ function handleClientMessage(ws, player, msg) {
     case 'RECONNECT_MATCH': {
       const match = matches.get(msg.matchId);
       if (match && match.status === 'ACTIVE') {
-        const isWhite = match.whitePlayer.id === msg.playerId;
-        const isBlack = match.blackPlayer.id === msg.playerId;
+        const isWhite =
+          match.whitePlayer?.playerId === msg.playerId || match.whitePlayer?.id === msg.playerId;
+        const isBlack =
+          match.blackPlayer?.playerId === msg.playerId || match.blackPlayer?.id === msg.playerId;
         if (isWhite || isBlack) {
           const reconPlayer = isWhite ? match.whitePlayer : match.blackPlayer;
           const otherPlayer = isWhite ? match.blackPlayer : match.whitePlayer;
@@ -755,14 +896,17 @@ function handleClientMessage(ws, player, msg) {
           }
 
           sendMsg(reconPlayer.ws, 'RECONNECT_SUCCESS', {
-            matchId: match.id,
+            matchId: match.matchId,
             color: reconPlayer.color,
+            turn: match.turn,
             opponent: { name: otherPlayer.name, elo: otherPlayer.elo, skinId: otherPlayer.skinId }
           });
-          sendMsg(otherPlayer.ws, 'OPPONENT_RECONNECTED', {
-            opponentName: reconPlayer.name,
-            message: `${reconPlayer.name} đã kết nối lại! Trận đấu tiếp tục.`
-          });
+          if (otherPlayer && otherPlayer.ws) {
+            sendMsg(otherPlayer.ws, 'OPPONENT_RECONNECTED', {
+              opponentName: reconPlayer.name,
+              message: `${reconPlayer.name} đã kết nối lại! Trận đấu tiếp tục.`
+            });
+          }
           return;
         }
       }
@@ -772,74 +916,12 @@ function handleClientMessage(ws, player, msg) {
 
     case 'MATCH_VICTORY_CHECK': {
       if (!player.matchId) return;
-      handleVictoryClaim(player, msg);
+      if (msg.winnerColor) {
+        endMatch(player.matchId, msg.winnerColor, msg.reason || 'CHECKMATE', msg.message || 'Chiếu bí / Tiêu diệt Vua!');
+      }
       break;
     }
   }
-}
-
-/**
- * Anti-cheat victory verification.
- * The server cannot replay the RPG combat engine, so it uses cross-checking instead of blind trust:
- *  - A player conceding (claiming the OPPONENT won) is always accepted: no incentive to fake it.
- *  - A player claiming their OWN win is accepted only when the opponent confirms it, or stays silent
- *    for the confirmation window (loser's client gone). A contested claim (both claim own win) never ends the match.
- *  - Claims are rejected before a minimum number of turns, and only for the real winner colours 'w' / 'b'.
- */
-const VICTORY_MIN_TURNS = 3;
-const VICTORY_CONFIRM_WINDOW_MS = 6000;
-const BOT_VICTORY_CONFIRM_MS = 1200;
-
-function handleVictoryClaim(player, msg) {
-  const match = matches.get(player.matchId);
-  if (!match || match.status !== 'ACTIVE') return;
-  const claimed = msg.winnerColor;
-  if (claimed !== 'w' && claimed !== 'b') return;
-  if (player.color !== 'w' && player.color !== 'b') return;
-
-  const reason = typeof msg.reason === 'string' ? msg.reason.slice(0, 40) : 'CHECKMATE';
-  const text = typeof msg.message === 'string' ? msg.message.slice(0, 160) : 'Tiêu diệt Vua!';
-
-  if ((match.turnCount || 0) < VICTORY_MIN_TURNS) {
-    console.warn(`[ANTI-CHEAT] Rejected early victory claim from ${player.name} (turn ${match.turnCount})`);
-    return;
-  }
-
-  // Concession: always valid
-  if (claimed !== player.color) {
-    endMatch(match.matchId, claimed, reason, text);
-    return;
-  }
-
-  match.victoryClaims = match.victoryClaims || {};
-  match.victoryClaims[player.color] = claimed;
-  const opponentColor = player.color === 'w' ? 'b' : 'w';
-  const opponentClaim = match.victoryClaims[opponentColor];
-
-  if (opponentClaim === claimed) {
-    endMatch(match.matchId, claimed, reason, text);
-    return;
-  }
-  if (opponentClaim && opponentClaim !== claimed) {
-    console.warn(`[ANTI-CHEAT] Disputed victory in match ${match.matchId}: both sides claim a win. Match continues.`);
-    if (match.victoryTimer) {
-      clearTimeout(match.victoryTimer);
-      match.victoryTimer = null;
-    }
-    return;
-  }
-
-  if (match.victoryTimer) return;
-  const waitMs = match.isBotMatch ? BOT_VICTORY_CONFIRM_MS : VICTORY_CONFIRM_WINDOW_MS;
-  match.victoryTimer = setTimeout(() => {
-    match.victoryTimer = null;
-    if (match.status !== 'ACTIVE') return;
-    const claims = match.victoryClaims || {};
-    const contested = claims[opponentColor] && claims[opponentColor] !== claimed;
-    if (!contested) {
-      endMatch(match.matchId, claimed, reason, text);
-    }
-  }, waitMs);
 }
 
 /**
@@ -857,10 +939,6 @@ function endMatch(matchId, winnerColor, reason, detailMessage) {
   if (match.disconnectTimeout) {
     clearTimeout(match.disconnectTimeout);
     match.disconnectTimeout = null;
-  }
-  if (match.victoryTimer) {
-    clearTimeout(match.victoryTimer);
-    match.victoryTimer = null;
   }
 
   match.status = 'ENDED';
@@ -955,7 +1033,7 @@ function handlePlayerDisconnect(player) {
   }
 }
 
-// Heartbeat interval to prune stale connections (every 25 seconds)
+// Heartbeat interval to prune stale connections (every 20 seconds)
 setInterval(() => {
   for (const [ws, player] of clients) {
     if (!player.isAlive) {
@@ -967,37 +1045,41 @@ setInterval(() => {
   }
   // Periodically match queued players
   attemptMatchmaking();
-}, 20000);
+}, 20000).unref();
 
-// Start server
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`================================================================`);
-  console.log(`🚀 Poker Chess 3D Realtime Multiplayer Engine Started!`);
-  console.log(`🌐 Port: ${PORT} (Supports 100+ Concurrent 1v1 Matches)`);
-  console.log(`⚡ WebSocket: ws://localhost:${PORT}`);
-  console.log(`📡 Healthcheck API: http://localhost:${PORT}/api/health`);
-  console.log(`================================================================`);
-});
+// Start standalone HTTP server only when server/index.js is executed directly
+const isMainModule =
+  process.argv[1] &&
+  fileURLToPath(import.meta.url).replace(/\\/g, '/') === process.argv[1].replace(/\\/g, '/');
 
-// Graceful shutdown on termination signals (Railway / Docker lifecycle)
-function handleShutdown(signal) {
-  console.log(`[Server] Received ${signal}. Closing all WebSocket connections and server...`);
-  for (const [ws] of clients) {
-    try {
-      ws.close(1001, 'Server is restarting or deploying update.');
-    } catch {
-      // Ignore error during shutdown
-    }
-  }
-  wss.close(() => {
-    server.close(() => {
-      console.log('[Server] Successfully shut down.');
-      process.exit(0);
-    });
+if (isMainModule) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`================================================================`);
+    console.log(`🚀 Poker Chess 3D Realtime Multiplayer Engine Started!`);
+    console.log(`🌐 Port: ${PORT} (Supports 100+ Concurrent 1v1 Matches)`);
+    console.log(`⚡ WebSocket: ws://localhost:${PORT}`);
+    console.log(`📡 Healthcheck API: http://localhost:${PORT}/api/health`);
+    console.log(`================================================================`);
   });
-  // Force exit after 5 seconds if connections linger
-  setTimeout(() => process.exit(0), 5000).unref();
-}
 
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-process.on('SIGINT', () => handleShutdown('SIGINT'));
+  function handleShutdown(signal) {
+    console.log(`[Server] Received ${signal}. Closing all WebSocket connections and server...`);
+    for (const [ws] of clients) {
+      try {
+        ws.close(1001, 'Server is restarting or deploying update.');
+      } catch {
+        // Ignore error during shutdown
+      }
+    }
+    wss.close(() => {
+      server.close(() => {
+        console.log('[Server] Successfully shut down.');
+        process.exit(0);
+      });
+    });
+    setTimeout(() => process.exit(0), 5000).unref();
+  }
+
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
+}

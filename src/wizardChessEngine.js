@@ -2966,9 +2966,6 @@ export function initWizardChess() {
     let validMoves = [];
     let isAnimatingMove = false;
     let moveAnimationStartTime = 0;
-    const PIECE_NAMES_VI = Object.fromEntries(
-      Object.entries(UNIT_BASE_STATS).map(([k, v]) => [k, v.name])
-    );
     let gameOver = false;
     let capturedByWhite = 0;
     let capturedByBlack = 0;
@@ -4228,10 +4225,13 @@ export function initWizardChess() {
       floatingTexts3D.length = 0;
       for (const lb of lightningBeams3D) {
         if (lb.mesh) scene.remove(lb.mesh);
+        if (lb.ringMesh) scene.remove(lb.ringMesh);
       }
       lightningBeams3D.length = 0;
       for (const sw of combatShockwaves3D) {
         if (sw.mesh) scene.remove(sw.mesh);
+        if (sw.outerMesh) scene.remove(sw.outerMesh);
+        if (sw.innerMesh) scene.remove(sw.innerMesh);
       }
       combatShockwaves3D.length = 0;
       for (const sa of slashArcs3D) {
@@ -4280,7 +4280,6 @@ export function initWizardChess() {
       checkmateState.kingFallAngleDeg = 0;
       checkmateState.phase = 'none';
       checkmateState.rankedRewardGranted = false;
-      checkmateState.victoryReported = false;
       stopCheckmateConfetti();
       const overlay = document.getElementById('checkmate-overlay');
       if (overlay) {
@@ -6290,6 +6289,11 @@ export function initWizardChess() {
       turnPhase = 'MOVE_OR_COMBAT';
       pendingComboEval = null;
       scheduleBoardTimeout(() => {
+        if (gameMode === 'multi') {
+          try {
+            multiplayerClient.syncBoardState(captureBoardSnapshot().cells, currentTurn, gameOver, null);
+          } catch (e) {}
+        }
         updateAllUnitBadges();
         updateTurnUI();
       }, targets.length * 95 + 120);
@@ -6360,6 +6364,11 @@ export function initWizardChess() {
       gameOver = true;
       turnPhase = 'MOVE_OR_COMBAT';
       pendingComboEval = null;
+      if (gameMode === 'multi') {
+        try {
+          multiplayerClient.checkVictory(winnerColor, 'ROYAL_APOCALYPSE', 'Thùng Phá Sảnh Diệt Thế!');
+        } catch (e) {}
+      }
       triggerCheckmateSequence(oppColor, winnerColor);
       updateTurnUI();
       return true;
@@ -6424,6 +6433,7 @@ export function initWizardChess() {
     // =========================================================================
     function drawTurnCards() {
       if (gameOver || isAnimatingMove) return false;
+      if (gameMode === 'multi' && currentTurn !== playerColor) return false;
       const pState = pokerDecks[currentTurn];
       if (!pState) return false;
       const prevCount = pState.hand.length;
@@ -6447,6 +6457,7 @@ export function initWizardChess() {
 
     function useManaCoin() {
       if (gameOver || isAnimatingMove) return false;
+      if (gameMode === 'multi' && currentTurn !== playerColor) return false;
       const pState = pokerDecks[currentTurn];
       if (!pState || !pState.coinAvailable) return false;
       pState.coinAvailable = false;
@@ -6468,6 +6479,7 @@ export function initWizardChess() {
 
     function toggleCardSelectionIndex(idx) {
       if (gameOver || isAnimatingMove) return false;
+      if (gameMode === 'multi' && currentTurn !== playerColor) return false;
       const pState = pokerDecks[currentTurn];
       if (!pState) return false;
       if (turnPhase === 'DRAW_PHASE') {
@@ -6491,6 +6503,7 @@ export function initWizardChess() {
     }
 
     function autoSelectBest5Cards() {
+      if (gameMode === 'multi' && currentTurn !== playerColor) return null;
       const pState = pokerDecks[currentTurn];
       if (!pState) return null;
       if (turnPhase === 'DRAW_PHASE') {
@@ -6505,6 +6518,7 @@ export function initWizardChess() {
 
     function commitSelected5CardCombo() {
       if (gameOver || isAnimatingMove) return null;
+      if (gameMode === 'multi' && currentTurn !== playerColor) return null;
       const pState = pokerDecks[currentTurn];
       if (!pState) return null;
       if (turnPhase === 'DRAW_PHASE' || pState.hand.length < 5) {
@@ -6697,6 +6711,7 @@ export function initWizardChess() {
 
     function endPlayerTurnNow() {
       if (gameOver || isAnimatingMove) return false;
+      if (gameMode === 'multi' && currentTurn !== playerColor) return false;
       return handleTurnTimeout();
     }
 
@@ -6811,9 +6826,19 @@ export function initWizardChess() {
         multiplayerClient.sendChessMove({
           from: { r: fromR, c: fromC },
           to: { r: toR, c: toC },
-          pieceType: piece.type
+          pieceType: piece.type,
+          targetPiece: captured ? { type: captured.type, color: captured.color } : null,
+          combatData: combatSim
+            ? {
+                outcome: combatSim.outcome,
+                atkHpAfter: combatSim.atkHpAfter,
+                defHpAfter: combatSim.defHpAfter,
+                atkArmorAfter: combatSim.atkArmorAfter,
+                defArmorAfter: combatSim.defArmorAfter
+              }
+            : null
         });
-        if (roomCode) {
+        if (roomCode && !multiplayerClient.currentMatch) {
           sendMultiplayerMove({
             playerToken,
             color: piece.color,
@@ -7289,7 +7314,7 @@ export function initWizardChess() {
             const inheritedHistory = Array.isArray(piece.pathHistory)
               ? piece.pathHistory.map((st) => ({ ...st }))
               : [];
-            scene.remove(piece.mesh);
+            removePieceMeshSafely(piece);
             const promoted = instantiatePiece('queen', piece.color, toR, toC, inheritedLvl);
             promoted.hasMoved = true;
             promoted.activeCombo = inheritedCombo;
@@ -7366,7 +7391,7 @@ export function initWizardChess() {
               spawnFloatingCombatText(spPos, `🌊 -${sp.dmg} HP (Thùng)`, '#3b82f6', 0.8);
               if (spUnit.hp <= 0 && spUnit.type !== 'king') {
                 spawnStoneShatter(spPos, spUnit.color);
-                if (spUnit.mesh) scene.remove(spUnit.mesh);
+                removePieceMeshSafely(spUnit);
                 boardState[sp.r][sp.c] = null;
                 if (piece.color === 'w') capturedByWhite += 1;
                 else capturedByBlack += 1;
@@ -7621,6 +7646,11 @@ export function initWizardChess() {
         if (!blackKing || blackKing.hp <= 0) {
           gameOver = true;
           isAnimatingMove = false;
+          if (gameMode === 'multi') {
+            try {
+              multiplayerClient.checkVictory('w', 'KING_CAPTURE', 'Vua Đen đã bị tiêu diệt!');
+            } catch (e) {}
+          }
           triggerCheckmateSequence('b', 'w');
           updateTurnUI();
           return;
@@ -7628,6 +7658,11 @@ export function initWizardChess() {
         if (!whiteKing || whiteKing.hp <= 0) {
           gameOver = true;
           isAnimatingMove = false;
+          if (gameMode === 'multi') {
+            try {
+              multiplayerClient.checkVictory('b', 'KING_CAPTURE', 'Vua Trắng đã bị tiêu diệt!');
+            } catch (e) {}
+          }
           triggerCheckmateSequence('w', 'b');
           updateTurnUI();
           return;
@@ -7644,6 +7679,11 @@ export function initWizardChess() {
         lastEmpoweredSquare = null;
         ultimateTargetSquares = [];
         isAnimatingMove = false;
+        if (gameMode === 'multi') {
+          try {
+            multiplayerClient.syncBoardState(captureBoardSnapshot().cells, currentTurn, false, null);
+          } catch (e) {}
+        }
         renderer.shadowMap.needsUpdate = true;
         soundFX.playTurnStartFanfare(currentTurn);
         updateAllUnitBadges();
@@ -9405,7 +9445,8 @@ export function initWizardChess() {
       const titleEl = document.getElementById('checkmate-title');
       const subEl = document.getElementById('checkmate-subtitle');
 
-      const isMyWin = gameMode === 'multi' ? (winnerColor === multiplayerClient.mySide) : (winnerColor === playerColor);
+      const myOnlineColor = multiplayerClient.mySide || playerColor;
+      const isMyWin = gameMode === 'multi' ? (winnerColor === myOnlineColor) : (winnerColor === playerColor);
       const winnerName = winnerColor === 'w' ? 'White' : 'Black';
       const defeatedName = defeatedColor === 'w' ? 'White' : 'Black';
 
@@ -9453,13 +9494,6 @@ export function initWizardChess() {
 
     function triggerCheckmateSequence(defeatedColor = currentTurn, winnerColor = null, extraData = null) {
       const actualWinner = winnerColor || (defeatedColor === 'w' ? 'b' : 'w');
-
-      if (gameMode === 'multi' && !extraData && !checkmateState.victoryReported) {
-        checkmateState.victoryReported = true;
-        try {
-          multiplayerClient.checkVictory(actualWinner, 'KING_CAPTURE', 'Vua đã bị hạ gục!');
-        } catch (e) {}
-      }
 
       if (extraData?.reason === 'DISCONNECTED' || extraData?.reason === 'SURRENDER') {
         showCheckmateBanner(actualWinner, defeatedColor, extraData);
@@ -9873,7 +9907,7 @@ export function initWizardChess() {
     }
 
     function getPokerChessUIState() {
-      const activeColor = gameMode === 'single' ? playerColor : currentTurn;
+      const activeColor = playerColor;
       const pState = pokerDecks?.[activeColor] || pokerDecks?.w || createPlayerPokerState();
       const selectedCards = (pState.selectedIndices || [])
         .map((idx) => pState.hand[idx])
@@ -10244,6 +10278,11 @@ export function initWizardChess() {
       turnPhase = 'DRAW_PHASE';
       lastEmpoweredSquare = null;
       resetTurnTimer();
+      if (gameMode === 'multi' && expiredSide === playerColor) {
+        try {
+          multiplayerClient.sendTurnTimeout(expiredSide, nextSide);
+        } catch (e) {}
+      }
       updateAllUnitBadges();
       updateTurnUI();
       maybeScheduleAIMove();
@@ -10305,6 +10344,7 @@ export function initWizardChess() {
 
     function skipEmpowerPhase() {
       if (gameOver || isAnimatingMove) return false;
+      if (gameMode === 'multi' && currentTurn !== playerColor) return false;
       if (turnPhase === 'EMPOWER_UNIT' && pendingComboEval) {
         const bestMovable = findBestMovableFriendlyUnit(currentTurn);
         if (bestMovable) {
@@ -11344,9 +11384,13 @@ export function initWizardChess() {
 
     function startMultiplayerMatch(matchInfo) {
       soundFX.playUIClick();
+      stopMultiplayerSync();
+      pendingRemoteMoves.length = 0;
+      isProcessingRemoteMove = false;
       gameMode = 'multi';
       roomCode = matchInfo.matchId || matchInfo.roomCode || 'ROOM_1V1';
       playerColor = matchInfo.myColor === 'b' ? 'b' : 'w';
+      multiplayerClient.mySide = playerColor;
       resetChessBoard(true, false);
       setCameraForSide(playerColor, false);
       addCombatLog(
@@ -11375,23 +11419,35 @@ export function initWizardChess() {
       }
       isProcessingRemoteMove = true;
 
-      // Ensure turn and phase are unlocked for remote move execution
-      const movingPiece = boardState[msg.from.r]?.[msg.from.c];
+      let fromR = msg.from.r;
+      let fromC = msg.from.c;
+      let toR = msg.to.r;
+      let toC = msg.to.c;
+      const oppColor = playerColor === 'w' ? 'b' : 'w';
+
+      let movingPiece = boardState[fromR]?.[fromC];
+      // Self-healing fallback: if server Bot's virtual board had a slight coordinate drift, pick a valid piece of oppColor
+      if (!movingPiece || movingPiece.color !== oppColor) {
+        const fallbackMove = chooseSmartAIMove(oppColor);
+        if (fallbackMove) {
+          fromR = fallbackMove.fromR;
+          fromC = fallbackMove.fromC;
+          toR = fallbackMove.toR;
+          toC = fallbackMove.toC;
+          movingPiece = boardState[fromR]?.[fromC];
+        }
+      }
+
       if (movingPiece && movingPiece.color !== currentTurn) {
         currentTurn = movingPiece.color;
       }
       turnPhase = 'MOVE_OR_COMBAT';
 
-      let remoteApplied = false;
       try {
-        remoteApplied = executeChessMove(msg.from.r, msg.from.c, msg.to.r, msg.to.c, { fromRemote: true });
+        executeChessMove(fromR, fromC, toR, toC, { fromRemote: true, skipAutoPoker: true });
       } catch (err) {
         console.warn('[Remote Move Execution Error]:', err);
-      }
-      if (!remoteApplied && !gameOver && currentTurn !== playerColor) {
-        // Server board desynced from RPG combat results: skip the impossible move, hand turn back to the player
-        console.warn('[Remote Move] could not be applied, passing turn to local player', msg);
-        try { recoverStalledTurn(currentTurn); } catch (e) { console.error(e); }
+        isAnimatingMove = false;
       }
 
       // Wait until move animation finishes before unlocking next move
@@ -11415,21 +11471,42 @@ export function initWizardChess() {
       }
     });
 
+    multiplayerClient.on('opponent_turn_timeout', (msg) => {
+      if (gameMode === 'multi' && msg && msg.nextTurn && currentTurn !== msg.nextTurn) {
+        handleTurnTimeout();
+      }
+    });
+
     multiplayerClient.on('opponent_buff', (msg) => {
       if (gameMode === 'multi' && typeof msg.targetRow === 'number' && typeof msg.targetCol === 'number') {
         try {
           const targetPiece = boardState[msg.targetRow]?.[msg.targetCol];
           if (targetPiece) {
-            targetPiece.activeCombo = {
-              id: msg.comboId || 'ONE_PAIR',
-              name: msg.comboName || 'Một Đôi',
-              ringColor: msg.colorHex ? parseInt(msg.colorHex.replace('#', '0x'), 16) : 0xf5d76e,
-              atkBonus: msg.atkBonus || 10,
-              armorBonus: msg.armorBonus || 4
-            };
-            targetPiece.attack = (targetPiece.attack || 30) + (msg.atkBonus || 10);
-            targetPiece.armor = (targetPiece.armor || 0) + (msg.armorBonus || 4);
+            const ringColorHex = msg.colorHex ? parseInt(msg.colorHex.replace('#', '0x'), 16) : 0xf5d76e;
+            const res = applyComboEmpowermentToUnit(
+              targetPiece,
+              {
+                id: msg.comboId || 'ONE_PAIR',
+                name: msg.comboName || 'Một Đôi',
+                colorHex: msg.colorHex || '#f5d76e',
+                ringColor: ringColorHex,
+                atkBonus: typeof msg.atkBonus === 'number' ? msg.atkBonus : 2,
+                armorBonus: typeof msg.armorBonus === 'number' ? msg.armorBonus : 2,
+                healInstant: msg.healInstant || 0
+              },
+              boardState,
+              turnNumber
+            );
+            const wPos = boardToWorld(msg.targetRow, msg.targetCol);
+            spawnDivineLightningBeam(wPos, ringColorHex, 0.065);
+            spawnFloatingCombatText(
+              wPos,
+              `✦ BUFF ${(res?.comboName || msg.comboName || 'MỘT ĐÔI').toUpperCase()}: +${res?.atkBonus || 2}⚔${(res?.armorBonus || 0) > 0 ? ` +${res.armorBonus}🛡` : ''}`,
+              msg.colorHex || '#f5d76e',
+              0.88
+            );
             updateUnit3DBadge(targetPiece);
+            emitPokerChessSync();
           }
         } catch (e) {
           console.warn('[Opponent Buff Error]:', e);
@@ -11439,7 +11516,8 @@ export function initWizardChess() {
 
     multiplayerClient.on('match_ended', (msg) => {
       if (gameMode === 'multi') {
-        const winnerColor = msg.winnerColor || (multiplayerClient.mySide === 'w' ? 'w' : 'b');
+        const myCol = multiplayerClient.mySide || playerColor;
+        const winnerColor = msg.winnerColor || (myCol === 'w' ? 'w' : 'b');
         const defeatedColor = msg.defeatedColor || (winnerColor === 'w' ? 'b' : 'w');
         triggerCheckmateSequence(defeatedColor, winnerColor, {
           reason: msg.reason,
@@ -12101,21 +12179,11 @@ export function initWizardChess() {
           updateTurnUI();
           emitPokerChessSync();
         }
-        else if (activeMoveTweens.length === 0 && animElapsedMs > 600) {
-          // Flag stuck on with no running tween (finishMove never reached): release it
-          isAnimatingMove = false;
-          orbitControls.enabled = true;
-          if (activeDuelSavedCam) {
-            camera.position.copy(activeDuelSavedCam.pos);
-            orbitControls.target.copy(activeDuelSavedCam.target);
-            activeDuelSavedCam = null;
-          }
-          if (!gameOver && !checkmateState.active) checkKingDeathAndEndGame();
-          updateTurnUI();
-        }
       } else if (activeMoveTweens.length > 0 && !isAnimatingMove) {
         isAnimatingMove = true;
         moveAnimationStartTime = performance.now();
+      } else if (activeMoveTweens.length === 0 && isAnimatingMove) {
+        isAnimatingMove = false;
       }
 
       for (let i = activeMoveTweens.length - 1; i >= 0; i--) {
