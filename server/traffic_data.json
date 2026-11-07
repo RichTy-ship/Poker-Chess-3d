@@ -1,11 +1,12 @@
 {
-  "totalVisits": 1,
+  "totalVisits": 9,
   "uniqueIps": {
-    "127.0.0.1": true
+    "127.0.0.1": true,
+    "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0": true
   },
   "gamesPlayed": 0,
-  "pvToday": 1,
-  "totalPlayTimeSec": 0,
+  "pvToday": 9,
+  "totalPlayTimeSec": 830,
   "currentDateStr": "2026-11-07",
   "sources": {
     "Facebook / Messenger": 0,
@@ -13,19 +14,123 @@
     "Direct / Bookmark": 1,
     "Telegram": 0,
     "Google / Search": 0,
-    "Khác": 0
+    "Khác": 8
   },
   "devices": {
     "Android": 0,
     "iPhone / iPad": 0,
-    "Windows PC": 0,
+    "Windows PC": 8,
     "Mac / Linux": 0,
     "Khác": 1
   },
   "hourly": {
-    "21:00": 1
+    "21:00": 9
   },
   "recentLogs": [
+    {
+      "sessionId": "s_mw6j15e9_11bel",
+      "rawIp": "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0",
+      "time": "21:56:50",
+      "date": "2026-11-07",
+      "ip": "2405:480...",
+      "source": "Khác",
+      "device": "Windows PC",
+      "browser": "Google Chrome",
+      "durationSec": 20,
+      "lastActiveTime": 1794063430547,
+      "event": "Ghé thăm trang"
+    },
+    {
+      "sessionId": "s_mw6j15e9_11bel",
+      "rawIp": "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0",
+      "time": "21:56:50",
+      "date": "2026-11-07",
+      "ip": "2405:480...",
+      "source": "Khác",
+      "device": "Windows PC",
+      "browser": "Google Chrome",
+      "durationSec": 0,
+      "lastActiveTime": 1794063410537,
+      "event": "Ghé thăm trang"
+    },
+    {
+      "sessionId": "s_mw6j0kx3_touhr",
+      "rawIp": "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0",
+      "time": "21:56:24",
+      "date": "2026-11-07",
+      "ip": "2405:480...",
+      "source": "Khác",
+      "device": "Windows PC",
+      "browser": "Google Chrome",
+      "durationSec": 25,
+      "lastActiveTime": 1794063408652,
+      "event": "Ghé thăm trang"
+    },
+    {
+      "sessionId": "s_mw6j0kx3_touhr",
+      "rawIp": "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0",
+      "time": "21:56:24",
+      "date": "2026-11-07",
+      "ip": "2405:480...",
+      "source": "Khác",
+      "device": "Windows PC",
+      "browser": "Google Chrome",
+      "durationSec": 0,
+      "lastActiveTime": 1794063384040,
+      "event": "Ghé thăm trang"
+    },
+    {
+      "sessionId": "s_mw6ixu6j_fcghv",
+      "rawIp": "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0",
+      "time": "21:54:15",
+      "date": "2026-11-07",
+      "ip": "2405:480...",
+      "source": "Khác",
+      "device": "Windows PC",
+      "browser": "Google Chrome",
+      "durationSec": 127,
+      "lastActiveTime": 1794063383136,
+      "event": "Ghé thăm trang"
+    },
+    {
+      "sessionId": "s_mw6ixu6j_fcghv",
+      "rawIp": "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0",
+      "time": "21:54:15",
+      "date": "2026-11-07",
+      "ip": "2405:480...",
+      "source": "Khác",
+      "device": "Windows PC",
+      "browser": "Google Chrome",
+      "durationSec": 0,
+      "lastActiveTime": 1794063255977,
+      "event": "Ghé thăm trang"
+    },
+    {
+      "sessionId": "s_mw6ijphs_tsukj",
+      "rawIp": "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0",
+      "time": "21:43:16",
+      "date": "2026-11-07",
+      "ip": "2405:480...",
+      "source": "Khác",
+      "device": "Windows PC",
+      "browser": "Google Chrome",
+      "durationSec": 658,
+      "lastActiveTime": 1794063254834,
+      "event": "Ghé thăm trang"
+    },
+    {
+      "sessionId": "s_mw6ijphs_tsukj",
+      "rawIp": "2405:4802:a2fd:a7f0:51f7:d6b9:915a:23a0",
+      "time": "21:43:16",
+      "date": "2026-11-07",
+      "ip": "2405:480...",
+      "source": "Khác",
+      "device": "Windows PC",
+      "browser": "Google Chrome",
+      "durationSec": 0,
+      "lastActiveTime": 1794062596632,
+      "event": "Ghé thăm trang"
+    },
     {
       "sessionId": "s_127001",
       "rawIp": "127.0.0.1",

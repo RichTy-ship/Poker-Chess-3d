@@ -181,6 +181,9 @@ const server = createServer((req, res) => {
 
 // WebSocket Server using noServer mode so it can safely attach to both standalone HTTP server and Vite dev server
 const wss = new WebSocketServer({ noServer: true });
+wss.on('error', (err) => {
+  console.warn('[WSS Error]:', err.message);
+});
 const attachedServers = new WeakSet();
 
 export function attachMultiplayerServer(httpServer) {
@@ -188,13 +191,22 @@ export function attachMultiplayerServer(httpServer) {
   attachedServers.add(httpServer);
 
   httpServer.on('upgrade', (req, socket, head) => {
-    // Ignore Vite HMR WebSocket upgrades so Vite dev server works without conflict
-    const proto = req.headers['sec-websocket-protocol'] || '';
-    if (proto.includes('vite-hmr')) return;
+    socket.on('error', () => {});
+    // Ignore Vite HMR and Vite Ping WebSocket upgrades so Vite dev server never shares a socket with wss
+    const proto = String(req.headers['sec-websocket-protocol'] || '');
+    if (proto.includes('vite-hmr') || proto.includes('vite-ping') || proto.startsWith('vite')) {
+      return;
+    }
 
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, req);
-    });
+    try {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+    } catch (err) {
+      try {
+        socket.destroy();
+      } catch {}
+    }
   });
 
   return wss;
@@ -568,6 +580,10 @@ wss.on('connection', (ws, req) => {
     player.isAlive = true;
   });
 
+  ws.on('error', (err) => {
+    console.warn('[WS Client Error]:', err.message);
+  });
+
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
@@ -583,6 +599,121 @@ wss.on('connection', (ws, req) => {
     broadcastServerStats();
   });
 });
+
+function isValidBoardCoord(pos) {
+  return (
+    Boolean(pos) &&
+    typeof pos === 'object' &&
+    typeof pos.r === 'number' &&
+    typeof pos.c === 'number' &&
+    Number.isInteger(pos.r) &&
+    Number.isInteger(pos.c) &&
+    pos.r >= 0 &&
+    pos.r <= 7 &&
+    pos.c >= 0 &&
+    pos.c <= 7
+  );
+}
+
+function handleVictoryClaim(ws, player, match, msg) {
+  if (!match || match.status !== 'ACTIVE') return;
+  const winnerColor = msg.winnerColor === 'w' || msg.winnerColor === 'b' ? msg.winnerColor : null;
+  if (!winnerColor) {
+    sendMsg(ws, 'ERROR', { message: 'Phe chiến thắng không hợp lệ!' });
+    return;
+  }
+
+  // Bot matches can end directly
+  if (match.isBotMatch) {
+    endMatch(
+      match.matchId,
+      winnerColor,
+      msg.reason || 'CHECKMATE',
+      msg.message || 'Chiếu bí / Tiêu diệt Vua!'
+    );
+    return;
+  }
+
+  // Anti-cheat T1: Reject early victory claims before at least 4 plies have been played
+  if (!Array.isArray(match.movesHistory) || match.movesHistory.length < 4) {
+    sendMsg(ws, 'ERROR', { message: 'Chưa đủ số nước đi tối thiểu để xác nhận kết thúc trận!' });
+    return;
+  }
+
+  // Anti-cheat T4 / T6: Concession (claiming the opponent won) ends the match immediately
+  if (winnerColor !== player.color) {
+    if (match.victoryClaimTimeout) {
+      clearTimeout(match.victoryClaimTimeout);
+      match.victoryClaimTimeout = null;
+    }
+    endMatch(
+      match.matchId,
+      winnerColor,
+      msg.reason || 'CHECKMATE',
+      msg.message || 'Chiếu bí / Tiêu diệt Vua!'
+    );
+    return;
+  }
+
+  // Self-claim (winnerColor === player.color)
+  if (!match.victoryClaims) {
+    match.victoryClaims = {};
+  }
+  match.victoryClaims[player.color] = winnerColor;
+
+  const opponentColor = player.color === 'w' ? 'b' : 'w';
+  const opponentClaim = match.victoryClaims[opponentColor];
+
+  // T6: Both agreed on the same winner
+  if (opponentClaim === winnerColor) {
+    if (match.victoryClaimTimeout) {
+      clearTimeout(match.victoryClaimTimeout);
+      match.victoryClaimTimeout = null;
+    }
+    endMatch(
+      match.matchId,
+      winnerColor,
+      msg.reason || 'CHECKMATE',
+      msg.message || 'Chiếu bí / Tiêu diệt Vua!'
+    );
+    return;
+  }
+
+  // T5: Disputed claims (each player claimed themselves as winner) -> cancel pending claim and do not end match
+  if (opponentClaim && opponentClaim !== winnerColor) {
+    if (match.victoryClaimTimeout) {
+      clearTimeout(match.victoryClaimTimeout);
+      match.victoryClaimTimeout = null;
+    }
+    match.victoryClaims = {};
+    sendMsg(ws, 'ERROR', { message: 'Tranh chấp kết quả trận đấu, tiếp tục ván cờ!' });
+    return;
+  }
+
+  // T3: Lone self-claim -> wait 4 seconds for opponent confirmation or dispute
+  if (match.victoryClaimTimeout) {
+    clearTimeout(match.victoryClaimTimeout);
+  }
+  match.victoryClaimTimeout = setTimeout(() => {
+    match.victoryClaimTimeout = null;
+    if (match.status !== 'ACTIVE') return;
+    if (
+      match.victoryClaims &&
+      match.victoryClaims[player.color] === winnerColor &&
+      !match.victoryClaims[opponentColor]
+    ) {
+      endMatch(
+        match.matchId,
+        winnerColor,
+        msg.reason || 'CHECKMATE',
+        msg.message || 'Chiếu bí / Tiêu diệt Vua!'
+      );
+    }
+  }, 4000);
+  if (match.victoryClaimTimeout.unref) {
+    match.victoryClaimTimeout.unref();
+  }
+}
 
 /**
  * Client Message Router
@@ -677,6 +808,15 @@ function handleClientMessage(ws, player, msg) {
 
       if (match.turn !== player.color) {
         sendMsg(ws, 'ERROR', { message: 'Chưa tới lượt đi của bạn!' });
+        return;
+      }
+
+      if (
+        !isValidBoardCoord(msg.from) ||
+        !isValidBoardCoord(msg.to) ||
+        (msg.from.r === msg.to.r && msg.from.c === msg.to.c)
+      ) {
+        sendMsg(ws, 'ERROR', { message: 'Tọa độ nước đi không hợp lệ!' });
         return;
       }
 
@@ -785,7 +925,7 @@ function handleClientMessage(ws, player, msg) {
         applySnapshotToVirtualBoard(match.virtualBoard, msg.boardSnapshot);
       }
       if (msg.gameOver && msg.winnerColor) {
-        endMatch(player.matchId, msg.winnerColor, msg.reason || 'KING_CAPTURE', msg.message || 'Vua đã ngã xuống!');
+        handleVictoryClaim(ws, player, match, msg);
       }
       break;
     }
@@ -916,9 +1056,8 @@ function handleClientMessage(ws, player, msg) {
 
     case 'MATCH_VICTORY_CHECK': {
       if (!player.matchId) return;
-      if (msg.winnerColor) {
-        endMatch(player.matchId, msg.winnerColor, msg.reason || 'CHECKMATE', msg.message || 'Chiếu bí / Tiêu diệt Vua!');
-      }
+      const match = matches.get(player.matchId);
+      handleVictoryClaim(ws, player, match, msg);
       break;
     }
   }
@@ -939,6 +1078,11 @@ function endMatch(matchId, winnerColor, reason, detailMessage) {
   if (match.disconnectTimeout) {
     clearTimeout(match.disconnectTimeout);
     match.disconnectTimeout = null;
+  }
+
+  if (match.victoryClaimTimeout) {
+    clearTimeout(match.victoryClaimTimeout);
+    match.victoryClaimTimeout = null;
   }
 
   match.status = 'ENDED';

@@ -2037,13 +2037,83 @@ class SanctumSoundEngine {
     osc.stop(now + 0.19);
   }
 
+  _playWarDrumHit(startTime, baseFreq = 92, peakGain = 0.24, withLeatherTransient = true) {
+    const ctx = this.ensureCtx();
+    if (!ctx) return;
+    const t0 = typeof startTime === 'number' && Number.isFinite(startTime) ? startTime : ctx.currentTime;
+    const safeFreq = typeof baseFreq === 'number' && Number.isFinite(baseFreq) ? baseFreq : 92;
+    const safeGain = Math.max(0.001, (typeof peakGain === 'number' && Number.isFinite(peakGain) ? peakGain : 0.24));
+
+    // 1. Deep resonant kettle / war-drum body thump
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(safeFreq, t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(24, safeFreq * 0.32), t0 + 0.36);
+
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(safeGain, t0 + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.38);
+
+    osc.connect(gain);
+    this._connectToSanctumSpace(gain, 0.95, 0.52, 0);
+    osc.start(t0);
+    osc.stop(t0 + 0.4);
+
+    // 2. Warm drumhead leather mallet strike
+    if (withLeatherTransient) {
+      const brownBuf = this._getBrownNoiseBuffer();
+      if (brownBuf) {
+        const src = ctx.createBufferSource();
+        src.buffer = brownBuf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(safeFreq * 2.4, t0);
+        bp.Q.setValueAtTime(1.8, t0);
+        const nGain = ctx.createGain();
+        nGain.gain.setValueAtTime(safeGain * 0.65, t0);
+        nGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
+        src.connect(bp).connect(nGain);
+        this._connectToSanctumSpace(nGain, 0.9, 0.45, 0);
+        src.start(t0);
+        src.stop(t0 + 0.16);
+      }
+    }
+  }
+
+  _playGothicChoirPad(startTime, freqs = [146.83, 220.0, 293.66, 440.0], duration = 1.6, peakGain = 0.1) {
+    const ctx = this.ensureCtx();
+    if (!ctx) return;
+    const t0 = typeof startTime === 'number' && Number.isFinite(startTime) ? startTime : ctx.currentTime;
+    const safeDur = Math.max(0.4, Number(duration) || 1.6);
+    const safePeak = Math.max(0.001, Number(peakGain) || 0.1);
+
+    (Array.isArray(freqs) ? freqs : [146.83, 220.0, 293.66]).forEach((f, idx) => {
+      const osc = ctx.createOscillator();
+      const lp = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      osc.type = idx % 2 === 0 ? 'triangle' : 'sawtooth';
+      osc.frequency.setValueAtTime(f, t0);
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(680 + idx * 140, t0);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime(safePeak / Math.sqrt(idx + 1), t0 + 0.16);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + safeDur);
+      osc.connect(lp).connect(gain);
+      this._connectToSanctumSpace(gain, 0.7, 0.85, (idx - 1.5) * 0.2);
+      osc.start(t0);
+      osc.stop(t0 + safeDur + 0.04);
+    });
+  }
+
   playComboEmpower(rank = 2) {
     const ctx = this.ensureCtx();
     if (!ctx) return;
     const now = ctx.currentTime;
+    const safeRank = typeof rank === 'number' && Number.isFinite(rank) ? rank : 2;
 
     // 1. Deep forge-fire & war-drum buff ignition
-    this._playWarDrumHit(now, 92 + rank * 4, 0.26 * this.sfxVolume, true);
+    this._playWarDrumHit(now, 92 + safeRank * 4, 0.26 * this.sfxVolume, true);
 
     // 2. Warm orchestral brass fifth swell in cathedral space
     const root = 146.83; // D3
@@ -2056,7 +2126,7 @@ class SanctumSoundEngine {
       osc.type = idx === 0 ? 'sawtooth' : 'triangle';
       osc.frequency.setValueAtTime(f, now);
       lp.type = 'lowpass';
-      lp.frequency.setValueAtTime(520 + rank * 65, now);
+      lp.frequency.setValueAtTime(520 + safeRank * 65, now);
       g.gain.setValueAtTime(0.0001, now);
       g.gain.linearRampToValueAtTime(0.085 * this.sfxVolume, now + 0.06);
       g.gain.exponentialRampToValueAtTime(0.0001, now + 0.48);
@@ -2252,6 +2322,10 @@ class SanctumSoundEngine {
     const now = ctx.currentTime;
     this._playWarDrumHit(now, 98, 0.34 * this.sfxVolume, true);
     this._playGothicChoirPad(now, [146.83, 220.0, 293.66, 440.0], 1.6, 0.1 * this.sfxVolume);
+  }
+
+  playCheckmateFanfare() {
+    this.playVictoryFanfare();
   }
 
   playUltimateThunder(isApocalypse = false) {
